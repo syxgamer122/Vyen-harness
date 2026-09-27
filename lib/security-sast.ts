@@ -586,27 +586,56 @@ export class SecuritySastScanner {
 
   private scanFileContent(relPath: string, content: string, findings: SastFinding[]) {
     const lines = content.split(/\r?\n/);
-    // Theo dõi block comment nhiều dòng: prose trong /* ... */ thường nhắc tới
-    // "eval(...)", "rm -rf /"... và bị quét như code thật (báo động giả CRITICAL).
+    /*
+     * Prose trong block comment hay nhắc "eval(...)", "rm -rf /"... và bị quét
+     * như code thật (báo động giả CRITICAL). Nhưng KHÔNG được bỏ cả dòng: một
+     * dòng có thể vừa có comment vừa có code — dòng ĐÓNG một comment nhiều
+     * dòng rồi `dangerouslySetInnerHTML=...` ngay sau là code thật. Bỏ dòng đó
+     * là mất finding HIGH thật. Nên ta CẮT phần comment ra và chỉ quét phần
+     * code còn lại.
+     *
+     * Comment JSX về mặt ký tự cũng chỉ là block comment, khác ở ngoặc nhọn
+     * bọc ngoài, nên cắt theo cặp mở/đóng là đủ cho cả hai — không cần một
+     * nhánh riêng cho JSX.
+     */
     let inBlockComment = false;
     for (let i = 0; i < lines.length; i++) {
-      // JSX bọc comment trong `{/* ... */}`, nên `trimmed` mở đầu bằng `{/*`
-      // chứ không phải `/*` — hai nhánh bên dưới không nhận ra, và prose trong
-      // comment bị quét như code thật. Thống nhất về block comment thường để dùng
-      // chung logic, kể cả khi comment nằm giữa dòng: `<div>{/* c */} eval(x)`
-      // sau bước này không còn mở đầu bằng `/*` nên vẫn bị quét — đúng, vì `eval`
-      // đó là code thật.
-      const line = lines[i].replace(/\{\s*\/\*/g, '/*').replace(/\*\/\s*\}/g, '*/');
-      const trimmed = line.trim();
+      const line = lines[i];
+      // Dựng lại phần CODE của dòng, bỏ mọi đoạn block comment (kể cả đoạn
+      // đã mở ở dòng trước và đóng ở dòng này).
+      const parts: string[] = [];
+      let inComment = inBlockComment;
+      let segStart = 0;
+      let j = 0;
+      while (j < line.length) {
+        if (inComment) {
+          const end = line.indexOf('*/', j);
+          if (end === -1) break;
+          parts.push(line.slice(segStart, j));
+          inComment = false;
+          j = end + 2;
+          segStart = j;
+          continue;
+        }
+        if (line.startsWith('/*', j)) {
+          const end = line.indexOf('*/', j + 2);
+          if (end === -1) {
+            parts.push(line.slice(segStart, j));
+            inComment = true;
+            j = line.length;
+            break;
+          }
+          parts.push(line.slice(segStart, j));
+          j = end + 2;
+          segStart = j;
+          continue;
+        }
+        j++;
+      }
+      if (!inComment && segStart < line.length) parts.push(line.slice(segStart));
+      inBlockComment = inComment;
 
-      if (inBlockComment) {
-        if (trimmed.includes('*/')) inBlockComment = false;
-        continue;
-      }
-      if (trimmed.startsWith('/*')) {
-        if (!trimmed.includes('*/')) inBlockComment = true;
-        continue;
-      }
+      const trimmed = parts.join('').trim();
 
       if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('*')) {
         continue;
@@ -616,7 +645,7 @@ export class SecuritySastScanner {
       }
 
       for (const rule of this.rules) {
-        const matched = rule.match(line, i, content, relPath);
+        const matched = rule.match(trimmed, i, content, relPath);
         if (matched) {
           findings.push({
             id: `FIND-${findings.length + 1}`,

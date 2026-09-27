@@ -23,6 +23,12 @@ const OVERLAY_FILES = [
   'components/recipes/recipes-panel.tsx',
   'components/sidebar.tsx',
   'components/toast.tsx',
+  // Các lớp nổi đè lên nội dung, cũng là nơi xung đột chồng xảy ra. Composer
+  // `z-20` là chính thứ từng vẽ đè lên modal khi backdrop rơi về `z-index:auto`.
+  'components/composer.tsx',
+  'components/model-selector.tsx',
+  'components/chat-export-menu.tsx',
+  'components/chat/stream-bubble.tsx',
 ];
 
 describe('A11y Contract & Accessibility Compliance', () => {
@@ -157,22 +163,38 @@ describe('A11y Contract & Accessibility Compliance', () => {
       );
     });
 
-    it('không overlay nào bỏ qua thang, dùng z-[NN] viết tay', () => {
+    it('không overlay nào bỏ qua thang, dùng z viết tay', () => {
       /*
        * Ngược lại với trên: số trong className phải đến từ `Z_CLASS`, không gõ
        * tay. Gõ tay là cách `settings-dialog.tsx` từng có `z-50` thấp hơn mọi
        * modal khác (xem chú thích đầu `lib/ui-z.ts`).
+       *
+       * Phải bắt CẢ hai dạng: `z-50` (class có sẵn của Tailwind) lẫn `z-[100]`
+       * (arbitrary). Bản đầu chỉ khớp dạng arbitrary, nên đúng lỗi lịch sử mà
+       * test này viết ra — `z-50` — lại lọt qua. `Z_CLASS` cũng có `z-0`,
+       * `z-40`, `z-50`, nên so sánh bằng danh sách giá trị sẽ hợp lệ cho cả hai.
+       *
+       * Chỉ soi ELEMENT BACKDROP (`fixed inset-0`), không soi mọi `z-` trong
+       * file: `z-10` cho header dính hay `z-20` cho dropdown là chồng lấp
+       * TRONG một khối, không cạnh tranh với modal, và không thuộc thang này.
+       * Đó là lý do `OVERLAY_FILES` mở rộng thêm composer/model-selector/
+       * chat-export-menu/stream-bubble vẫn không sinh phản đối: các `z` đó
+       * không nằm trên backdrop.
        */
+      const allowed = new Set<string>(Object.values(Z_CLASS));
       const offenders: string[] = [];
       for (const rel of OVERLAY_FILES) {
         const src = readComponent(rel);
-        for (const m of src.matchAll(/\bz-\[(\d+)\]/g)) {
-          if (!Object.values(Z_CLASS).includes(m[0])) {
-            offenders.push(`${rel}: ${m[0]}`);
+        for (const m of src.matchAll(/<div[^>]*\bfixed inset-0\b[^>]*>/g)) {
+          for (const z of m[0].matchAll(/\bz-(\[?\d+\]?)/g)) {
+            // Backdrop đã khai báo ý định qua hằng số thì không cần class.
+            if (!allowed.has(z[0]) && !m[0].includes('Z_CLASS.')) {
+              offenders.push(`${rel}: ${z[0]}`);
+            }
           }
         }
       }
-      expect(offenders, 'z-[NN] viết tay thay vì lấy từ Z_CLASS').toEqual([]);
+      expect(offenders, 'backdrop dùng z viết tay thay vì lấy từ Z_CLASS').toEqual([]);
     });
   });
 

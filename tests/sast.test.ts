@@ -141,6 +141,60 @@ describe('Chaitin Security SAST Security Engine', () => {
     }
   });
 
+  it('bắt code nằm SAU dòng đóng comment — không bỏ cả dòng', () => {
+    /*
+     * Regression nghiêm trọng hơn: lần sửa trước chuẩn hoá `{/*`→`/*` rồi bỏ
+     * cả dòng khi nó mở comment. Nhưng dòng ĐÓNG một comment nhiều dòng lại mở
+     * đầu bằng dấu đóng, nên bị nhận là "vẫn trong comment" và cả dòng biến mất
+     * — kéo theo code thật ngay sau đó. Đã đo được: một `dangerouslySetInnerHTML`
+     * thật trên dòng đóng comment JSX khiến `ok=true score=100`. Báo động giả
+     * HIGH chỉ làm đỏ test; mất finding HIGH thì lọt thẳng khỏi cổng audit.
+     *
+     * Vì vậy bộ lọc phải CẮT phần comment, không bỏ dòng.
+     */
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vyen-sast-tail-'));
+    try {
+      // (a) code thật nằm ngay sau dấu đóng comment JSX nhiều dòng.
+      fs.writeFileSync(
+        path.join(testDir, 'after-jsx-comment.tsx'),
+        [
+          'export const v = (',
+          '  <div>{/*',
+          '    Render raw HTML below -- review before shipping.',
+          '  */} <span dangerouslySetInnerHTML={{ __html: serverHtml }} />',
+          '  );',
+        ].join('\n'),
+        'utf8',
+      );
+      // (b) cùng hình dạng trong block comment thường, file .ts.
+      fs.writeFileSync(
+        path.join(testDir, 'after-block-comment.ts'),
+        ['function f(input) {', '  /* note', '   */ return eval(input);', '}'].join('\n'),
+        'utf8',
+      );
+      // (c) comment một dòng đóng ngay, code đi sau trên CHÍNH dòng đó.
+      fs.writeFileSync(
+        path.join(testDir, 'same-line.ts'),
+        'function g(x) { /* run */ eval(x); }\n',
+        'utf8',
+      );
+
+      const report = runSecuritySast(testDir);
+      const found = new Set(report.findings.map((f) => `${f.ruleId}@${f.file}`));
+      expect(found, 'XSS-001 phải bắt được code sau dòng đóng comment JSX').toContain(
+        'XSS-001@after-jsx-comment.tsx',
+      );
+      expect(found, 'EVAL-001 phải bắt được code sau dòng đóng block comment').toContain(
+        'EVAL-001@after-block-comment.ts',
+      );
+      expect(found, 'EVAL-001 phải bắt được code sau comment một dòng').toContain(
+        'EVAL-001@same-line.ts',
+      );
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
   it('tính điểm an ninh chính xác theo trọng số mức độ nghiêm trọng', () => {
     /*
      * Dùng thư mục tạm RIÊNG cho mỗi lần chạy (mkdtempSync) thay vì đường dẫn
