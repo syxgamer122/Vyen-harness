@@ -88,10 +88,23 @@ export function collectToolEvents(
       ev.name = String((inv as any).toolName);
     }
     if (!ev.args && (inv as any).args !== undefined && (inv as any).args !== null) {
-      ev.args = typeof (inv as any).args === 'string'
-        ? (inv as any).args
-        : JSON.stringify((inv as any).args);
+      if (typeof (inv as any).args === 'string') {
+        ev.args = (inv as any).args;
+      } else {
+        /*
+         * Args đến từ model/MCP, có thể là object vòng (circular) — JSON.stringify
+         * ném TypeError và chết luôn dòng tin nhắn, vì ErrorBoundary ở
+         * message-item.tsx chỉ bọc quanh MarkdownRenderer chứ không bọc ToolTrace.
+         * `db.ts` đã có cùng cách xử lý cho `result`; args thì chưa.
+         */
+        try {
+          ev.args = JSON.stringify((inv as any).args);
+        } catch {
+          ev.args = '[tham số không serialize được]';
+        }
+      }
     }
+
     if (inv.state === 'result') {
       ev.done = true;
       if (typeof inv.result === 'string' && !ev.summary) {

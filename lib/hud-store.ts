@@ -11,6 +11,7 @@
  */
 
 import { create } from 'zustand';
+import { AVAILABLE_MODELS } from '@/lib/models';
 import type { CategoryId } from '@/lib/routing/categories';
 import type { Effort } from '@/lib/model-contracts';
 import type { EvidenceLevel } from '@/lib/evidence';
@@ -59,7 +60,7 @@ export const useHudStore = create<HudState>((set, get) => ({
   upsertLane: (input) => {
     set((state) => {
       const existing = state.lanes[input.laneId];
-      const model = input.model ?? existing?.model ?? 'gpt-5-6-sol';
+      const model = input.model ?? existing?.model ?? AVAILABLE_MODELS[0].id;
       const effort = input.effort ?? existing?.effort ?? 'medium';
       const category = input.category ?? existing?.category ?? 'capable';
       const kind = input.kind ?? existing?.kind ?? 'main';

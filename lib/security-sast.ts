@@ -604,7 +604,10 @@ export class SecuritySastScanner {
       // Dựng lại phần CODE của dòng, bỏ mọi đoạn block comment (kể cả đoạn
       // đã mở ở dòng trước và đóng ở dòng này).
       const parts: string[] = [];
-      let inComment = inBlockComment;
+      // `inComment` -> `inBlockComment` -> `inComment` là vòng suy luận kiểu hai
+      // chiều, TS không tự dứt được (chính vì vậy nó báo "directly or indirectly").
+      // Chỉ cần annotate biến trong vòng là đủ.
+      let inComment: boolean = inBlockComment;
       let segStart = 0;
       let j = 0;
       while (j < line.length) {

@@ -107,6 +107,26 @@ describe('ToolTrace — collectToolEvents (gộp annotation + invocation)', () =
       summary: 'done',
     });
   });
+
+  /*
+   * Regression: dòng back-fill args gọi `JSON.stringify` trần. Args đến từ
+   * model/MCP nên có thể là object vòng — stringify ném TypeError và chết cả
+   * dòng tin nhắn, vì ErrorBoundary ở message-item.tsx chỉ bọc quanh
+   * MarkdownRenderer chứ không bọc ToolTrace. `db.ts` đã có cùng cách xử lý
+   * cho `result` từ trước; args thì quên.
+   */
+  it('args vòng (circular) không làm sập render — hiện chú thích thay vì ném lỗi', () => {
+    const circular: Record<string, unknown> = { path: 'a.ts' };
+    circular.self = circular;
+
+    const events = collectToolEvents(undefined, [
+      { toolCallId: 'inv-c', toolName: 'read_file', args: circular, state: 'call' } as any,
+    ]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].name).toBe('read_file');
+    expect(events[0].args).toBe('[tham số không serialize được]');
+  });
 });
 
 /* Repo chạy vitest environment 'node' (không jsdom/testing-library) nên phần

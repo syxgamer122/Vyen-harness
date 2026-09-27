@@ -2835,7 +2835,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
             laneId: 'main',
             kind: 'main',
             category: rr.category ?? 'capable',
-            model: rr.selected?.model ?? 'gpt-5-6-sol',
+            model: rr.selected?.model ?? AVAILABLE_MODELS[0].id,
             effort: rr.selected?.effort ?? 'medium',
             tokensIn: usage.promptTokens ?? 0,
             tokensOut: usage.completionTokens ?? 0,

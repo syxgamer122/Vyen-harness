@@ -142,7 +142,7 @@ export function RoutingSettingsPanel() {
      * `value` không khớp option nào và trình duyệt hiển thị nhầm option đầu
      * trong khi chain thật lại trỏ sang model khác.
      */
-    const next = [...currentChain, { model: AVAILABLE_MODELS[0]!.id, effort: 'medium' as Effort }];
+    const next = [...currentChain, { model: AVAILABLE_MODELS[0].id, effort: 'medium' as Effort }];
     updateCurrentChain(next);
   };
 
