@@ -165,7 +165,6 @@ const config: Config = {
         brand: token('--accent'),
         'panel-bg': token('--panel-bg'),
         'panel-soft': token('--panel-soft'),
-        'border-hairline': token('--border-hairline'),
         'border-hover': token('--border-hover'),
         'border-subtle': token('--border-subtle'),
         'text-primary': token('--text-primary'),

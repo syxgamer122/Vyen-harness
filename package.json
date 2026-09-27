@@ -12,7 +12,7 @@
     "desktop": "node scripts/launch-desktop.cjs",
     "cli": "npx tsx bin/vyen.ts cli",
     "vyen": "npx tsx bin/vyen.ts",
-    "lint": "eslint .",
+    "lint": "eslint . --cache",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check-supply-chain.cjs",
     "docs:check": "node scripts/check-docs-sync.cjs",

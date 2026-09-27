@@ -315,7 +315,7 @@ cho cùng một thứ.
 | `bg-bg-deep` | `bg-sunken` | 1 | Đổi tên class |
 | `text-rose-danger` | `text-danger` | 1 | Đổi tên class |
 | `text-violet-reasoning` | `text-reasoning` | 1 | Đổi tên class |
-| `border-border-hairline` | `border-subtle` | 0 | **Xoá key ngay** — không còn code gọi |
+| `border-border-hairline` | `border-subtle` | 0 | ✅ **Đã xoá** key + biến `--border-hairline` (§9.8) |
 | `text-emerald-safe` | `text-success` | 0 | **Xoá key ngay** |
 | `bg-surface-elevated` | `bg-overlay` | 0 | **Xoá key ngay** |
 | `shadow-ambient-glow` | `shadow-bevel-out` | 0 | **Xoá key ngay** |
@@ -470,9 +470,9 @@ với `viewport.themeColor` (`app/layout.tsx:37-40`), xem §7. Nó **không** ph
 drift, dù lệch với `--bg-sunken` (`#07090d`) hiện tại — cố ý giữ nguyên để splash
 không nháy trắng lúc cài app.
 
-**Một lỗ hổng của chính assertion trên:** `app/globals.css:84` (`--border-hairline`)
-và `:100` (`--line`) khai màu cũ `#495059` ở **dạng channel RGB `73 80 89`**, và
-regex chỉ khớp dạng `#hex` nên **không nhìn thấy** chúng. Xem §9.8.
+**Lỗ hổng của chính assertion trên đã được bịt:** nó chỉ soi component, nên token màu
+khai trong chính `app/globals.css` không bao giờ đi qua — và dạng channel RGB thì
+regex `#hex` cũng không thấy. Nay có assertion riêng quét thẳng file đó. Xem §9.8.
 
 Hai hex `#07090d` / `#e8eaed` trong `app/global-error.tsx:36` và `#07090d` ở
 `app/layout.tsx:38-39` là **cố ý hardcode inline** (chữ không trắng trước
@@ -548,19 +548,25 @@ Nếu bạn đọc bản cũ của tài liệu này và thấy thiếu bậc nà
   thêm `shadow-bevel-out`.
 - **Không có `dark:` variant nào** trong codebase (0 lượt) — đúng theo §7.
 
-### 9.8 Màu cũ né được assertion hex — chưa gỡ
+### 9.8 Màu cũ né được assertion hex — đã gỡ
 
-`app/globals.css:84` khai `--border-hairline: 73 80 89;` và `:100` khai
-`--line: 73 80 89;`. `73 80 89` chính là `#495059` — màu viền của **bảng màu cũ**,
-một trong 13 dòng của bảng drift ở §9.2. Ở đây nó nằm ở dạng channel RGB nên regex
-`#[0-9a-fA-F]{3,8}` của assertion `bề mặt hợp đồng chỉ dùng hex trong bảng màu §2`
-**không nhìn thấy**, dù `app/globals.css` nằm trong danh sách hợp đồng.
+**Đã xử lý.** Cả `--border-hairline` và `--line` (`73 80 89` = `#495059`, màu
+viền của bảng màu cũ) đã bị xoá khỏi `app/globals.css`, kèm mapping
+`token('--border-hairline')` trong `tailwind.config.ts`. Lý do gỡ chứ không phải
+đổi màu: cả hai token đều **không component nào dùng** — `border-hairline` chỉ còn
+ở đúng 2 chỗ là dòng định nghĩa và dòng mapping, và `--line` không được map trong
+`tailwind.config.ts` lẫn không có lượt dùng nào. Nên sửa màu sẽ vô nghĩa, xoá mới
+đúng; đổi `--line` sang `border-strong` như gợi ý cũ là việc làm cho code chết.
 
-Đây là drift thật, chưa được xử lý: `border-hairline` đã rỗng ở §6.1 nên có thể xoá
-cả biến; `border-strong` là `#5a6675` = `90 102 117`, tức `--line` nên đổi sang đó
-nếu giữ. Cả hai biến đều viết tay bằng channel RGB, nên **cách duy nhất** assertion
-bắt được là thêm một assertion riêng khớp dạng `\d+ \d+ \d+` — việc đó thuộc
-`tests/design-system.test.ts`, ngoài phạm vi tài liệu này.
+Lỗ hổng của assertion thì **vẫn còn và đã được bịt**. Nguyên nhân: assertion
+`bề mặt hợp đồng chỉ dùng hex trong bảng màu §2` chỉ soi **component**, còn token lạ
+nằm trong chính file định nghĩa nên không bao giờ đi qua nó — và dạng channel RGB
+thì regex `#[0-9a-fA-F]{3,8}` không thấy nữa. Nay có assertion
+`mọi giá trị màu khai báo trong globals.css đều thuộc bảng màu §2` quét thẳng
+`app/globals.css`, đổi hex của §2 sang kênh RGB rồi so trực tiếp — bắt được mọi
+token màu, kể cả token viết tay. Đã kiểm hai chiều: thêm lại `--border-hairline`
+thì assertion đỏ với đúng thông điệp.
+
 
 ---
 

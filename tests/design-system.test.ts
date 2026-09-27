@@ -334,6 +334,57 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     expect(css).not.toMatch(/--brand-hover\s*:/);
   });
 
+  /*
+   * Regression: `--border-hairline` và `--line` cùng giữ `73 80 89` (=
+   * màu cũ `#495059`) suốt thời gian migrate, và không ai bắt được vì
+   * assertion bề mặt bên dưới chỉ soi COMPONENT — token lạ nằm trong chính
+   * file định nghĩa nên không bao giờ đi qua nó.
+   *
+   * Nên nay kiểm thẳng `app/globals.css`: MỌI giá trị màu khai báo ở đó
+   * phải thuộc bảng ở trên. Token alias ghi "= --token-kia" thì hợp lệ vì
+   * trỏ tới bảng; token giữ nguyên màu cũ thì không.
+   */
+  it('mọi giá trị màu khai báo trong globals.css đều thuộc bảng màu §2', () => {
+    const css = read(globalsCssPath);
+
+    /* Bảng §2 lưu dạng hex, globals.css khai báo dạng kênh RGB. Chuyển hex
+     * sang "r g b" để so trực tiếp với những gì CSS thật sự ghi. */
+    const ALLOWED = new Set(
+      [...PALETTE_TOKENS].map((hex) => {
+        const n = parseInt(hex.slice(1), 16);
+        return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+      }),
+    );
+
+    const declared = [...css.matchAll(/^\s*(--[\w-]+):\s*(\d{1,3}\s+\d{1,3}\s+\d{1,3})\s*;/gm)];
+    expect(
+      declared.length,
+      'không đọc được token màu nào trong globals.css — regex chắc hỏng',
+    ).toBeGreaterThan(0);
+
+    for (const m of declared) {
+      expect(
+        ALLOWED.has(m[2]!.replace(/\s+/g, ' ')),
+        `${m[1]} = ${m[2]} không thuộc bảng màu §2 — màu sót từ palette cũ`,
+      ).toBe(true);
+    }
+  });
+
+  it('token alias chết đã được gỡ khỏi cả globals.css lẫn tailwind.config.ts', () => {
+    /* Cặp này từng tồn tại ở CẢ HAI nơi mà không component nào dùng. Gỡ
+     * đúng một nơi còn sót nơi kia sẽ để class trỏ vào token không tồn tại. */
+    const css = read(globalsCssPath);
+    const config = read(tailwindConfigPath);
+    for (const token of ['--border-hairline', '--line']) {
+      expect(css, `globals.css còn ${token}`).not.toMatch(
+        new RegExp(`^\\s*${token}\\s*:`, 'm'),
+      );
+      expect(config, `tailwind.config.ts còn map ${token}`).not.toContain(
+        `token('${token}')`,
+      );
+    }
+  });
+
   it('thang zinc lật bậc đã bị gỡ: chỉ còn đúng 3 bậc alias', () => {
     const config = read(tailwindConfigPath);
     const block = config.slice(config.indexOf('zinc: {'), config.indexOf('} as const', config.indexOf('zinc: {')));

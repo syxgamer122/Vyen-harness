@@ -81,7 +81,6 @@
     --bg-canvas: 11 14 19; /* = --bg-base — vai trò "vùng làm việc" */
     --panel-bg: 18 22 29; /* = --bg-surface — vai trò "khối chat/panel phụ" */
     --panel-soft: 26 31 39; /* = --bg-raised — vai trò "khối hover, code" */
-    --border-hairline: 73 80 89; /* giữ nguyên giá trị cũ — chưa thuộc bảng màu mới */
     --border-hover: 90 102 117; /* = --border-strong */
     --text-muted: 167 176 187; /* = --text-secondary */
     --accent-steel: 124 183 234; /* = --accent */
@@ -97,7 +96,6 @@
     --brand-accent: 239 111 92; /* = --danger — dùng trực tiếp bởi vyen-logo.tsx */
     --foreground: 232 234 237; /* = --text-primary */
     --muted-foreground: 167 176 187; /* = --text-secondary */
-    --line: 73 80 89; /* giữ nguyên giá trị cũ — 0 lượt dùng ở component */
   }
 
   /*
