@@ -96,9 +96,9 @@ function ParamField({
   onChange: (v: string) => void;
 }) {
   const label = (
-    <label htmlFor={`recipe-param-${def.key}`} className="block text-[11px] text-text-muted">
-      {def.key}
-      <span className="ml-1 text-[#5c6470]">
+    <label htmlFor={`recipe-param-${def.key}`} className="field-label block">
+      <span className="font-mono">{def.key}</span>
+      <span className="ml-1 font-normal text-disabled">
         {def.requirement === 'required' ? '(bắt buộc)' : def.requirement === 'user_prompt' ? '(hỏi khi chạy)' : '(tuỳ chọn)'}
       </span>
     </label>
@@ -119,19 +119,22 @@ function ParamField({
   }
   if (def.input_type === 'boolean') {
     return (
-      <div className="mt-2 flex items-center gap-2">
+      <label
+        htmlFor={`recipe-param-${def.key}`}
+        className="mt-2 flex cursor-pointer items-center gap-2"
+      >
         <input
           id={`recipe-param-${def.key}`}
           type="checkbox"
           checked={value === 'true'}
           onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
-          className="h-4 w-4 accent-[#6a9fcc]"
+          className="h-4 w-4 flex-shrink-0 rounded-none accent-accent"
         />
-        <span className="text-[11px] text-text-muted">
-          {def.key}
-          {def.description ? ` — ${def.description}` : ''}
+        <span className="text-ui text-primary">
+          <span className="font-mono font-medium">{def.key}</span>
+          {def.description ? <span className="text-tertiary"> — {def.description}</span> : null}
         </span>
-      </div>
+      </label>
     );
   }
   return (
@@ -367,17 +370,17 @@ export function RecipesPanel({
       onClick={onClose}
     >
       <aside
-        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden rounded-none border border-border-hairline bg-panel-bg font-mono"
+        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden rounded-none border border-subtle bg-overlay font-mono"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-2 border-b border-border-hairline bg-surface-raised px-4 py-3">
+        <div className="flex items-start justify-between gap-2 border-b border-subtle bg-raised px-4 py-3">
           <div className="min-w-0">
-            <h2 id="recipes-panel-title" className="flex items-center gap-2 text-[15px] font-semibold text-text-primary">
-              <span className="font-bold text-accent-steel">$</span>
-              <span className="text-accent-steel">recipes</span>
+            <h2 id="recipes-panel-title" className="flex items-center gap-2 text-read font-semibold text-primary">
+              <span className="font-bold text-accent">$</span>
+              <span className="text-accent">recipes</span>
               <span>· {items.length} workflow</span>
             </h2>
-            <div className="text-[11px] text-text-muted">
+            <div className="text-meta text-tertiary">
               Workflow đóng gói: tham số, tool, kiểm chứng và retry.
             </div>
           </div>
@@ -386,7 +389,7 @@ export function RecipesPanel({
             type="button"
             onClick={onClose}
             aria-label="Đóng panel recipes"
-            className="icon-btn icon-btn-md relative rounded-none after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6a9fcc]"
+            className="icon-btn icon-btn-md"
           >
             <X size={14} />
           </button>
@@ -394,16 +397,16 @@ export function RecipesPanel({
 
         {!selected && (
           <>
-            <div className="flex items-center gap-1.5 border-b border-border-hairline px-3 py-2">
+            <div className="flex items-center gap-1.5 border-b border-subtle px-3 py-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 border border-border-hairline px-2 py-1.5 text-[11px] text-text-primary transition-colors hover:border-border-hover hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+                className="btn-secondary px-2 py-1.5"
               >
                 <FileUp size={12} aria-hidden="true" /> Nhập file
               </button>
               <div className="flex min-w-0 flex-1 items-center gap-1">
-                <Link2 size={12} aria-hidden="true" className="flex-none text-accent-steel" />
+                <Link2 size={12} aria-hidden="true" className="flex-none text-accent" />
                 <input
                   type="text"
                   value={linkInput}
@@ -417,7 +420,7 @@ export function RecipesPanel({
                 type="button"
                 onClick={() => void handleImportLink()}
                 disabled={!linkInput.trim()}
-                className="border border-border-hairline px-2 py-1.5 text-[11px] text-text-primary transition-colors hover:border-border-hover hover:bg-surface-raised disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+                className="btn-secondary px-2 py-1.5"
               >
                 Nhập
               </button>
@@ -439,34 +442,34 @@ export function RecipesPanel({
                   key={item.key}
                   type="button"
                   onClick={() => select({ recipe: item.recipe, origin: item.origin, ...(item.recordId ? { recordId: item.recordId } : {}), ...(item.workspacePath ? { workspacePath: item.workspacePath } : {}) })}
-                  className="block w-full border-b border-border-hairline px-3 py-2.5 text-left transition-colors hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+                  className="block w-full border-b border-subtle px-3 py-2.5 text-left transition-colors hover:bg-raised"
                 >
                   <div className="flex items-baseline gap-2">
-                    <ChefHat size={13} aria-hidden="true" className="flex-none text-accent-steel" />
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-text-primary">{item.recipe.title}</span>
-                    <span className="flex-none text-[10.5px] text-text-muted">
+                    <ChefHat size={13} aria-hidden="true" className="flex-none text-accent" />
+                    <span className="min-w-0 flex-1 truncate text-body text-primary">{item.recipe.title}</span>
+                    <span className="flex-none text-micro text-tertiary">
                       {item.origin === 'db' ? 'đã lưu' : item.workspacePath}
                     </span>
                   </div>
-                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-text-muted">
+                  <p className="mt-0.5 line-clamp-2 text-meta leading-relaxed text-tertiary">
                     {item.recipe.description}
                   </p>
                   {(item.recipe.parameters?.length ?? 0) > 0 && (
-                    <p className="mt-0.5 text-[10.5px] text-[#5c6470]">
+                    <p className="mt-0.5 text-micro text-disabled">
                       tham số: {item.recipe.parameters!.map((p) => p.key).join(', ')}
                     </p>
                   )}
                 </button>
               ))}
               {items.length === 0 && (
-                <div role="status" className="px-4 py-8 text-center text-[11.5px] leading-relaxed text-text-muted">
+                <div role="status" className="px-4 py-8 text-center text-ui leading-relaxed text-tertiary">
                   Chưa có recipe nào. Nhập file .yaml, dán liên kết share, hoặc tạo
                   thư mục <code>.vyen/recipes/</code> trong workspace rồi đặt file
                   recipe vào đó.
                 </div>
               )}
               {wsError && (
-                <div role="status" className="border-t border-border-hairline px-3 py-2 text-[10.5px] text-status-warning">
+                <div role="status" className="border-t border-subtle px-3 py-2 text-micro text-warning">
                   {wsError}
                 </div>
               )}
@@ -476,22 +479,22 @@ export function RecipesPanel({
 
         {selected && (
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b border-border-hairline bg-surface-raised px-4 py-3">
+            <div className="border-b border-subtle bg-raised px-4 py-3">
               <div className="flex items-baseline gap-2">
-                <ChefHat size={14} aria-hidden="true" className="flex-none text-accent-steel" />
-                <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-text-primary">{selected.recipe.title}</span>
+                <ChefHat size={14} aria-hidden="true" className="flex-none text-accent" />
+                <span className="min-w-0 flex-1 truncate text-read font-semibold text-primary">{selected.recipe.title}</span>
                 <button
                   type="button"
                   onClick={() => select(null)}
                   aria-label="Quay lại danh sách"
-                  className="flex-none text-[11px] text-accent-steel hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6a9fcc]"
+                  className="flex-none text-meta text-accent hover:text-primary"
                 >
                   danh sách
                 </button>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-text-muted">{selected.recipe.description}</p>
+              <p className="mt-1 text-meta leading-relaxed text-tertiary">{selected.recipe.description}</p>
               {selected.origin === 'link' && (
-                <p className="mt-1 text-[10.5px] text-status-warning">
+                <p className="mt-1 text-micro text-warning">
                   Recipe từ liên kết — xem trước nội dung, không gì chạy cho tới khi bạn bấm Run.
                 </p>
               )}
@@ -510,48 +513,48 @@ export function RecipesPanel({
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] text-text-muted">Recipe không cần tham số.</p>
+                <p className="text-meta text-tertiary">Recipe không cần tham số.</p>
               )}
 
               {(selected.recipe.retry?.checks?.length ?? 0) > 0 && (
-                <div className="mt-4 border-t border-border-hairline pt-3">
-                  <p className="text-[11px] font-semibold text-text-primary">Kiểm chứng sau khi agent xong</p>
+                <div className="mt-4 border-t border-subtle pt-3">
+                  <p className="text-meta font-semibold text-primary">Kiểm chứng sau khi agent xong</p>
                   <ul className="mt-1 space-y-0.5">
                     {selected.recipe.retry!.checks.map((c, i) => (
-                      <li key={i} className="text-[11px] text-text-muted">
-                        <code className="text-[#8fb8d8]">{c.command}</code>
+                      <li key={i} className="text-meta text-tertiary">
+                        <code className="text-accent">{c.command}</code>
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-1 text-[10.5px] text-[#5c6470]">
+                  <p className="field-hint mt-1">
                     Tối đa {selected.recipe.retry!.max_retries} lần chạy lại; lệnh vẫn qua phê duyệt như thường.
                   </p>
                 </div>
               )}
 
-              {formError && <p role="alert" className="mt-3 text-[11px] text-status-error">{formError}</p>}
-              {notice && <p role="status" className="mt-3 text-[11px] text-status-success">{notice}</p>}
+              {formError && <p role="alert" className="mt-3 text-meta text-danger">{formError}</p>}
+              {notice && <p role="status" className="mt-3 text-meta text-success">{notice}</p>}
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-border-hairline bg-surface-raised px-3 py-2.5">
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-subtle bg-raised px-3 py-2.5">
               <button
                 type="button"
                 onClick={() => void handleRun()}
-                className="flex items-center gap-1.5 bg-[#6a9fcc] px-3 py-2 text-[12px] font-semibold text-[#0d1116] transition-colors hover:bg-[#6a9fcc]/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0d1116]"
+                className="btn-primary"
               >
                 <Play size={12} aria-hidden="true" /> Run
               </button>
               <button
                 type="button"
                 onClick={() => void handleExport()}
-                className="flex items-center gap-1.5 border border-border-hairline px-2 py-1.5 text-[11px] text-text-primary transition-colors hover:border-border-hover hover:bg-panel-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+                className="btn-secondary px-2 py-1.5"
               >
                 <FileDown size={12} aria-hidden="true" /> Export .yaml
               </button>
               <button
                 type="button"
                 onClick={() => void handleCopyLink()}
-                className="flex items-center gap-1.5 border border-border-hairline px-2 py-1.5 text-[11px] text-text-primary transition-colors hover:border-border-hover hover:bg-panel-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+                className="btn-secondary px-2 py-1.5"
               >
                 <Link2 size={12} aria-hidden="true" /> Copy link
               </button>
@@ -563,7 +566,7 @@ export function RecipesPanel({
                     select(null);
                   }}
                   aria-label={`Xoá recipe ${selected.recipe.title}`}
-                  className="ml-auto flex items-center gap-1 border border-border-hairline px-2 py-1.5 text-[11px] text-status-error transition-colors hover:border-status-error hover:bg-panel-bg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#e8704f]"
+                  className="btn-secondary ml-auto border-danger px-2 py-1.5 text-danger hover:border-danger hover:text-danger"
                 >
                   <Trash2 size={12} aria-hidden="true" /> Xoá
                 </button>
@@ -573,7 +576,7 @@ export function RecipesPanel({
         )}
 
         {!selected && notice && (
-          <div className="border-t border-border-hairline bg-surface-raised px-4 py-2 text-[11px] text-status-success" role="status">
+          <div className="border-t border-subtle bg-raised px-4 py-2 text-meta text-success" role="status">
             {notice}
           </div>
         )}

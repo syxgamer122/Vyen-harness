@@ -119,19 +119,19 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
       onClick={onClose}
     >
       <aside
-        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden rounded-none border border-border-hairline bg-panel-bg font-mono"
+        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden rounded-none border border-subtle bg-overlay font-mono"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-2 border-b border-border-hairline bg-surface-raised px-4 py-3">
+        <div className="flex items-start justify-between gap-2 border-b border-subtle bg-raised px-4 py-3">
           <div className="min-w-0">
-            <h2 id="tools-panel-title" className="flex items-center gap-2 text-[15px] font-semibold text-text-primary">
-              <span className="font-bold text-accent-steel">$</span>
-              <span className="text-accent-steel">tools</span>
+            <h2 id="tools-panel-title" className="flex items-center gap-2 text-read font-semibold text-primary">
+              <span className="font-bold text-accent">$</span>
+              <span className="text-accent">tools</span>
               <span>
                 · {TOOL_CATALOG.length} tool · {ALL_TOOL_CATEGORIES.length} nhóm
               </span>
             </h2>
-            <div className="text-[11px] text-text-muted">
+            <div className="text-meta text-tertiary">
               Toàn bộ tool AI đang có, nhóm theo loại, kèm quyền chạy.
             </div>
           </div>
@@ -140,13 +140,13 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
             type="button"
             onClick={onClose}
             aria-label="Đóng panel công cụ"
-            className="icon-btn icon-btn-md relative rounded-none after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6a9fcc]"
+            className="icon-btn icon-btn-md relative rounded-none after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           >
             <X size={14} />
           </button>
         </div>
 
-        <div className="border-b border-border-hairline px-3 py-2">
+        <div className="border-b border-subtle px-3 py-2">
           <input
             type="text"
             value={query}
@@ -156,7 +156,7 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
             className="field-sm"
           />
           {query.trim() && (
-            <div role="status" className="mt-1 px-1 text-[10.5px] text-text-muted">
+            <div role="status" className="mt-1 px-1 text-micro text-tertiary">
               {shown} / {TOOL_CATALOG.length} tool
             </div>
           )}
@@ -169,14 +169,14 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
               <section
                 key={section.category}
                 aria-label={section.label}
-                className="border-b border-border-hairline last:border-b-0"
+                className="border-b border-subtle last:border-b-0"
               >
-                <div className="flex items-center gap-2 bg-surface-raised px-3 py-2">
-                  {Icon && <Icon size={13} className="flex-none text-accent-steel" aria-hidden="true" />}
-                  <span className="flex-none text-[12px] font-semibold text-text-primary">
+                <div className="flex items-center gap-2 bg-raised px-3 py-2">
+                  {Icon && <Icon size={13} className="flex-none text-accent" aria-hidden="true" />}
+                  <span className="flex-none text-ui font-semibold text-primary">
                     {section.label}
                   </span>
-                  <span className="flex-none text-[11px] text-text-muted">
+                  <span className="flex-none text-meta text-tertiary">
                     {section.tools.length} tool
                   </span>
                   <span className="min-w-1 flex-1" />
@@ -198,7 +198,7 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
                         ),
                       });
                     }}
-                    className="field-sm min-h-[38px] w-[7.5rem] flex-none text-[11px]"
+                    className="field-sm min-h-[38px] w-[7.5rem] flex-none text-meta"
                   >
                     {PERMISSION_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
@@ -209,25 +209,25 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
                 </div>
                 <ul>
                   {section.tools.map((tool) => (
-                    <li key={tool.name} className="border-t border-border-hairline px-3 py-2">
+                    <li key={tool.name} className="border-t border-subtle px-3 py-2">
                       <div className="flex items-baseline gap-2">
-                        <span className="flex-none text-[12px] text-text-primary">{tool.name}</span>
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-text-muted">
+                        <span className="flex-none text-ui text-primary">{tool.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-meta text-tertiary">
                           {tool.shortLabel}
                         </span>
                         {tool.desktopOnly && (
                           <span
                             title="Chỉ chạy ở bản desktop, cần desktop bridge đang kết nối"
-                            className="flex-none text-[10.5px] text-text-muted"
+                            className="flex-none text-micro text-tertiary"
                           >
                             chỉ bản desktop
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
+                      <p className="mt-0.5 text-meta leading-relaxed text-tertiary">
                         {tool.description}
                       </p>
-                      <p className="text-[10.5px] text-text-muted">
+                      <p className="text-micro text-tertiary">
                         {tool.kind === 'client' ? 'chạy trên máy người dùng' : 'chạy trên backend'}
                       </p>
                     </li>
@@ -237,14 +237,14 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
             );
           })}
           {sections.length === 0 && (
-            <div role="status" className="px-3 py-8 text-center text-[11.5px] text-text-muted">
+            <div role="status" className="px-3 py-8 text-center text-ui text-tertiary">
               Không có tool khớp &quot;{query.trim()}&quot;.
             </div>
           )}
         </div>
 
-        <div className="border-t border-border-hairline bg-surface-raised px-4 py-2.5">
-          <p className="text-[10.5px] leading-relaxed text-text-muted">
+        <div className="border-t border-subtle bg-raised px-4 py-2.5">
+          <p className="text-micro leading-relaxed text-tertiary">
             Chặn: tool trong nhóm trả lỗi ngay và không chạy (áp dụng cho tool chạy trên máy bạn;
             tool backend như tìm web vẫn chạy). Quyền nhóm đè chính sách duyệt chung của
             Auto-pilot; lệnh nguy hiểm (rm -rf /, mkfs) luôn phải hỏi.

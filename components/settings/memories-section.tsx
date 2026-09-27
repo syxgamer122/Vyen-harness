@@ -77,17 +77,17 @@ export function MemoriesSection() {
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="field-label text-[15px]">
+        <h4 className="field-label text-read">
           Duyệt đề xuất ghi nhớ (Reviewer Gate)
         </h4>
-        <p className="mt-0.5 text-xs leading-relaxed text-text-muted">
+        <p className="mt-0.5 text-ui leading-relaxed text-tertiary">
           Không ghi nhớ im lặng: Agent chỉ đề xuất candidate. Bạn trực tiếp duyệt (Nhớ / Từ chối / Hoãn).
           Chỉ ký ức đã duyệt mới vào Recall Pack theo ngân sách token.
         </p>
       </div>
 
       {error && (
-        <div className="flex items-center gap-1.5 border border-status-error/30 bg-[#e8704f]/10 p-2 text-xs text-status-error">
+        <div className="notice-error flex items-center gap-1.5" role="alert">
           <AlertCircle size={14} className="shrink-0" />
           <span>{error}</span>
         </div>
@@ -96,17 +96,17 @@ export function MemoriesSection() {
       {/* 1. Review Cards for Pending Candidates */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h5 className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
-            <Clock size={13} className="text-status-warning" />
+          <h5 className="flex items-center gap-1.5 text-ui font-semibold text-primary">
+            <Clock size={13} className="text-warning" />
             <span>Đang chờ duyệt</span>
-            <span className="border border-status-warning/30 bg-[#e8993a]/15 px-1.5 py-0.2 text-[10px] font-medium text-status-warning">
+            <span className="rounded-none border border-warning/40 bg-warning/10 px-1.5 py-0.2 font-mono text-micro tabular-nums text-warning">
               {(candidates ?? []).length}
             </span>
           </h5>
         </div>
 
         {(candidates ?? []).length === 0 ? (
-          <p className="border border-border-hairline/40 bg-surface-raised px-3 py-2 text-[11px] italic text-text-muted">
+          <p className="rounded-none border border-subtle bg-surface px-3 py-2 text-meta italic text-tertiary">
             Không có ghi nhớ nào đang chờ duyệt.
           </p>
         ) : (
@@ -114,33 +114,33 @@ export function MemoriesSection() {
             {(candidates ?? []).map((cand) => (
               <div
                 key={cand.id}
-                className="border border-status-warning/40 bg-surface-raised p-3 text-xs"
+                className="rounded-none border border-warning/40 bg-raised p-3 text-ui"
               >
-                <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-border-hairline">
+                <div className="flex items-center justify-between gap-2 border-b border-subtle pb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs">{kindIcons[cand.kind] || '📌'}</span>
-                    <span className="font-semibold uppercase tracking-wider text-[10px] text-text-primary">
+                    <span className="text-ui">{kindIcons[cand.kind] || '📌'}</span>
+                    <span className="font-mono text-micro font-semibold uppercase tracking-wider text-primary">
                       {cand.kind}
                     </span>
-                    <span className="text-[#757d89]">•</span>
-                    <span className="text-[10px] text-text-muted">
+                    <span className="text-tertiary" aria-hidden="true">•</span>
+                    <span className="font-mono text-micro text-tertiary">
                       scope: {cand.scope.kind} ({cand.scope.ref})
                     </span>
                   </div>
                   {cand.reviewDueAt && (
-                    <span className="text-[10px] text-status-warning">
+                    <span className="font-mono text-micro text-warning">
                       Hạn xét: {new Date(cand.reviewDueAt).toLocaleDateString()}
                     </span>
                   )}
                 </div>
 
-                <div className="my-2 leading-relaxed text-text-primary">
+                <div className="my-2 leading-relaxed text-primary">
                   {cand.text}
                 </div>
 
                 {refusePromptId === cand.id ? (
-                  <div className="mt-2 space-y-2 border border-status-error/40 bg-surface-raised p-2">
-                    <div className="text-[11px] font-medium text-status-error">
+                  <div className="mt-2 space-y-2 rounded-none border border-danger/40 bg-surface p-2">
+                    <div className="text-meta font-medium text-danger">
                       Nhập lý do từ chối (bắt buộc):
                     </div>
                     <input
@@ -148,7 +148,7 @@ export function MemoriesSection() {
                       value={refuseReason}
                       onChange={(e) => setRefuseReason(e.target.value)}
                       placeholder="Ví dụ: Quy ước này không còn áp dụng / Vi phạm bảo mật"
-                      className="field-sm w-full text-xs"
+                      className="field-sm w-full"
                       autoFocus
                     />
                     <div className="flex justify-end gap-1.5">
@@ -158,14 +158,14 @@ export function MemoriesSection() {
                           setRefusePromptId(null);
                           setRefuseReason('');
                         }}
-                        className="rounded-none border border-border-hairline bg-panel-bg px-2 py-1 text-xs text-text-primary hover:bg-panel-soft"
+                        className="btn-secondary px-2 py-1"
                       >
                         Hủy
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleReview(cand.id, 'refuse', refuseReason)}
-                        className="rounded-none bg-[#e8704f] px-2.5 py-1 text-xs font-semibold text-[#0d1116] hover:bg-[#e8704f]/85"
+                        className="btn-primary border-danger bg-danger px-2.5 py-1"
                       >
                         Xác nhận từ chối
                       </button>
@@ -176,7 +176,7 @@ export function MemoriesSection() {
                     <button
                       type="button"
                       onClick={() => void handleReview(cand.id, 'defer', 'Hoãn xem xét 7 ngày')}
-                      className="inline-flex items-center gap-1 border border-border-hairline bg-panel-bg px-2 py-1 text-[11px] font-medium text-text-primary hover:bg-panel-soft"
+                      className="btn-secondary px-2 py-1 text-meta"
                     >
                       <Clock size={11} /> Hoãn
                     </button>
@@ -186,14 +186,14 @@ export function MemoriesSection() {
                         setRefusePromptId(cand.id);
                         setRefuseReason('');
                       }}
-                      className="inline-flex items-center gap-1 border border-status-error/40 bg-surface-raised px-2 py-1 text-[11px] font-medium text-status-error hover:bg-[#e8704f]/10"
+                      className="btn-secondary border-danger px-2 py-1 text-meta text-danger"
                     >
                       <Ban size={11} /> Từ chối
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleReview(cand.id, 'remember')}
-                      className="inline-flex items-center gap-1 border border-status-success/40 bg-[#5db87a] px-2.5 py-1 text-[11px] font-semibold text-[#0d1116] hover:bg-[#5db87a]/85"
+                      className="btn-primary border-success bg-success px-2.5 py-1"
                     >
                       <Check size={11} /> Nhớ
                     </button>
@@ -207,16 +207,16 @@ export function MemoriesSection() {
 
       {/* 2. Active & Reviewed Memories */}
       <div className="space-y-2">
-        <h5 className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
-          <Sparkles size={13} className="text-accent-steel" />
+        <h5 className="flex items-center gap-1.5 text-ui font-semibold text-primary">
+          <Sparkles size={13} className="text-accent" />
           <span>Ký ức đã duyệt</span>
-          <span className="border border-accent-steel/30 bg-[#6a9fcc]/15 px-1.5 py-0.2 text-[10px] font-medium text-accent-steel">
+          <span className="rounded-none border border-accent/30 bg-accent/10 px-1.5 py-0.2 font-mono text-micro tabular-nums text-accent">
             {(records ?? []).length}
           </span>
         </h5>
 
         {(records ?? []).length === 0 ? (
-          <p className="border border-border-hairline/40 bg-surface-raised px-3 py-2 text-[11px] italic text-text-muted">
+          <p className="rounded-none border border-subtle bg-surface px-3 py-2 text-meta italic text-tertiary">
             Chưa có ký ức nào được kích hoạt.
           </p>
         ) : (
@@ -224,36 +224,36 @@ export function MemoriesSection() {
             {(records ?? []).map((rec) => (
               <div
                 key={rec.id}
-                className="group flex items-start justify-between gap-2 border border-border-hairline bg-surface-raised p-2.5 text-xs"
+                className="group flex items-start justify-between gap-2 rounded-none border border-subtle bg-surface p-2.5 text-ui"
               >
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[11px]">{kindIcons[rec.kind] || '📌'}</span>
+                    <span className="text-meta">{kindIcons[rec.kind] || '📌'}</span>
                     <span
-                      className={`px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                      className={`rounded-none border px-1.5 py-0.5 font-mono text-micro font-semibold uppercase tracking-wider ${
                         rec.status === 'active'
-                          ? 'border border-status-success/30 bg-[#5db87a]/15 text-status-success'
+                          ? 'border-success/40 bg-success/10 text-success'
                           : rec.status === 'reference'
-                            ? 'border border-accent-steel/30 bg-[#6a9fcc]/15 text-accent-steel'
+                            ? 'border-accent/40 bg-accent/10 text-accent'
                             : rec.status === 'archive'
-                              ? 'border border-border-hairline/40 bg-panel-bg text-text-muted'
-                              : 'border border-status-error/30 bg-[#e8704f]/15 text-status-error'
+                              ? 'border-subtle bg-raised text-tertiary'
+                              : 'border-danger/40 bg-danger/10 text-danger'
                       }`}
                     >
                       {rec.status}
                     </span>
-                    <span className="text-[10px] text-[#757d89]">
+                    <span className="font-mono text-micro tabular-nums text-tertiary">
                       confirm: {rec.confirmCount}
                     </span>
                     {rec.reviewDueAt && (
-                      <span className="text-[10px] text-text-muted">
+                      <span className="font-mono text-micro text-tertiary">
                         • hạn: {new Date(rec.reviewDueAt).toLocaleDateString()}
                       </span>
                     )}
                   </div>
-                  <div className="text-text-primary leading-relaxed">{rec.text}</div>
+                  <div className="leading-relaxed text-primary">{rec.text}</div>
                   {rec.reason && (
-                    <div className="text-[10px] text-status-error italic">
+                    <div className="font-mono text-micro italic text-danger">
                       Lý do: {rec.reason}
                     </div>
                   )}
@@ -261,10 +261,18 @@ export function MemoriesSection() {
                 <button
                   type="button"
                   onClick={() => {
+                    // Xoá ký ức đã duyệt là mất vĩnh viễn Recall Pack — hỏi lại,
+                    // đúng như các nút xoá khác trong Cài đặt.
+                    if (
+                      !window.confirm(
+                        `Xóa ký ức này khỏi Recall Pack? Không thể hoàn tác.\n"${rec.text.slice(0, 80)}${rec.text.length > 80 ? '…' : ''}"`,
+                      )
+                    )
+                      return;
                     void deleteReviewedRecord(rec.id);
                   }}
                   aria-label="Xóa ký ức"
-                  className="p-1 text-text-muted opacity-60 transition hover:bg-[#e8704f]/10 hover:text-status-error group-hover:opacity-100"
+                  className="icon-btn icon-btn-sm icon-btn-danger opacity-60 group-hover:opacity-100"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -275,15 +283,16 @@ export function MemoriesSection() {
       </div>
 
       {/* 3. Propose New Memory Card */}
-      <div className="space-y-2 border border-dashed border-border-hairline bg-surface-raised p-3">
+      <div className="space-y-2 rounded-none border border-dashed border-default bg-surface p-3">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-text-primary">
+          <label htmlFor="memory-new-kind" className="field-label">
             Thêm đề xuất ghi nhớ mới
           </label>
           <select
+            id="memory-new-kind"
             value={newKind}
             onChange={(e) => setNewKind(e.target.value as MemoryKind)}
-            className="field-sm text-xs py-0.5"
+            className="field-sm py-0.5"
           >
             <option value="pattern">🔧 Pattern (cách làm tốt)</option>
             <option value="rule">📏 Rule (quy tắc bắt buộc)</option>
@@ -298,7 +307,7 @@ export function MemoriesSection() {
           onChange={(e) => setNewText(e.target.value)}
           rows={2}
           maxLength={MAX_MEMORY_CHARS}
-          className="field-sm resize-none text-xs w-full"
+          className="field-sm w-full resize-none"
           placeholder='Ví dụ: "Luôn chạy test vitest trước khi commit thay đổi"'
           aria-label="Nội dung đề xuất ghi nhớ"
         />
@@ -307,7 +316,7 @@ export function MemoriesSection() {
           type="button"
           onClick={() => void handlePropose()}
           disabled={!newText.trim()}
-          className="btn-secondary w-full justify-center text-xs py-1.5"
+          className="btn-secondary w-full justify-center py-1.5"
         >
           Đề xuất ghi nhớ
         </button>

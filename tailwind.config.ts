@@ -2,24 +2,105 @@ import type { Config } from 'tailwindcss'
 import defaultTheme from 'tailwindcss/defaultTheme'
 
 /**
- * Ramp zinc dẫn qua CSS variables (`--zinc-*` trong globals.css).
- * Class sẵn có (`text-zinc-800`, `hover:bg-zinc-100`...) nhờ đó tự thích
- * ứng cả hai theme mà không phải sửa từng component: giá trị biến bị LẬT
- * bậc trong theme tối (zinc-100 sáng ↔ nền tối) để giữ đúng vai trò
- * "nền nhạt / chữ đậm" thay vì đúng mã hex gốc.
+ * Hợp đồng design token của Vyen.
+ *
+ * Mọi màu khai báo dạng channel RGB trong `app/globals.css` (`--token: R G B`)
+ * để Tailwind vẫn áp dụng được modifier opacity (`bg-surface/60`) trong khi
+ * CSS thuần dùng lại đúng một biến qua `rgb(var(--token) / a)`. Cùng một nguồn
+ * sự thật, không thể lệch nhau theo thời gian.
+ *
+ * Ứng dụng DARK-ONLY: không có nhánh sáng, xem `.dark` no-op trong globals.css.
  */
-const zincRamp = (suffix = '') =>
-  Object.fromEntries(
-    [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((step) => [
-      step,
-      `rgb(var(--zinc-${step}${suffix}) / <alpha-value>)`,
-    ]),
-  )
+const token = (name: string) => `rgb(var(${name}) / <alpha-value>)`
 
 /**
- * Design tokens dùng chung. Màu khai báo dạng channel RGB trong globals.css
- * (`--brand: 10 126 140`) để Tailwind vẫn áp dụng được modifier opacity
- * (`bg-brand/20`) mà CSS thuần cũng dùng lại được cùng một biến.
+ * Màu đơn (không có alpha modifier cần thiết) — khai trực tiếp bằng hex.
+ * Chỉ dùng cho token KHÔNG nằm trong hệ thống channel RGB.
+ */
+const hex = {
+  sunken: '#07090d',
+  base: '#0b0e13',
+  surface: '#12161d',
+  raised: '#1a1f27',
+  overlay: '#20262f',
+
+  primary: '#e8eaed',
+  secondary: '#a7b0bb',
+  tertiary: '#7c8794',
+  disabled: '#5c6673',
+
+  subtle: '#1c222a',
+  default: '#3a4552',
+  strong: '#5a6675',
+
+  accent: '#7cb7ea',
+  'accent-dim': '#3f6a94',
+  success: '#5bbd7f',
+  warning: '#e0a04a',
+  danger: '#ef6f5c',
+  info: '#63b3d6',
+  reasoning: '#a78bd4',
+
+  'diff-add': '#6cc98d',
+  'diff-del': '#f08578',
+  'diff-ctx': '#8d97a3',
+} as const
+
+/**
+ * ALIAS TẠM — giữ cho các component CHƯA migrate sang tên mới.
+ *
+ * Đây là các key Tailwind đã bị gỡ khỏi hợp đồng nhưng vẫn còn code gọi tới.
+ * Chúng trỏ thẳng sang GIÁ TRỊ của token mới, nên đổi tên class không làm
+ * đổi màu. Đổi tên class là việc của các agent đang migrate component song
+ * song — khi `grep -rn "<tên>" components/` rỗng thì xoá key tương ứng ở đây.
+ *
+ * KHÔNG thêm alias mới. Thêm là đẻ thêm một cách gọi cho cùng một màu, và đó
+ * chính là thứ làm bảng màu cũ loãng.
+ */
+const legacyAlias = {
+  /* Trạng thái cũ → bảng accent/status mới. */
+  'cyan-glow': hex.accent,
+  'emerald-safe': hex.success,
+  'amber-warn': hex.warning,
+  'rose-danger': hex.danger,
+  'violet-reasoning': hex.reasoning,
+
+  /* Mặt phẳng cũ → thang 5 tầng mới. */
+  canvas: hex.sunken,
+  'surface-elevated': hex.overlay,
+  'surface-subtle': hex.surface,
+  'surface-glass': 'rgba(32, 38, 47, 0.82)',
+
+  /* Ranh giới cũ → 3 bậc viền mới. */
+  'border-control': hex.default,
+
+  /* Bóng cũ — hai key này KHÔNG còn sinh CSS nào, giữ để class cũ không
+     vỡ cú pháp trong lúc component chuyển sang `bevel-out`/`bevel-in`. */
+  'ambient-glow': 'none',
+  'reasoning-glow': 'none',
+
+  /*
+   * THANG ZINC LẬT BẬC — alias cho 5 chỗ dùng sót lại.
+   *
+   * `zinc` trước đây là một thang màu BỊ LẬT (zinc-50 tối nhất, zinc-950 sáng
+   * nhất) để `text-zinc-800` trông sáng trên nền tối. Cơ chế đó giấu nhầm
+   * cả những chỗ dùng sai — nên thang đã bị gỡ khỏi hệ màu.
+   *
+   * Chỉ giữ lại ĐÚNG 3 bậc còn code gọi tới, map theo vai trò thật sự:
+   *   zinc-200 — viền ảnh trong markdown-renderer → viền mảnh
+   *   zinc-500 — chữ "đang tải" ở app/page.tsx   → chữ phụ
+   *   zinc-600 — chữ fallback khi KaTeX lỗi      → chữ phụ
+   * Xoá khi grep `zinc-` trong components/ app/ không còn kết quả.
+   */
+  zinc: {
+    200: hex.subtle,
+    500: hex.tertiary,
+    600: hex.tertiary,
+  },
+} as const
+
+/**
+ * Design tokens dùng chung.
  */
 const config: Config = {
   darkMode: 'class',
@@ -27,75 +108,97 @@ const config: Config = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    /*
+     * `lib/` chứa `ui-z.ts`, nơi toàn bộ class `z-[NN]` của hệ phân lớp được
+     * định nghĩa. Không có glob này thì Tailwind KHÔNG sinh class nào trong
+     * Z_CLASS — mọi modal/toast/sidebar rơi về z-index 0 và thứ tự chồng do
+     * thứ tự DOM quyết định, tức cơ chế phân lớp trở nên vô nghĩa.
+     */
+    './lib/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {
       colors: {
-        /** Thang xám chủ đạo — theo theme qua --zinc-*. */
-        zinc: zincRamp(),
-        /** Canvas & các mặt phẳng nổi. */
-        surface: {
-          DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
-          raised: 'rgb(var(--surface-raised) / <alpha-value>)',
-          bubble: 'rgb(var(--surface-bubble) / <alpha-value>)',
-          muted: 'rgb(var(--surface-muted) / <alpha-value>)',
-          code: 'rgb(var(--surface-code) / <alpha-value>)',
-          'code-header': 'rgb(var(--surface-code-header) / <alpha-value>)',
-        },
-        /** Thương hiệu Vyen. */
-        brand: {
-          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
-          hover: 'rgb(var(--brand-hover) / <alpha-value>)',
-          accent: 'rgb(var(--brand-accent) / <alpha-value>)',
-          border: 'rgb(var(--brand-border) / <alpha-value>)',
-        },
-        foreground: {
-          DEFAULT: 'rgb(var(--foreground) / <alpha-value>)',
-          strong: 'rgb(var(--foreground-strong) / <alpha-value>)',
-          muted: 'rgb(var(--muted-foreground) / <alpha-value>)',
-        },
-        /** Đường kẻ dùng chung (bảng, hr, viền panel nhạt). */
-        line: {
-          DEFAULT: 'rgb(var(--line) / <alpha-value>)',
-          strong: 'rgb(var(--line-strong) / <alpha-value>)',
-        },
-        /** DESIGN.md Pi Harness x Pixel Tokens */
-        'bg-deep': 'rgb(var(--bg-deep) / <alpha-value>)',
-        'bg-canvas': 'rgb(var(--bg-canvas) / <alpha-value>)',
-        'panel-bg': 'rgb(var(--panel-bg) / <alpha-value>)',
-        'panel-soft': 'rgb(var(--panel-soft) / <alpha-value>)',
-        'border-hairline': 'rgb(var(--border-hairline) / <alpha-value>)',
-        'border-hover': 'rgb(var(--border-hover) / <alpha-value>)',
+        /* BỀ MẶT — 5 tầng, mỗi tầng sáng hơn tầng trước đúng một bậc. */
+        sunken: hex.sunken,
+        base: hex.base,
+        surface: hex.surface,
+        raised: hex.raised,
+        overlay: hex.overlay,
+
+        /* CHỮ — 4 tầng theo vai trò. */
+        primary: hex.primary,
+        secondary: hex.secondary,
+        tertiary: hex.tertiary,
+        disabled: hex.disabled,
+
         /*
-         * Bậc viền theo VAI TRÒ (DESIGN.md mục 4). Trước đây mọi đường viền
-         * dùng chung --border-hairline nên khung, control và divider cùng trọng
-         * lượng thị giác. Ba token dưới tách bạch:
-         *   border-subtle  — đường phân cách TRONG một khối (dùng ở alpha ~45%)
-         *   border-control — viền control (input, nút), nổi hơn khung một bậc
-         *   border-hover   — hover / focus / active
+         * VIỀN — 3 tầng, mỗi tầng đảm nhiệm đúng MỘT việc. Đây là thứ quyết
+         * định một khối trông như "khung" hay như "control".
+         *   subtle  — đường phân cách giữa các dòng TRONG một khối
+         *   default — ranh giới control (input, nút, ô chọn)
+         *   strong  — hover / focus / selected
          */
-        'border-subtle': 'rgb(var(--border-subtle) / <alpha-value>)',
-        'border-control': 'rgb(var(--border-control) / <alpha-value>)',
-        'text-primary': 'rgb(var(--text-primary) / <alpha-value>)',
-        'text-muted': 'rgb(var(--text-muted) / <alpha-value>)',
-        'accent-steel': 'rgb(var(--accent-steel) / <alpha-value>)',
-        'accent-thread': 'rgb(var(--accent-thread) / <alpha-value>)',
-        'status-success': 'rgb(var(--status-success) / <alpha-value>)',
-        'status-warning': 'rgb(var(--status-warning) / <alpha-value>)',
-        'status-error': 'rgb(var(--status-error) / <alpha-value>)',
+        subtle: hex.subtle,
+        default: hex.default,
+        strong: hex.strong,
+
+        /* NHẤN & TRẠNG THÁI — một bảng màu cho toàn ứng dụng. */
+        accent: hex.accent,
+        'accent-dim': hex['accent-dim'],
+        success: hex.success,
+        warning: hex.warning,
+        danger: hex.danger,
+        info: hex.info,
+        reasoning: hex.reasoning,
+
+        /* DIFF — ba trạng thái của một dòng thay đổi. */
+        'diff-add': hex['diff-add'],
+        'diff-del': hex['diff-del'],
+        'diff-ctx': hex['diff-ctx'],
+
+        /*
+         * Hệ cũ, map theo vai trò chứ không theo tên. Giữ cho tới khi các
+         * component migrate xong — xem khối ALIAS TẠM ở globals.css.
+         * Mỗi dòng là MỘT cách viết khác của đúng token mới ở trên.
+         */
+        brand: token('--accent'),
+        'panel-bg': token('--panel-bg'),
+        'panel-soft': token('--panel-soft'),
+        'border-hairline': token('--border-hairline'),
+        'border-hover': token('--border-hover'),
+        'border-subtle': token('--border-subtle'),
+        'text-primary': token('--text-primary'),
+        'text-muted': token('--text-muted'),
+        'accent-steel': token('--accent-steel'),
+        'status-success': token('--status-success'),
+        'status-warning': token('--status-warning'),
+        'status-error': token('--status-error'),
+        'bg-deep': token('--bg-deep'),
+        'bg-canvas': token('--bg-canvas'),
+
+        ...legacyAlias,
       },
       borderRadius: {
         none: '0px',
-        sm: '0px',
-        DEFAULT: '0px',
-        md: '0px',
-        lg: '0px',
-        xl: '0px',
-        '2xl': '0px',
-        '3xl': '0px',
+        sm: '3px',
+        DEFAULT: '5px',
+        md: '5px',
         full: '9999px',
+        /*
+         * Cố ý KHÔNG định nghĩa `lg`/`xl`/`2xl`/`3xl`. Mọi bo góc đều là
+         * 0px trong ứng dụng này; nếu ai đó gọi `rounded-lg` thì class đó không
+         * được sinh ra — thà không có bo góc nào còn hơn là bo góc ngoài ý muốn.
+         * (Trước đây khối override `[class*="rounded-lg"]` trong globals.css làm
+         * cho cấu hình này bị vô hiệu hoàn toàn; khối đó đã bị xoá.)
+         */
       },
       boxShadow: {
+        /*
+         * Ứng dụng KHÔNG dùng bóng đổ. Mọi key mặc định của Tailwind bị khoá
+         * về `none` để không class `shadow-*` nào lọt vào mang theo bóng mềm —
+         * ngoại trừ HAI key dưới đây.
+         */
         none: 'none',
         DEFAULT: 'none',
         sm: 'none',
@@ -104,10 +207,54 @@ const config: Config = {
         xl: 'none',
         '2xl': 'none',
         inner: 'none',
-        brand: 'none',
-        'brand-lg': 'none',
-        panel: 'none',
-        card: 'none',
+
+        /*
+         * BEVEL — chiều sâu hai tông theo kiểu GUI Minecraft/Windows 95: cạnh
+         * trên & trái sáng hơn, cạnh dưới & phải tối hơn. Đây là CÁCH DUY NHẤT
+         * để tạo tầng bậc trong giao diện phẳng này, nên nó là hai `boxShadow`
+         * duy nhất không phải `none`.
+         *
+         * Dùng `box-shadow` chứ không phải `border-color`: một cạnh viền 1px chỉ
+         * mang được một màu, còn bevel cần hai để đọc ra hướng ánh sáng. Cả bốn
+         * cạnh đều `inset` nên không đổi kích thước bố cục.
+         *
+         * Giá trị phải khớp byte với `.bevel-out` / `.bevel-in` trong
+         * globals.css — sửa một bên thì phải sửa cả bên kia.
+         */
+        'bevel-out':
+          'inset 0 1px 0 rgb(255 255 255 / 0.07), inset 1px 0 0 rgb(255 255 255 / 0.04), inset 0 -1px 0 rgb(0 0 0 / 0.45), inset -1px 0 0 rgb(0 0 0 / 0.30)',
+        'bevel-in':
+          'inset 0 1px 0 rgb(0 0 0 / 0.45), inset 1px 0 0 rgb(0 0 0 / 0.30), inset 0 -1px 0 rgb(255 255 255 / 0.06), inset -1px 0 0 rgb(255 255 255 / 0.04)',
+      },
+      fontSize: {
+        /*
+         * SÁU BẬC CỠ CHỮ. Trước đây giao diện có 16 kích thước rải rác
+         * (`text-[10.5px]`, `text-[12.5px]`, `text-[13.5px]`...) khiến mọi vùng
+         * chữ khác nhau một chút và không ai nhớ quy tắc. Nay mỗi bậc là một
+         * VAI TRÒ, dùng lại được ở mọi nơi:
+         *   micro   — siêu nhỏ, dấu phân biệt, số đếm
+         *   meta    — timestamp, metadata, chú thích nhỏ
+         *   ui      — nhãn, nút, chữ trong khối giao diện (mặc định)
+         *   body    — nội dung trong ô nhập, dòng bảng
+         *   read    — văn bản đọc dài (markdown, đoạn văn)
+         *   head    — tiêu đề khối lớn
+         */
+        micro: ['10px', { lineHeight: '1.4' }],
+        meta: ['11px', { lineHeight: '1.45' }],
+        ui: ['12px', { lineHeight: '1.5' }],
+        body: ['13px', { lineHeight: '1.6' }],
+        read: ['15px', { lineHeight: '1.7' }],
+        head: ['20px', { lineHeight: '1.3' }],
+
+        /*
+         * Cỡ chữ Tailwind mặc định giữ NGUYÊN — 146 chỗ dùng `text-xs` và 40
+         * chỗ dùng `text-sm` trong component chưa migrate. Đổi số ở đây là đổi
+         * diện mạo toàn ứng dụng, nên chỉ chờ khi từng component chuyển sang
+         * tên bậc mới rồi mới thay.
+         */
+        xs: ['0.75rem', { lineHeight: '1rem' }],
+        sm: ['0.875rem', { lineHeight: '1.25rem' }],
+        base: ['1rem', { lineHeight: '1.5rem' }],
       },
       fontFamily: {
         /*
@@ -115,8 +262,12 @@ const config: Config = {
          * `font-sans` của Tailwind vẫn là font hệ thống và Inter (đã tải kèm
          * subset tiếng Việt) không bao giờ được dùng.
          */
-        sans: ['var(--font-sans)', ...defaultTheme.fontFamily.sans],
-        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        sans: ['var(--font-sans)', 'Geist', 'Inter', ...defaultTheme.fontFamily.sans],
+        mono: [['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'], { fontFeatureSettings: '"calt" 1, "zero" 1' }],
+        /*
+         * Font pixel là đạo diện NGUYÊN CẢO — dành cho wordmark (.font-pixel).
+         * KHÔNG áp cho tiêu đề trong câu trả lời của model.
+         */
         pixel: ['var(--font-pixel)', 'Pixelify Sans', 'Minecraft', 'monospace'],
       },
       maxWidth: {

@@ -7,17 +7,19 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
  * `maxHeight` chỉ có khi component xin (`withMaxHeight`).
  */
 export interface PanelPos {
-  top: number;
+  top?: number;
+  bottom?: number;
   left: number;
   width: number;
   maxHeight?: number;
 }
 
-/** Hình học phần tử neo: chỉ cần 3 mép dùng để đặt panel. */
+/** Hình học phần tử neo: 3 mép cơ bản + top tuỳ chọn để hỗ trợ mở lật lên. */
 export interface AnchorRect {
   left: number;
   right: number;
   bottom: number;
+  top?: number;
 }
 
 export interface AnchoredPanelViewport {
@@ -30,18 +32,20 @@ export interface ComputeAnchoredPanelOptions {
   width: number;
   /** 'left': mép trái panel theo mép trái trigger; 'right': theo mép phải. */
   align: 'left' | 'right';
-  /** Khoảng hở từ mép dưới trigger tới panel và viền viewport (mặc định 8). */
+  /** Khoảng hở từ mép trigger tới panel và viền viewport (mặc định 8). */
   margin?: number;
   /** Mép giữ lại hai bên viewport khi kẹp left (mặc định 8). */
   minMargin?: number;
   /** Có tính maxHeight cho panel cuộn được (floor 160px). */
   withMaxHeight?: boolean;
+  /** Hướng mở: 'bottom' (mặc định), 'top', hoặc 'auto' (tự lật lên nếu phía dưới thiếu chỗ). */
+  placement?: 'bottom' | 'top' | 'auto';
 }
 
 /**
- * Toán tử đặt panel dropdown của status line (ModelSelector, ThinkingMenu,
- * ChatExportMenu dùng chung). Panel mở XUỐNG từ mép dưới trigger, rộng tối đa
- * `width` nhưng phải hở `margin*2` hai bên viewport, rồi kẹp left vào
+ * Toán tử đặt panel dropdown của status line và composer (ModelSelector, ThinkingMenu,
+ * ChatExportMenu dùng chung). Panel mở XUỐNG hoặc LẬT LÊN tuỳ vị trí trigger và viewport,
+ * rộng tối đa `width` nhưng phải hở `margin*2` hai bên viewport, rồi kẹp left vào
  * [`minMargin`, vw - width - `minMargin`]. Hàm thuần để test ma trận kẹp ở
  * NODE env; hook bên dưới và component chỉ việc gọi.
  */
@@ -52,12 +56,39 @@ export function computeAnchoredPanelPos(
 ): PanelPos {
   const margin = opts.margin ?? 8;
   const minMargin = opts.minMargin ?? 8;
-  const width = Math.min(opts.width, viewport.width - margin * 2);
+  let width = Math.min(opts.width, viewport.width - margin * 2);
+  if (opts.align === 'left') {
+    const spaceRight = viewport.width - rect.left - minMargin;
+    if (spaceRight >= 320 && spaceRight < width) {
+      width = Math.round(spaceRight);
+    }
+  }
+
   const anchorLeft = opts.align === 'left' ? rect.left : rect.right - width;
   const left = Math.min(
     Math.max(minMargin, Math.round(anchorLeft)),
     Math.round(viewport.width - width - minMargin),
   );
+
+  const placement = opts.placement ?? 'bottom';
+  const spaceBelow = viewport.height - rect.bottom - margin;
+  const topAnchor = rect.top !== undefined ? rect.top : rect.bottom - 32;
+  const spaceAbove = topAnchor - margin;
+
+  const shouldOpenUp =
+    placement === 'top' || (placement === 'auto' && spaceBelow < 380 && spaceAbove > spaceBelow);
+
+  if (shouldOpenUp) {
+    const bottom = Math.round(viewport.height - topAnchor + margin);
+    const pos: PanelPos = { bottom, left, width };
+    if (opts.withMaxHeight) {
+      pos.maxHeight = Math.max(160, Math.round(topAnchor - margin * 2));
+      const maxBottom = Math.round(viewport.height - pos.maxHeight - margin);
+      pos.bottom = Math.min(bottom, Math.max(minMargin, maxBottom));
+    }
+    return pos;
+  }
+
   const top = Math.round(rect.bottom) + margin;
   const pos: PanelPos = { top, left, width };
   if (opts.withMaxHeight) {
@@ -72,6 +103,7 @@ export interface UseAnchoredPanelOptions {
   triggerRef: RefObject<HTMLElement | null>;
   width: number;
   align: 'left' | 'right';
+  placement?: 'bottom' | 'top' | 'auto';
   withMaxHeight?: boolean;
   /**
    * Callback đóng của component. Dismissal bên ngoài gọi `close(false)`:
@@ -87,19 +119,15 @@ export interface UseAnchoredPanelOptions {
 }
 
 /**
- * Chuẩn chung cho các menu portal của status line: vị trí neo dưới trigger
- * (tính lại khi resize), đóng khi cuộn/pointerdown ngoài panel. Header status
- * line là sticky + overflow-x-auto nên mọi absolute con của nó bị cắt/clipped
- * và hướng mở `bottom-full` đứng từ mép viewport thì trôi mất, nên panel phải
- * ra document.body, mở XUỐNG, kẹp trong viewport. Escape và focus trả về
- * trigger giữ nguyên ở từng component (mỗi menu có cleanup riêng: picker xóa
- * query, export giữ thông báo lỗi).
+ * Chuẩn chung cho các menu portal của status line và composer: vị trí neo theo trigger
+ * (tính lại khi resize), đóng khi cuộn/pointerdown ngoài panel.
  */
 export function useAnchoredPanel({
   open,
   triggerRef,
   width,
   align,
+  placement = 'bottom',
   withMaxHeight,
   close,
   insideRef,
@@ -118,16 +146,16 @@ export function useAnchoredPanel({
       const rect = el.getBoundingClientRect();
       setPos(
         computeAnchoredPanelPos(
-          { left: rect.left, right: rect.right, bottom: rect.bottom },
+          { left: rect.left, right: rect.right, bottom: rect.bottom, top: rect.top },
           { width: window.innerWidth, height: window.innerHeight },
-          { width, align, withMaxHeight },
+          { width, align, withMaxHeight, placement },
         ),
       );
     };
     compute();
     window.addEventListener('resize', compute);
     return () => window.removeEventListener('resize', compute);
-  }, [open, width, align, withMaxHeight, triggerRef]);
+  }, [open, width, align, placement, withMaxHeight, triggerRef]);
 
   useEffect(() => {
     if (!open) return;

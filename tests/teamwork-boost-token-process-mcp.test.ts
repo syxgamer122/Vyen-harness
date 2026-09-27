@@ -310,10 +310,19 @@ describe('Feature 3: Background Process Management Tools', () => {
 
     const startRes = await runner.process_start(cmd);
 
-    // Wait a brief moment for output
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    /* Chờ stdout CÓ dữ liệu thay vì ngủ cứng 600ms. `process_start` spawn thẳng
+     * `cmd.exe /d /s /c` (lib/teamwork/tools.ts) nên `&` ở đây KHÔNG bị
+     * shell-policy chặn; lý do đỏ thật sự là spawn đầu tiên trên Windows đôi khi
+     * rò output chậm hơn 600ms → assert chạy trước lúc pipe đủ dòng. Vì vậy chờ
+     * TỚI DÒNG CUỐI (line3), không chỉ dòng đầu — nếu chỉ chờ line1 thì assert
+     * 'line2' lại đỏ khi output tới dần. */
+    const deadline = Date.now() + 5_000;
+    let out = runner.process_output(startRes.processId);
+    while (!out.stdout.includes('line3') && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      out = runner.process_output(startRes.processId);
+    }
 
-    const out = runner.process_output(startRes.processId);
     expect(out.stdout).toContain('line1');
     expect(out.stdout).toContain('line2');
 

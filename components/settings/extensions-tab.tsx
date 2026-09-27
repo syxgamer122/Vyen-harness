@@ -12,7 +12,6 @@
  */
 
 import dynamic from 'next/dynamic';
-import { useAppStore } from '@/lib/store';
 import { SectionLoading } from '@/components/settings/section-loading';
 import { DiskSkillsSection } from '@/components/settings-skills';
 import { CustomSlashCommandsSection } from '@/components/settings/slash-commands-section';
@@ -20,13 +19,11 @@ import { CustomSlashCommandsSection } from '@/components/settings/slash-commands
 const McpSettingsPanel = dynamic(() => import('@/components/mcp/mcp-settings-panel').then((m) => m.McpSettingsPanel), { ssr: false, loading: SectionLoading });
 
 export function ExtensionsTab() {
-  const settings = useAppStore((s) => s.settings);
-
   return (
     <>
-      <div className="border-b border-border-hairline pb-2">
-        <h3 className="text-sm font-semibold text-text-primary">Mở rộng</h3>
-        <p className="mt-0.5 text-[11px] text-text-muted">
+      <div className="border-b border-subtle pb-2">
+        <h3 className="text-read font-semibold text-primary">Mở rộng</h3>
+        <p className="mt-0.5 text-meta text-tertiary">
           Tích hợp máy chủ MCP bên ngoài, kỹ năng SKILL.md và lệnh gõ nhanh slash commands.
         </p>
       </div>

@@ -119,6 +119,65 @@ describe('computeAnchoredPanelPos - maxHeight', () => {
   });
 });
 
+describe('computeAnchoredPanelPos - hướng mở (placement top / bottom / auto)', () => {
+  it('placement auto: ở status line (nhiều chỗ bên dưới) -> mở xuống', () => {
+    const pos = computeAnchoredPanelPos(
+      { left: 100, right: 240, top: 0, bottom: 32 },
+      { width: 1280, height: 800 },
+      { width: 620, align: 'left', withMaxHeight: true, placement: 'auto' },
+    );
+    expect(pos.top).toBe(40);
+    expect(pos.bottom).toBeUndefined();
+    expect(pos.maxHeight).toBe(800 - 40 - 8);
+  });
+
+  it('placement auto: ở composer gần đáy viewport -> lật lên trên (bottom anchor)', () => {
+    const pos = computeAnchoredPanelPos(
+      { left: 100, right: 240, top: 740, bottom: 772 },
+      { width: 1280, height: 800 },
+      { width: 620, align: 'left', withMaxHeight: true, placement: 'auto' },
+    );
+    expect(pos.top).toBeUndefined();
+    expect(pos.bottom).toBe(800 - 740 + 8);
+    expect(pos.maxHeight).toBe(740 - 16);
+  });
+
+  it('placement top ép buộc: luôn mở lật lên trên', () => {
+    const pos = computeAnchoredPanelPos(
+      { left: 100, right: 240, top: 500, bottom: 532 },
+      { width: 1280, height: 800 },
+      { width: 620, align: 'left', withMaxHeight: true, placement: 'top' },
+    );
+    expect(pos.top).toBeUndefined();
+    expect(pos.bottom).toBe(800 - 500 + 8);
+    expect(pos.maxHeight).toBe(500 - 16);
+  });
+
+  it('placement top/auto: topAnchor thấp kẹp bottom không vượt mép trên viewport', () => {
+    // viewport 400, topAnchor 120, maxHeight floor 160: bottom kẹp về 400 - 160 - 8 = 232 thay vì 288
+    const pos = computeAnchoredPanelPos(
+      { left: 100, right: 240, top: 120, bottom: 152 },
+      { width: 800, height: 400 },
+      { width: 620, align: 'left', withMaxHeight: true, placement: 'top' },
+    );
+    expect(pos.bottom).toBe(400 - 160 - 8);
+    expect(pos.maxHeight).toBe(160);
+    // Đỉnh panel cách đỉnh viewport đúng margin 8px
+    expect(400 - pos.bottom! - pos.maxHeight!).toBe(8);
+  });
+
+  it('canh trái trên màn hình hẹp: co width theo không gian bên phải để không đè sidebar', () => {
+    // viewport 860, trigger ở 272 (sau sidebar 256px): không gian phải 860 - 272 - 8 = 580 >= 320
+    const pos = computeAnchoredPanelPos(
+      { left: 272, right: 400, bottom: 40 },
+      { width: 860, height: 800 },
+      { width: 620, align: 'left' },
+    );
+    expect(pos.width).toBe(580);
+    expect(pos.left).toBe(272);
+  });
+});
+
 describe('computeAnchoredPanelPos - margin và làm tròn', () => {
   it('margin/minMargin mặc định 8: kết quả trùng bản ghi tường minh', () => {
     const rect = { left: 100, right: 240, bottom: 40 };

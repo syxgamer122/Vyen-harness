@@ -47,6 +47,66 @@ describe('ToolTrace — collectToolEvents (gộp annotation + invocation)', () =
     expect(collectToolEvents(undefined, undefined)).toEqual([]);
     expect(collectToolEvents([{ notTool: 1 }], [{ state: 'result' }])).toEqual([]);
   });
+
+  it('toolInvocations không có annotations vẫn giữ lại name và args khi có toolName', () => {
+    const events = collectToolEvents(
+      undefined,
+      [
+        {
+          toolCallId: 'inv-1',
+          toolName: 'read_file',
+          args: { path: 'src/index.ts' },
+          state: 'call',
+        } as any,
+        {
+          toolCallId: 'inv-2',
+          toolName: 'shell',
+          args: '{"command":"ls -la"}',
+          state: 'result',
+          result: 'total 0',
+        } as any,
+      ],
+    );
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      id: 'inv-1',
+      name: 'read_file',
+      args: '{"path":"src/index.ts"}',
+      done: false,
+    });
+    expect(events[1]).toMatchObject({
+      id: 'inv-2',
+      name: 'shell',
+      args: '{"command":"ls -la"}',
+      done: true,
+      summary: 'total 0',
+    });
+  });
+
+  it('annotations đã có sẵn name/args thì không bị toolInvocations ghi đè', () => {
+    const events = collectToolEvents(
+      [
+        { tool: { id: 't1', name: 'custom_tool', phase: 'start', args: 'initial' } },
+      ],
+      [
+        {
+          toolCallId: 't1',
+          toolName: 'ignored_name',
+          args: 'ignored_args',
+          state: 'result',
+          result: 'done',
+        } as any,
+      ],
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      id: 't1',
+      name: 'custom_tool',
+      args: 'initial',
+      done: true,
+      summary: 'done',
+    });
+  });
 });
 
 /* Repo chạy vitest environment 'node' (không jsdom/testing-library) nên phần

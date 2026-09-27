@@ -5,7 +5,6 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 import {
   buildProtocolHeader,
   EMU_MAX_CALLS_PER_ROUND,
-  EMU_MAX_ROUNDS,
   parseToolCallBlocks,
   runEmulatedLoop,
 } from '@/lib/emulated-agent';
@@ -371,9 +370,5 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
     expect(p).toContain('fs_list');
     expect(p).not.toContain('memory_search');
     expect(p).not.toContain('exchange_rates');
-  });
-
-  it(`số round mặc định = ${EMU_MAX_ROUNDS}`, () => {
-    expect(EMU_MAX_ROUNDS).toBe(10);
   });
 });

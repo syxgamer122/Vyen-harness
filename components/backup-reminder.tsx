@@ -60,7 +60,7 @@ export function BackupReminder({ chatCount }: { chatCount: number }) {
               type="button"
               onClick={handleBackup}
               disabled={busy}
-              className="rounded-none bg-[#e8993a] px-2.5 py-1 font-medium text-[#0d1116] transition hover:bg-[#e8993a]/85 disabled:opacity-50"
+              className="rounded-none bg-warning px-2.5 py-1 font-medium text-sunken transition hover:bg-warning/85 disabled:opacity-50"
             >
               {busy ? 'Đang sao lưu…' : 'Sao lưu ngay'}
             </button>
@@ -70,7 +70,7 @@ export function BackupReminder({ chatCount }: { chatCount: number }) {
                 snoozeBackupReminder();
                 setVisible(false);
               }}
-              className="rounded-none px-2 py-1 text-status-warning transition hover:bg-[#e8993a]/10"
+              className="rounded-none px-2 py-1 text-status-warning transition hover:bg-warning/10"
             >
               Để sau
             </button>
@@ -83,7 +83,7 @@ export function BackupReminder({ chatCount }: { chatCount: number }) {
             snoozeBackupReminder();
             setVisible(false);
           }}
-          className="-mr-1 -mt-0.5 flex-shrink-0 rounded-none p-0.5 text-text-muted transition hover:bg-[#e8993a]/10 hover:text-status-warning"
+          className="-mr-1 -mt-0.5 flex-shrink-0 rounded-none p-0.5 text-text-muted transition hover:bg-warning/10 hover:text-status-warning"
         >
           <X size={13} />
         </button>

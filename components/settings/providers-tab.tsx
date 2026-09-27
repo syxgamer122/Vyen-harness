@@ -26,16 +26,16 @@ export function ProvidersTab() {
 
   return (
     <>
-      <div className="border-b border-border-hairline pb-2">
-        <h3 className="text-sm font-semibold text-text-primary">Model &amp; Nhà cung cấp</h3>
-        <p className="mt-0.5 text-[11px] text-text-muted">
+      <div className="border-b border-subtle pb-2">
+        <h3 className="text-read font-semibold text-primary">Model &amp; Nhà cung cấp</h3>
+        <p className="mt-0.5 text-meta text-tertiary">
           Quản lý API key cá nhân (BYOK), danh sách model, vision model và chiến lược điều phối Lead/Worker.
         </p>
       </div>
 
       {activeProviderId === SERVER_PROVIDER_ID && (
         <div>
-          <label htmlFor="server-api-key" className="mb-1.5 block text-sm font-medium text-text-primary">
+          <label htmlFor="server-api-key" className="field-label mb-1.5 block">
             API Key OpenAI (máy chủ mặc định)
           </label>
           <input
@@ -44,9 +44,9 @@ export function ProvidersTab() {
             value={settings.apiKey || ''}
             onChange={(e) => updateSettings({ apiKey: e.target.value })}
             placeholder="sk-..."
-            className="field font-mono w-full"
+            className="field w-full"
           />
-          <p className="mt-1 text-[11px] leading-relaxed text-text-muted">
+          <p className="field-hint mt-1">
             Chỉ lưu trong phiên này, không persist vào đĩa. Key này được gửi
             thẳng tới api.openai.com khi gọi model OpenAI.
           </p>
@@ -54,20 +54,20 @@ export function ProvidersTab() {
       )}
 
       <div>
-        <h4 className="mb-1.5 text-sm font-semibold text-text-primary">Nhà cung cấp API (BYOK)</h4>
-        <p className="mb-2 text-[11px] leading-relaxed text-text-muted">
+        <h4 className="field-label mb-1.5 block text-read">Nhà cung cấp API (BYOK)</h4>
+        <p className="mb-2 text-ui leading-relaxed text-tertiary">
           Lưu nhiều nhà cung cấp chuẩn OpenAI-compatible, tải danh sách model và chuyển
           nhanh mà không cần cấu hình lại server.
         </p>
         <ProviderManager />
       </div>
 
-      <div className="border-t border-border-hairline pt-3">
+      <div className="border-t border-subtle pt-3">
         <VisionModelSection />
       </div>
 
-      <div className="border-t border-border-hairline pt-3">
-        <label htmlFor="access-code" className="mb-1.5 block text-sm font-medium text-text-primary">
+      <div className="border-t border-subtle pt-3">
+        <label htmlFor="access-code" className="field-label mb-1.5 block">
           Mã truy cập (Access Code cho server gateway)
         </label>
         <input
@@ -76,11 +76,14 @@ export function ProvidersTab() {
           value={settings.accessCode || ''}
           onChange={(e) => updateSettings({ accessCode: e.target.value })}
           placeholder="Nhập mã truy cập..."
-          className="field font-mono w-full"
+          className="field w-full"
         />
+        <p className="field-hint mt-1">
+          Gửi kèm mỗi yêu cầu tới server gateway dùng chung. Để trống nghĩa là không yêu cầu.
+        </p>
       </div>
 
-      <div className="border-t border-border-hairline pt-3">
+      <div className="border-t border-subtle pt-3">
         <RoutingSettingsPanel />
       </div>
     </>

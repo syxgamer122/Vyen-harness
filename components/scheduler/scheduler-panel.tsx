@@ -107,8 +107,14 @@ export function SchedulerPanel() {
    * mọi "trần ngân sách" chỉ chạy được khi scheduler đang bật — cần một nút
    * dừng khẩn cấp để người dùng cắt ngay khi nghi lịch đang làm hỏng việc.
    * Sentinel file do bridge quản lý (`.vyen/scheduler-paused`).
+   *
+   * `null` = CHƯA BIẾT. Bridge chỉ có `setKillSwitch` (lib/desktop-bridge.ts),
+   * không có getter — daemon còn tự dừng vì phiên trước thì mở Cài đặt ra ta
+   * không có cách nào biết. Trước đây state là `false` cứng nên UI luôn bảo
+   * "Scheduler đang hoạt động" — sai. Nay null hiện đúng sự thật là không đọc
+   * được, và nút mặc định hành động theo hướng AN TOÀN (dừng).
    */
-  const [killSwitchOn, setKillSwitchOn] = useState(false);
+  const [killSwitch, setKillSwitch] = useState<boolean | null>(null);
   const [killSwitchBusy, setKillSwitchBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [recipeId, setRecipeId] = useState('');
@@ -200,55 +206,51 @@ export function SchedulerPanel() {
   };
 
   const renderStatusBadge = (status?: ScheduleStatus, error?: string) => {
-    if (status === 'running') {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-none border border-status-warning/30 bg-[#e8993a]/15 px-2 py-0.5 text-[11px] font-medium text-status-warning">
-          <Loader2 size={12} className="animate-spin" />
-          Đang chạy
-        </span>
-      );
-    }
-    if (status === 'success') {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-none border border-status-success/30 bg-[#5db87a]/15 px-2 py-0.5 text-[11px] font-medium text-status-success">
-          <CheckCircle2 size={12} />
-          Thành công
-        </span>
-      );
-    }
-    if (status === 'failure') {
-      return (
-        <span
-          className="inline-flex items-center gap-1 rounded-none border border-status-error/30 bg-[#e8704f]/15 px-2 py-0.5 text-[11px] font-medium text-status-error"
-          title={error}
-        >
-          <AlertCircle size={12} />
-          Lỗi
-        </span>
-      );
-    }
+    const tone: Record<
+      'running' | 'success' | 'failure' | 'idle',
+      { className: string; icon: React.ReactNode; label: string }
+    > = {
+      running: {
+        className: 'border border-warning/40 bg-warning/10 text-warning',
+        icon: <Loader2 size={12} className="animate-spin" />,
+        label: 'Đang chạy',
+      },
+      success: {
+        className: 'border border-success/40 bg-success/10 text-success',
+        icon: <CheckCircle2 size={12} />,
+        label: 'Thành công',
+      },
+      failure: {
+        className: 'border border-danger/40 bg-danger/10 text-danger',
+        icon: <AlertCircle size={12} />,
+        label: 'Lỗi',
+      },
+      idle: {
+        className: 'border border-subtle bg-raised text-tertiary',
+        icon: null,
+        label: 'Chưa chạy',
+      },
+    };
+    const t = tone[status ?? 'idle'];
     return (
-      <span className="inline-flex items-center gap-1 rounded-none border border-border-hairline/40 bg-panel-bg px-2 py-0.5 text-[11px] font-medium text-text-muted">
-        Chưa chạy
+      <span className={`inline-flex items-center gap-1 rounded-none px-2 py-0.5 text-meta font-medium ${t.className}`} title={error}>
+        {t.icon}
+        {t.label}
       </span>
     );
   };
 
   return (
-    <div className="space-y-4 font-mono text-xs">
-      <div className="flex items-center justify-between border-b border-border-hairline pb-3">
+    <div className="space-y-4 font-mono text-ui">
+      <div className="flex items-center justify-between border-b border-subtle pb-3">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary">Lịch chạy Recipe (Scheduler)</h3>
-          <p className="mt-0.5 text-[11px] text-text-muted">
+          <h3 className="text-read font-semibold text-primary">Lịch chạy Recipe (Scheduler)</h3>
+          <p className="mt-0.5 text-meta text-tertiary">
             Tự động thực thi các workflow recipe theo biểu thức cron định kỳ.
           </p>
         </div>
         {!isEditing && (
-          <button
-            type="button"
-            onClick={handleStartCreate}
-            className="flex items-center gap-1.5 rounded-none bg-[#6a9fcc] px-2.5 py-1 text-xs font-semibold text-[#0d1116] transition hover:bg-[#6a9fcc]/85"
-          >
+          <button type="button" onClick={handleStartCreate} className="btn-primary py-1">
             <Plus size={13} />
             <span>Thêm lịch mới</span>
           </button>
@@ -259,63 +261,82 @@ export function SchedulerPanel() {
        * Dừng khẩn cấp toàn bộ lịch. Khi BẬT, mọi tick bị bỏ trống và
        * `executeScheduledRun` từ chối ở cửa — kể cả lệnh "Run now" thủ công.
        */}
-      <div className="flex items-center justify-between gap-3 border border-border-hairline bg-surface-raised px-3 py-2">
+      <div className="settings-card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 font-semibold text-text-primary">
-            {killSwitchOn ? <AlertCircle size={13} className="text-status-error" /> : <CheckCircle2 size={13} />}
-            <span>{killSwitchOn ? 'Scheduler đang tạm dừng' : 'Scheduler đang hoạt động'}</span>
+          <div className="field-label flex items-center gap-1.5">
+            {killSwitch === false ? (
+              <CheckCircle2 size={13} className="text-success" />
+            ) : (
+              <AlertCircle size={13} className={killSwitch === true ? 'text-danger' : 'text-warning'} />
+            )}
+            <span>
+              {killSwitch === null
+                ? 'Scheduler: KHÔNG ĐỌC ĐƯỢC trạng thái'
+                : killSwitch
+                  ? 'Scheduler đang tạm dừng'
+                  : 'Scheduler đang hoạt động'}
+            </span>
           </div>
-          <p className="mt-0.5 text-[11px] text-text-muted">
-            {killSwitchOn
-              ? 'Không lịch nào chạy, kể cả Run now. Bật lại để tiếp tục cron.'
-              : 'Có thể dừng khẩn cấp mọi lịch khi nghi một job đang chạy lỗi.'}
+          <p className="mt-0.5 text-meta leading-relaxed text-tertiary">
+            {killSwitch === null
+              ? 'Bridge không có lệnh đọc trạng thái kill-switch, nên lần mở Cài đặt này Vyen không biết scheduler đang chạy hay đã bị dừng từ trước. Bấm "Dừng khẩn cấp" để chắc chắn không lịch nào chạy.'
+              : killSwitch
+                ? 'Không lịch nào chạy, kể cả Run now. Bật lại để tiếp tục cron.'
+                : 'Có thể dừng khẩn cấp mọi lịch khi nghi một job đang chạy lỗi.'}
           </p>
         </div>
         <button
           type="button"
           disabled={killSwitchBusy}
-          aria-pressed={killSwitchOn}
           onClick={async () => {
             const bridge = vyenDesktop();
-            if (!bridge?.scheduler?.setKillSwitch) return;
+            if (!bridge?.scheduler?.setKillSwitch) {
+              setErrorMessage('Kill-switch chỉ hoạt động trong Vyen desktop (Electron).');
+              return;
+            }
             setKillSwitchBusy(true);
+            // Chưa biết thì dừng — hành động mặc định phải là hướng an toàn.
+            const next = killSwitch !== true;
             try {
-              const next = !killSwitchOn;
               const res = await bridge.scheduler.setKillSwitch(next);
-              setKillSwitchOn(Boolean(res?.paused ?? next));
+              setKillSwitch(Boolean(res?.paused ?? next));
             } catch {
               // Bridge lỗi: giữ trạng thái cũ, không giả vờ đã bật/tắt.
+              setErrorMessage('Không bật/tắt được kill-switch — bridge trả lỗi.');
             } finally {
               setKillSwitchBusy(false);
             }
           }}
-          className="flex shrink-0 items-center gap-1.5 rounded-none border border-border-hairline px-2.5 py-1 text-xs font-semibold text-text-primary transition hover:bg-surface-overlay disabled:opacity-50"
+          className={`btn-secondary flex-shrink-0 ${killSwitch === true ? '' : 'border-danger text-danger'}`}
         >
-          {killSwitchBusy ? <Loader2 size={13} className="animate-spin" /> : killSwitchOn ? <Play size={13} /> : <Pause size={13} />}
-          <span>{killSwitchOn ? 'Tiếp tục' : 'Dừng khẩn cấp'}</span>
+          {killSwitchBusy ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : killSwitch === true ? (
+            <Play size={13} />
+          ) : (
+            <Pause size={13} />
+          )}
+          <span>{killSwitch === true ? 'Tiếp tục' : 'Dừng khẩn cấp'}</span>
         </button>
       </div>
 
       {isEditing && (
-        <form
-          onSubmit={handleSave}
-          className="rounded-none border border-border-hairline bg-surface-raised p-3.5 space-y-3"
-        >
+        <form onSubmit={handleSave} className="settings-card space-y-3 px-4 py-3.5">
           <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-text-primary">
+            <h4 className="field-label">
               {editingId ? 'Sửa lịch trình' : 'Tạo lịch trình mới'}
             </h4>
             <button
               type="button"
               onClick={resetForm}
-              className="text-text-muted hover:text-text-primary text-[11px]"
+              className="text-meta text-tertiary hover:text-primary"
             >
               Hủy
             </button>
           </div>
 
           <div>
-            <label htmlFor={recipeSelectId} className="block mb-1 text-text-primary">
+            <label htmlFor={recipeSelectId} className="field-label mb-1 block">
               Recipe cần chạy
             </label>
             {recipes && recipes.length > 0 ? (
@@ -327,7 +348,7 @@ export function SchedulerPanel() {
                   const found = recipes.find((r) => r.id === e.target.value);
                   if (found) setRecipeName(found.title);
                 }}
-                className="w-full rounded-none border border-border-hairline bg-bg-deep px-2.5 py-1.5 text-text-primary focus:outline-none focus:border-accent-steel"
+                className="field w-full"
               >
                 {recipes.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -345,18 +366,18 @@ export function SchedulerPanel() {
                   setRecipeName(e.target.value);
                   setRecipeId(e.target.value);
                 }}
-                className="w-full rounded-none border border-border-hairline bg-bg-deep px-2.5 py-1.5 text-text-primary focus:outline-none focus:border-accent-steel"
+                className="field w-full"
                 required
               />
             )}
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label htmlFor={cronInputId} className="text-text-primary">
+            <div className="mb-1 flex items-center justify-between">
+              <label htmlFor={cronInputId} className="field-label">
                 Biểu thức Cron (5 trường)
               </label>
-              <span className="text-[11px] text-text-muted">
+              <span className="text-meta text-tertiary">
                 {isValidCron(cronExpr) ? describeCron(cronExpr) : 'Cú pháp không hợp lệ'}
               </span>
             </div>
@@ -366,11 +387,8 @@ export function SchedulerPanel() {
               value={cronExpr}
               onChange={(e) => setCronExpr(e.target.value)}
               placeholder="*/5 * * * *"
-              className={`w-full rounded-none border px-2.5 py-1.5 text-text-primary focus:outline-none ${
-                isValidCron(cronExpr)
-                  ? 'border-border-hairline bg-bg-deep focus:border-accent-steel'
-                  : 'border-status-error bg-[#e8704f]/10'
-              }`}
+              aria-invalid={!isValidCron(cronExpr)}
+              className={`field w-full ${isValidCron(cronExpr) ? '' : 'border-danger bg-danger/10'}`}
               required
             />
             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -379,7 +397,7 @@ export function SchedulerPanel() {
                   key={p.cron}
                   type="button"
                   onClick={() => setCronExpr(p.cron)}
-                  className="rounded-none border border-border-hairline bg-panel-bg px-2 py-0.5 text-[10px] text-text-muted hover:text-text-primary hover:bg-panel-soft transition"
+                  className="btn-secondary px-2 py-0.5 text-micro text-tertiary"
                 >
                   {p.label}
                 </button>
@@ -388,8 +406,8 @@ export function SchedulerPanel() {
           </div>
 
           {isValidCron(cronExpr) && (
-            <div className="text-[11px] text-text-muted flex items-center gap-1.5">
-              <Clock size={12} className="text-accent-steel" />
+            <div className="flex items-center gap-1.5 text-meta text-tertiary">
+              <Clock size={12} className="text-accent" />
               <span>
                 Lần chạy kế tiếp:{' '}
                 {getNextCronRun(cronExpr)?.toLocaleString('vi-VN') || 'Không tìm thấy mốc kế tiếp'}
@@ -398,24 +416,17 @@ export function SchedulerPanel() {
           )}
 
           {errorMessage && (
-            <div className="flex items-center gap-1.5 text-status-error text-[11px]">
-              <AlertCircle size={13} />
+            <div className="notice-error flex items-center gap-1.5 text-meta" role="alert">
+              <AlertCircle size={13} className="flex-shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="rounded-none border border-border-hairline bg-panel-bg px-3 py-1 text-text-muted hover:text-text-primary hover:bg-panel-soft"
-            >
+            <button type="button" onClick={resetForm} className="btn-secondary">
               Hủy
             </button>
-            <button
-              type="submit"
-              className="rounded-none bg-[#6a9fcc] px-3 py-1 font-semibold text-[#0d1116] hover:bg-[#6a9fcc]/85 transition"
-            >
+            <button type="submit" className="btn-primary">
               Lưu lịch trình
             </button>
           </div>
@@ -425,13 +436,13 @@ export function SchedulerPanel() {
       {/* Danh sách Schedule */}
       <div className="space-y-2">
         {(!schedules || schedules.length === 0) && !isEditing && (
-          <div className="rounded-none border border-dashed border-border-hairline bg-surface-raised p-6 text-center text-text-muted">
-            <Calendar size={24} className="mx-auto mb-2 text-[#757d89]" />
+          <div className="rounded-none border border-dashed border-default bg-surface p-6 text-center text-tertiary">
+            <Calendar size={24} className="mx-auto mb-2 text-tertiary" />
             <p>Chưa có lịch trình nào được tạo.</p>
             <button
               type="button"
               onClick={handleStartCreate}
-              className="mt-2 inline-flex items-center gap-1 rounded-none border border-border-hairline bg-panel-bg px-2.5 py-1 text-text-primary hover:bg-panel-soft"
+              className="btn-secondary mt-2 px-2.5 py-1"
             >
               <Plus size={12} />
               <span>Tạo lịch đầu tiên</span>
@@ -444,21 +455,21 @@ export function SchedulerPanel() {
             key={s.id}
             className={`rounded-none border p-3 transition ${
               s.enabled
-                ? 'border-border-hairline bg-surface-raised hover:border-border-hover'
-                : 'border-border-hairline/40 bg-surface-raised/40 opacity-60'
+                ? 'border-subtle bg-raised hover:border-default'
+                : 'border-subtle bg-surface opacity-60'
             }`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-text-primary truncate">
+                  <span className="truncate font-semibold text-primary">
                     {s.recipeName || s.recipeId}
                   </span>
                   {renderStatusBadge(s.lastStatus, s.lastError)}
                 </div>
 
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted">
-                  <span className="rounded-none border border-border-hairline bg-panel-bg px-1.5 py-0.5 text-text-primary">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-tertiary">
+                  <span className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 font-mono text-primary">
                     {s.cron}
                   </span>
                   <span>{describeCron(s.cron)}</span>
@@ -469,72 +480,88 @@ export function SchedulerPanel() {
               </div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex flex-shrink-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleRunNow(s)}
                   disabled={runningId === s.id}
                   title="Chạy ngay bây giờ"
-                  className="rounded-none border border-border-hairline bg-panel-bg p-1.5 text-text-muted hover:bg-panel-soft hover:text-accent-steel transition disabled:opacity-50"
+                  aria-label={`Chạy ngay ${s.recipeName || s.recipeId}`}
+                  className="icon-btn icon-btn-sm border border-subtle"
                 >
-                  {runningId === s.id ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                  {runningId === s.id ? (
+                    <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Play size={13} aria-hidden="true" />
+                  )}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleToggle(s)}
                   title={s.enabled ? 'Tạm dừng (Pause)' : 'Kích hoạt (Resume)'}
-                  className="rounded-none border border-border-hairline bg-panel-bg p-1.5 text-text-muted hover:bg-panel-soft hover:text-text-primary transition"
+                  aria-label={
+                    s.enabled
+                      ? `Tạm dừng ${s.recipeName || s.recipeId}`
+                      : `Kích hoạt ${s.recipeName || s.recipeId}`
+                  }
+                  className="icon-btn icon-btn-sm border border-subtle"
                 >
-                  {s.enabled ? <Pause size={13} /> : <Play size={13} className="text-status-success" />}
+                  {s.enabled ? (
+                    <Pause size={13} aria-hidden="true" />
+                  ) : (
+                    <Play size={13} className="text-success" aria-hidden="true" />
+                  )}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleStartEdit(s)}
                   title="Chỉnh sửa"
-                  className="rounded-none border border-border-hairline bg-panel-bg p-1.5 text-text-muted hover:bg-panel-soft hover:text-text-primary transition"
+                  aria-label={`Chỉnh sửa ${s.recipeName || s.recipeId}`}
+                  className="icon-btn icon-btn-sm border border-subtle"
                 >
-                  <Pencil size={13} />
+                  <Pencil size={13} aria-hidden="true" />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleDelete(s.id)}
                   title="Xóa lịch trình"
-                  className="rounded-none border border-border-hairline bg-panel-bg p-1.5 text-text-muted hover:bg-[#e8704f]/10 hover:text-status-error transition"
+                  aria-label={`Xóa lịch trình ${s.recipeName || s.recipeId}`}
+                  className="icon-btn icon-btn-sm icon-btn-danger border border-subtle"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={13} aria-hidden="true" />
                 </button>
               </div>
             </div>
 
             {/* Danh sách Sessions sinh ra */}
             {s.sessions && s.sessions.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-border-hairline">
+              <div className="mt-2 border-t border-subtle pt-2">
                 <button
                   type="button"
                   onClick={() =>
                     setExpandedSessionsId(expandedSessionsId === s.id ? null : s.id)
                   }
-                  className="flex items-center gap-1 text-[10px] text-text-muted hover:text-text-primary"
+                  className="flex items-center gap-1 text-micro text-tertiary hover:text-primary"
                 >
                   {expandedSessionsId === s.id ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                  <span>{s.sessions.length} phiên đã sinh ra</span>
+                  <span className="tabular-nums">{s.sessions.length} phiên đã sinh ra</span>
                 </button>
 
                 {expandedSessionsId === s.id && (
-                  <div className="mt-1.5 space-y-1 max-h-28 overflow-y-auto pr-1">
+                  <div className="mt-1.5 max-h-28 space-y-1 overflow-y-auto pr-1">
                     {s.sessions.map((sessId) => (
                       <div
                         key={sessId}
-                        className="flex items-center justify-between rounded-none border border-border-hairline/50 bg-panel-bg px-2 py-1 text-[11px] text-text-primary"
+                        className="flex items-center justify-between rounded-none border border-subtle bg-sunken px-2 py-1 text-meta text-primary"
                       >
                         <span className="truncate">{sessId}</span>
                         <button
                           type="button"
                           onClick={() => setCurrentChatId(sessId)}
-                          className="flex items-center gap-1 text-accent-steel hover:underline shrink-0 text-[10px]"
+                          className="flex flex-shrink-0 items-center gap-1 text-micro text-accent hover:underline"
                         >
                           <span>Mở phiên</span>
                           <ExternalLink size={10} />

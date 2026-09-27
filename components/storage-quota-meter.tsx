@@ -62,10 +62,10 @@ export function StorageQuotaMeter() {
   const isCritical = percentage >= 90 || persisted === false;
 
   return (
-    <div className="border border-border-hairline bg-surface-raised p-3">
+    <div className="border border-subtle bg-raised p-3">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <HardDrive size={14} className="text-status-info" />
+          <HardDrive size={14} className="text-info" />
           <h4 className="text-xs font-semibold text-text-primary">Dung Lượng Bộ Nhớ &amp; Độ Bền Vững (Storage Quota)</h4>
         </div>
         <button
@@ -86,7 +86,7 @@ export function StorageQuotaMeter() {
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden border border-border-hairline">
+        <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden border border-subtle">
           <div
             className={`h-full transition-all duration-300 ${
               isCritical ? 'bg-status-error' : isHigh ? 'bg-status-warning' : 'bg-status-success'

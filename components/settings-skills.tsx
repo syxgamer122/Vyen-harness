@@ -82,17 +82,17 @@ export function DiskSkillsSection() {
   return (
     <div className="space-y-3 font-mono">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">Kỹ năng (SKILL.md)</h3>
+        <h3 className="field-label text-read">Kỹ năng (SKILL.md)</h3>
         <button
           type="button"
           onClick={() => void rescan()}
-          className="flex items-center gap-1.5 rounded-none border border-border-hairline bg-surface-raised px-2 py-1 text-[11px] text-text-primary hover:bg-panel-bg"
+          className="btn-secondary px-2 py-1"
         >
           <RefreshCw size={11} className={scanning ? 'animate-spin' : undefined} aria-hidden="true" />
           Quét lại
         </button>
       </div>
-      <p className="text-xs leading-relaxed text-text-muted">
+      <p className="text-ui leading-relaxed text-tertiary">
         Kỹ năng dạng file <code className="claude-inline-code">SKILL.md</code> trong{' '}
         <code className="claude-inline-code">.vyen/skills/</code> của workspace và{' '}
         <code className="claude-inline-code">~/.vyen/skills/</code> (desktop). Agent chỉ thấy{' '}
@@ -109,29 +109,29 @@ export function DiskSkillsSection() {
                 type="checkbox"
                 checked={!disabled}
                 onChange={() => toggle(e.name)}
-                className="mt-0.5 h-4 w-4 rounded-none accent-[#6a9fcc]"
+                className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
               />
               <label htmlFor={`skill-toggle-${e.source}-${e.name}`} className="min-w-0 flex-1 cursor-pointer">
-                <span className="block text-xs font-medium text-text-primary">
+                <span className="block text-ui font-medium text-primary">
                   {e.name}
-                  <span className="ml-1.5 font-normal text-[#757d89]">{e.source === 'workspace' ? 'workspace' : 'toàn cục'}</span>
-                  {e.version && <span className="ml-1.5 font-mono text-[10px] text-[#757d89]">v{e.version}</span>}
+                  <span className="ml-1.5 font-normal text-tertiary">{e.source === 'workspace' ? 'workspace' : 'toàn cục'}</span>
+                  {e.version && <span className="ml-1.5 font-mono text-micro text-tertiary">v{e.version}</span>}
                 </span>
-                <span className="block truncate text-[11px] text-text-muted">{e.description}</span>
+                <span className="field-hint block truncate">{e.description}</span>
               </label>
             </li>
           );
         })}
         {!scanning && entries.length === 0 && (
-          <li className="text-xs text-text-muted">
+          <li className="text-ui text-tertiary">
             Chưa tìm thấy skill nào. Kết nối workspace rồi bấm Quét lại, hoặc tạo skill mới bên dưới.
           </li>
         )}
-        {scanning && <li className="text-xs text-text-muted">Đang quét…</li>}
+        {scanning && <li className="text-ui text-tertiary">Đang quét…</li>}
       </ul>
 
       {errors.length > 0 && (
-        <div role="status" className="rounded-none border border-status-warning/40 bg-surface-raised px-2.5 py-2 text-[11px] text-status-warning">
+        <div role="status" className="notice-warn text-meta">
           {errors.slice(0, 3).map((e) => (
             <div key={e.source} className="truncate">
               {e.source}: {e.error}
@@ -140,8 +140,8 @@ export function DiskSkillsSection() {
         </div>
       )}
 
-      <div className="space-y-2 border-t border-border-hairline pt-3">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-text-primary">
+      <div className="space-y-2 border-t border-subtle pt-3">
+        <div className="field-label flex items-center gap-1.5 text-ui">
           <FolderPlus size={13} aria-hidden="true" />
           Tạo skill mới
         </div>
@@ -152,7 +152,7 @@ export function DiskSkillsSection() {
             onChange={(e) => setNewName(e.target.value)}
             placeholder="tên-khong-dau"
             aria-label="Tên skill mới"
-            className="claude-input font-mono text-xs"
+            className="field-sm"
           />
           <input
             type="text"
@@ -160,17 +160,17 @@ export function DiskSkillsSection() {
             onChange={(e) => setNewDesc(e.target.value)}
             placeholder="Mô tả ngắn: dùng khi nào"
             aria-label="Mô tả skill mới"
-            className="claude-input text-xs"
+            className="field-sm"
           />
         </div>
         <button
           type="button"
           onClick={() => void createSkill()}
-          className="rounded-none border border-border-hairline bg-surface-raised px-2.5 py-1.5 text-xs text-text-primary hover:bg-panel-bg"
+          className="btn-secondary w-full py-1.5"
         >
           Scaffold .vyen/skills/…/SKILL.md
         </button>
-        {notice && <p role="status" className="text-[11px] text-accent-steel">{notice}</p>}
+        {notice && <p role="status" className="text-meta text-accent">{notice}</p>}
       </div>
     </div>
   );

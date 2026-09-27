@@ -2,14 +2,27 @@
 
 import React from 'react';
 import { useHudStore, type HudLane } from '@/lib/hud-store';
-import { describeEvidence } from '@/lib/evidence';
 import { CATEGORY_DESCRIPTIONS } from '@/lib/routing/categories';
-import { Cpu, Zap, Activity, Clock, Coins, CheckCircle2, AlertTriangle, Play, HelpCircle } from 'lucide-react';
+import { EvidenceBadge } from '@/components/evidence-badge';
 
 interface AgentHudProps {
   className?: string;
 }
 
+/**
+ * PHIẾU CỦA LƯỢT GẦN NHẤT — không phải HUD telemetry sống.
+ *
+ * Store `hud-store` có đủ 9 mutator, nhưng vị trí ghi DUY NHẤT là
+ * `use-chat-orchestration.ts` trong `onFinish` — tức là SAU khi lượt đã xong.
+ * Vì vậy ở thời điểm render, store chỉ có thể trả lời chính xác cho: model +
+ * effort, category, số token, và cost. Các trường còn lại trong `HudLane`
+ * (`turn`, `elapsedSec`, `parallelShots`) không có call site nào ghi vào, nên
+ * chúng LUÔN bằng 0 — hiện chúng sẽ là những con số không bao giờ đúng.
+ *
+ * Vì vậy strip này không hiện chúng, và cũng không giả vờ làm nguồn số liệu
+ * trực tiếp. Muốn nó sống trở lại thì phải có call site ghi ở đầu lượt —
+ * xem ghi chú trong `lib/hud-store.ts`.
+ */
 export function AgentHud({ className = '' }: AgentHudProps) {
   const lanes = useHudStore((s) => s.lanes);
   const laneList = Object.values(lanes);
@@ -21,108 +34,55 @@ export function AgentHud({ className = '' }: AgentHudProps) {
   return (
     <div
       role="status"
-      aria-label="Agent Telemetry HUD"
-      className={`border-b border-border-hairline/50 bg-surface-raised/90 backdrop-blur-md px-3 py-2 text-xs font-mono text-text-muted transition-all duration-200 ${className}`}
+      aria-label="Last run receipt"
+      className={`border-b border-subtle bg-surface px-3 py-1.5 text-meta font-mono text-tertiary ${className}`}
     >
-      <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
-        {laneList.map((lane) => (
-          <HudRow key={lane.laneId} lane={lane} />
-        ))}
-      </div>
+      {laneList.map((lane) => (
+        <HudRow key={lane.laneId} lane={lane} />
+      ))}
     </div>
   );
 }
 
+/**
+ * MỘT dòng cố định: danh tính lượt · token · cost · mức bằng chứng.
+ * Không wrap — `truncate` để thanh receipt không đẩy layout khi tên model dài.
+ */
 function HudRow({ lane }: { lane: HudLane }) {
   const catInfo = CATEGORY_DESCRIPTIONS[lane.category] ?? { label: lane.category };
-  const evidenceInfo = describeEvidence(lane.evidence);
-
-  const costDisplay =
-    lane.costUsd === 'unknown'
-      ? 'unknown'
-      : `$${lane.costUsd.toFixed(4)}`;
-
-  const evidenceColorMap = {
-    default: 'bg-panel-soft text-text-muted border-border-hairline/60',
-    running: 'bg-[#6a9fcc]/10 text-accent-steel border-accent-steel/30 animate-pulse',
-    warning: 'bg-[#e8993a]/10 text-status-warning border-status-warning/30',
-    success: 'bg-[#5db87a]/10 text-status-success border-status-success/30 font-semibold',
-    danger: 'bg-[#e8704f]/10 text-status-error border-status-error/30',
-  };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-none border border-border-hairline/40 bg-panel-bg/60 px-2.5 py-1.5 hover:border-border-hairline transition-colors">
-      {/* Left: Model, Category, Effort */}
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="flex items-center gap-1 font-medium text-text-primary">
-          <Cpu className="h-3.5 w-3.5 text-accent-steel" />
-          <span className="truncate max-w-[120px] sm:max-w-[180px]">{catInfo.label}</span>
-        </span>
-        <span className="text-text-muted/60">/</span>
-        <span className="text-text-muted">
-          {lane.model}:{lane.effort}
-        </span>
-        {lane.kind !== 'main' && (
-          <span className="rounded-none bg-panel-soft px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-text-primary">
-            {lane.kind}
-          </span>
-        )}
-      </div>
-
-      {/* Center / Right: Telemetry metrics */}
-      <div className="flex items-center gap-3 text-[11px]">
-        {/* Parallel shot badge */}
-        {Boolean(lane.parallelShots && lane.parallelShots > 1) && (
-          <span className="inline-flex items-center gap-1 rounded-none bg-[#e8993a]/15 border border-status-warning/30 px-1.5 py-0.5 text-status-warning font-semibold">
-            <Zap className="h-3 w-3" />
-            parallel shot ×{lane.parallelShots}
-          </span>
-        )}
-
-        {/* Turn */}
-        <span className="hidden sm:inline-flex items-center gap-1 text-text-muted">
-          <Activity className="h-3 w-3" />
-          T{lane.turn}
-        </span>
-
-        {/* Tokens */}
-        <span className="hidden md:inline-flex items-center gap-1 text-text-muted">
-          <Coins className="h-3 w-3" />
-          {lane.tokensIn + lane.tokensOut > 0 ? (
-            <span>
-              {lane.tokensIn}↓ {lane.tokensOut}↑
-            </span>
-          ) : (
-            '0 tok'
-          )}
-        </span>
-
-        {/* Cost */}
-        <span className="inline-flex items-center gap-1 font-medium">
-          <span className={lane.costUsd === 'unknown' ? 'text-text-muted italic' : 'text-text-primary'}>
-            {costDisplay}
-          </span>
-        </span>
-
-        {/* Elapsed */}
-        <span className="hidden sm:inline-flex items-center gap-1 text-text-muted">
-          <Clock className="h-3 w-3" />
-          {lane.elapsedSec}s
-        </span>
-
-        {/* Evidence ladder badge */}
-        <span
-          className={`inline-flex items-center gap-1 rounded-none border px-2 py-0.5 text-[11px] ${
-            evidenceColorMap[evidenceInfo.variant]
-          }`}
-        >
-          {lane.evidence === 'verified' && <CheckCircle2 className="h-3 w-3" />}
-          {lane.evidence === 'running' && <Play className="h-3 w-3" />}
-          {lane.evidence === 'reported_done' && <AlertTriangle className="h-3 w-3" />}
-          {lane.evidence === 'prepared' && <HelpCircle className="h-3 w-3" />}
-          {evidenceInfo.badgeText}
-        </span>
-      </div>
+    <div className="flex items-center gap-1.5">
+      <span className="shrink-0 text-secondary">{catInfo.label}</span>
+      <Dot />
+      {/* `min-w-0`: mặc định flex item có `min-width:auto` nên không co lại
+          dưới kích thước nội dung — `truncate` sẽ không bao giờ kích hoạt. */}
+      <span className="min-w-0 truncate">{lane.model}:{lane.effort}</span>
+      {lane.kind !== 'main' && (
+        <>
+          <Dot />
+          <span className="shrink-0 uppercase tracking-wider">{lane.kind}</span>
+        </>
+      )}
+      <Dot />
+      <span className="shrink-0 tabular-nums">
+        {lane.tokensIn}↓ {lane.tokensOut}↑
+      </span>
+      <Dot />
+      {/* Model chưa có hợp đồng giá → `calculateModelCost` trả 'unknown'. Gạch
+          đầu dòng nói "không biết", không phải con số 0 và không phải chữ
+          "unknown" đọc như một số đo hỏng. */}
+      {lane.costUsd === 'unknown' ? (
+        <span className="shrink-0 text-disabled">—</span>
+      ) : (
+        <span className="shrink-0 tabular-nums text-secondary">${lane.costUsd.toFixed(4)}</span>
+      )}
+      <Dot />
+      <EvidenceBadge level={lane.evidence} size="md" className="shrink-0" />
     </div>
   );
+}
+
+function Dot() {
+  return <span className="shrink-0 text-disabled">·</span>;
 }

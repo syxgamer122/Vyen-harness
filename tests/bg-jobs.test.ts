@@ -76,8 +76,45 @@ describe('BgJobStore', () => {
     expect(store.get(newest.id)).not.toBeNull();
   });
 
-  it('hằng số hợp lý: max running 5, max jobs 50', () => {
-    expect(MAX_RUNNING).toBe(5);
-    expect(MAX_JOBS).toBe(50);
+  /* Trần MAX_JOBS chỉ được bảo vệ qua HÀNH VI, không pin con số: nếu ai đó nâng
+     hằng lên (50 → 1000) thì prune() mặc định không còn dọn gì và 5 job done
+     cũ nhất vẫn nằm lại ⇒ các khẳng định dưới đây đỏ. */
+  it('prune() mặc định thật sự dọn job vượt trần, giữ nguyên job đang chạy', () => {
+    // Đường sống thật: lib/ipc.cjs gọi `bgStore.prune()` KHÔNG truyền tham số,
+    // nên trần lấy từ default của hàm.
+    const old = Array.from({ length: MAX_JOBS + 5 }, (_, i) => store.create({ id: `bg-d${i}`, command: 'x' }));
+    for (const job of old.slice(0, 5)) {
+      store.update(job.id, { status: 'done', exitCode: 0 });
+    }
+
+    store.prune();
+
+    // 5 job done dựng sẵn vượt trần phải biến mất (kèm log trên đĩa).
+    for (const job of old.slice(0, 5)) {
+      expect(store.get(job.id), `${job.id} phải bị prune`).toBeNull();
+      expect(existsSync(store.logPath(job.id))).toBe(false);
+    }
+    // Trần giữ trên đĩa là MAX_JOBS, không phải MAX_JOBS + 5.
+    expect(store.list()).toHaveLength(MAX_JOBS);
+    // Không job đang chạy nào bị đụng tới.
+    for (const job of old.slice(5)) {
+      expect(store.get(job.id), `${job.id} đang chạy — không được prune`).not.toBeNull();
+    }
+  });
+
+  /* Trần MAX_RUNNING ở lib/ipc.cjs dựa hoàn toàn vào runningCount(), nên
+     hàm đếm này là mắt xích quyết định: đếm đúng job 'running', bỏ qua
+     done/failed. */
+  it('runningCount chỉ đếm job running — job kết thúc trả lại suất cho bg-run', () => {
+    const jobs = Array.from({ length: MAX_RUNNING + 3 }, (_, i) => store.create({ id: `bg-r${i}`, command: 'x' }));
+    store.update(jobs[0].id, { status: 'done', exitCode: 0 });
+    store.update(jobs[1].id, { status: 'failed', exitCode: 1 });
+
+    // 8 job trên đĩa nhưng chỉ 6 đang giữ suất nền.
+    expect(store.runningCount()).toBe(MAX_RUNNING + 1);
+
+    // Kết thúc hết ⇒ không còn suất nào bị giữ (giữ lại sẽ chặn bg_run vĩnh viễn).
+    for (const job of jobs) store.update(job.id, { status: 'done', exitCode: 0 });
+    expect(store.runningCount()).toBe(0);
   });
 });

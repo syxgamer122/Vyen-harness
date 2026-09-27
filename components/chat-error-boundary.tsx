@@ -51,7 +51,7 @@ export class ChatErrorBoundary extends Component<
       return (
         <div
           role="alert"
-          className="mx-auto my-4 max-w-xl rounded-none border border-status-error/40 bg-surface-raised p-4 text-xs font-mono text-text-primary"
+          className="mx-auto my-4 max-w-xl rounded-none border border-danger/40 bg-raised p-4 text-xs font-mono text-text-primary"
         >
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-error" />
@@ -67,7 +67,7 @@ export class ChatErrorBoundary extends Component<
                 <button
                   type="button"
                   onClick={this.handleRetry}
-                  className="btn-secondary inline-flex items-center gap-1.5 border border-status-error/40 text-status-error hover:bg-[#e8704f]/10 px-3 py-1.5 font-medium"
+                  className="btn-secondary inline-flex items-center gap-1.5 border border-danger/40 text-status-error hover:bg-danger/10 px-3 py-1.5 font-medium"
                 >
                   <RefreshCcw className="h-3.5 w-3.5" />
                   <span>Thử lại</span>

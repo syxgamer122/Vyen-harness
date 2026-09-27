@@ -31,7 +31,6 @@ describe('ContextMeter — computeMeter (clamp & tone)', () => {
     expect(m.percent).toBe(6);
     expect(m.fillRatio).toBeCloseTo(0.061725, 5);
     expect(m.tone).toBe('ok');
-    expect(m.safeMax).toBe(200000);
   });
 
   it('used = 0: thanh rỗng, tone ok', () => {

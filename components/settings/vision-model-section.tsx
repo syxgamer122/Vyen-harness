@@ -23,7 +23,10 @@ export function VisionModelSection() {
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor="vision-model" className="block text-sm font-medium text-text-primary">
+      <label
+        htmlFor="vision-model"
+        className={`field-label block ${noModels ? 'text-disabled' : 'text-primary'}`}
+      >
         Model đọc ảnh (vision)
       </label>
       <select
@@ -42,20 +45,20 @@ export function VisionModelSection() {
         ))}
       </select>
       {noModels ? (
-        <p className="text-[11px] leading-relaxed text-text-muted">
+        <p className="field-hint">
           Hãy chọn một Nhà cung cấp ở trên và bấm kiểm tra kết nối để tải danh sách model, rồi
           quay lại đây chọn model đọc ảnh.
           {visionModel ? ` Lựa chọn cũ (${visionModel}) vẫn được giữ.` : ''}
         </p>
       ) : (
-        <p className="text-[11px] leading-relaxed text-text-muted">
+        <p className="field-hint">
           Dùng để mô tả ảnh thành chữ: ảnh trong thư mục làm việc khi agent gọi{' '}
           <code className="claude-inline-code">fs_read</code>, ảnh do công cụ MCP trả về, và ảnh
           bạn đính kèm cho model không xem được ảnh.
         </p>
       )}
       {unusableModel && (
-        <p className="notice-warn text-[11px] leading-relaxed" role="status">
+        <p className="notice-warn text-meta leading-relaxed" role="status">
           Tên model &ldquo;{visionModel}&rdquo; chứa ký tự mà máy chủ không nhận nên Vyen chưa dùng được để
           đọc ảnh. Hãy chọn model khác.
         </p>

@@ -115,6 +115,62 @@ describe('replaceMostSimilarChunk — chuỗi fallback', () => {
   });
 });
 
+/* Vế REPLACE do model sinh — có thể chứa $&, $`, $', $$, $1... nếu ghi thẳng
+   vào String.replace với string pattern thì các ký tự đó bị diễn giải thành
+   backreference và nội dung file bị hỏng âm thầm. */
+const DOTS_FILE = 'alpha\nbeta\ngamma\n';
+
+describe('replaceMostSimilarChunk — REPLACE chứa ký tự $', () => {
+  for (const token of ['$&', '$`', "$'", '$$']) {
+    it(`elision "..." + REPLACE chứa "${token}" → giữ nguyên văn, không nội suy backreference`, () => {
+      const r = replaceMostSimilarChunk(
+        DOTS_FILE,
+        'alpha\n...\nbeta\n',
+        `A${token}B\n...\nB${token}C\n`,
+      );
+      expect(r.ok).toBe(true);
+      expect(r.strategy).toBe('dotdotdots');
+      expect(r.text).toBe(`A${token}B\nB${token}C\ngamma\n`);
+    });
+  }
+
+  it('elision "..." + REPLACE thường → nội dung nối đúng như cũ (regression)', () => {
+    const r = replaceMostSimilarChunk(DOTS_FILE, 'alpha\n...\nbeta\n', 'A\n...\nB\n');
+    expect(r.ok).toBe(true);
+    expect(r.strategy).toBe('dotdotdots');
+    expect(r.text).toBe('A\nB\ngamma\n');
+  });
+});
+
+describe('replaceMostSimilarChunk — newline cuối file', () => {
+  it('exact edit → file giữ nguyên newline cuối', () => {
+    const r = replaceMostSimilarChunk(FILE, 'main();', 'main(); // chạy');
+    expect(r.ok).toBe(true);
+    expect(r.strategy).toBe('exact');
+    expect(r.text).toBe(FILE.replace('main();', 'main(); // chạy'));
+    expect(r.text!.endsWith('\n')).toBe(true);
+  });
+
+  it('whitespace edit → cũng giữ nguyên newline cuối', () => {
+    const r = replaceMostSimilarChunk(FILE, 'return 1;', 'return 42;');
+    expect(r.ok).toBe(true);
+    expect(r.strategy).toBe('whitespace');
+    expect(r.text!.endsWith('\n')).toBe(true);
+  });
+
+  it('file gốc KHÔNG có newline cuối → không tự thêm vào', () => {
+    const r = replaceMostSimilarChunk('const a = 1;\nconst b = 2;', 'const b = 2;', 'const b = 200;');
+    expect(r.ok).toBe(true);
+    expect(r.text).toBe('const a = 1;\nconst b = 200;');
+  });
+
+  it('file rỗng + SEARCH rỗng → nội dung mới giữ nguyên, không thêm newline', () => {
+    const r = replaceMostSimilarChunk('', '', 'nội dung mới');
+    expect(r.ok).toBe(true);
+    expect(r.text).toBe('nội dung mới');
+  });
+});
+
 describe('findSimilarLines', () => {
   it('tìm cửa sổ trùng nhiều dòng nhất', () => {
     const hint = findSimilarLines('console.log("hi");\nreturn 1;', FILE);

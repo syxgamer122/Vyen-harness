@@ -14,6 +14,10 @@
 export const Z_INDEX = {
   /** Nội dung nền: chat, sidebar, status line. */
   content: 0,
+  /** Backdrop làm mờ khi mở thanh bên drawer trên mobile. */
+  sidebarBackdrop: 30,
+  /** Thanh bên drawer dạng trượt trên mobile / compact viewport. */
+  sidebarDrawer: 35,
   /** Dropdown gắn với control: TaskMenu, ThinkingMenu, menu ngữ cảnh phiên. */
   dropdown: 40,
   /** Popover rời: ModelSelector, ChatExportMenu. */
@@ -39,6 +43,8 @@ export type ZLayer = keyof typeof Z_INDEX;
 /** Class Tailwind tương ứng — dùng trực tiếp trong className. */
 export const Z_CLASS: Record<ZLayer, string> = {
   content: 'z-0',
+  sidebarBackdrop: 'z-[30]',
+  sidebarDrawer: 'z-[35]',
   dropdown: 'z-40',
   popover: 'z-50',
   toast: 'z-[60]',
@@ -54,6 +60,8 @@ export const Z_CLASS: Record<ZLayer, string> = {
  */
 export const Z_ORDER: ZLayer[] = [
   'content',
+  'sidebarBackdrop',
+  'sidebarDrawer',
   'dropdown',
   'popover',
   'toast',

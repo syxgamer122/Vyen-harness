@@ -542,13 +542,15 @@ describe('launch-desktop.cjs cross-platform server launcher', () => {
       expect(occupied).toBe(false);
 
       let spawnedPort: number | null = null;
+      let spawnedEnvPort: string | undefined;
       let resolveSpawn: (port: number) => void;
       const spawnPromise = new Promise<number>((r) => {
         resolveSpawn = r;
       });
 
-      const mockSpawnFn = (_subcmd: string, _env: any, opts: any) => {
+      const mockSpawnFn = (_subcmd: string, env: any, opts: any) => {
         spawnedPort = opts.port;
+        spawnedEnvPort = env.PORT;
         resolveSpawn(opts.port);
         return { pid: 88888, on: () => {} };
       };
@@ -562,8 +564,16 @@ describe('launch-desktop.cjs cross-platform server launcher', () => {
       });
 
       const port = await spawnPromise;
+      // Cổng được chọn phải là một candidate mà launcher ĐÃ tự kiểm tra còn
+      // trống (findAvailablePort), không phải "bất kỳ số nào khác 3000":
+      //  - khác cổng đang bị foreign process chiếm,
+      //  - thuộc danh sách cổng hợp lệ mà launcher tự export,
+      //  - thật sự bind được (isPortAvailable),
+      //  - và PORT truyền cho process con khớp đúng cổng đã chọn.
       expect(port).not.toBe(3000);
-      expect([3001, 3002, 3457]).toContain(port);
+      expect(launcher.DEFAULT_PORTS, `cổng đã chọn không thuộc danh sách hợp lệ: ${port}`).toContain(port);
+      expect(await launcher.isPortAvailable(port)).toBe(true);
+      expect(spawnedEnvPort).toBe(String(spawnedPort));
 
       await expect(promise).rejects.toThrow('Timeout');
     } finally {

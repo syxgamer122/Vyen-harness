@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { exportJson, exportMarkdown } from '@/lib/backup';
 import { Download, FileJson, FileText, Loader2 } from 'lucide-react';
 import { useAnchoredPanel } from '@/lib/hooks/use-anchored-panel';
+import { Z_CLASS } from '@/lib/ui-z';
 
 /**
  * Menu xuất hội thoại. Panel render qua portal + position:fixed (xem
@@ -86,21 +87,21 @@ export function ChatExportMenu({ chatId }: { chatId: string | null }) {
             ref={panelRef}
             role="menu"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-            className="surface-panel z-50 animate-pop-in p-1"
+            className={`surface-panel ${Z_CLASS.popover} animate-pop-in p-1`}
           >
             {exportError && (
-              <p role="alert" className="notice-error mx-1 mb-1 px-2 py-1.5 text-[11px] leading-relaxed">
+              <p role="alert" className="notice-error mx-1 mb-1 px-2 py-1.5 text-meta leading-relaxed">
                 {exportError}
               </p>
             )}
             <MenuRow
-              icon={<FileJson size={15} className="text-text-muted" />}
+              icon={<FileJson size={15} className="text-tertiary" />}
               title="Xuất JSON (đầy đủ nhánh)"
               desc="Bảo toàn toàn bộ cây tin nhắn"
               onClick={() => run('json')}
             />
             <MenuRow
-              icon={<FileText size={15} className="text-text-muted" />}
+              icon={<FileText size={15} className="text-tertiary" />}
               title="Xuất Markdown (nhánh active)"
               desc="Dành cho đọc và in ấn"
               onClick={() => run('md')}
@@ -116,7 +117,7 @@ export function ChatExportMenu({ chatId }: { chatId: string | null }) {
           <p
             role="alert"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-            className="notice-error z-50 px-2.5 py-2 text-[11px] leading-relaxed"
+            className={`notice-error ${Z_CLASS.popover} px-2.5 py-2 text-meta leading-relaxed`}
           >
             {exportError}
           </p>,
@@ -146,8 +147,8 @@ function MenuRow({
     >
       <span className="mt-0.5 flex-none">{icon}</span>
       <span className="flex min-w-0 flex-col">
-        <span className="text-[13px] font-medium text-text-primary">{title}</span>
-        <span className="text-[11px] text-text-muted">{desc}</span>
+        <span className="text-body font-medium text-primary">{title}</span>
+        <span className="text-meta text-tertiary">{desc}</span>
       </span>
     </button>
   );

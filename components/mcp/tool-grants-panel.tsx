@@ -10,6 +10,9 @@ import { ShieldCheck, ShieldAlert, Trash2, RefreshCw, Clock, Key } from 'lucide-
 
 export const MAX_GRANT_TTL_MS = 60 * 60 * 1000; // Trần cứng 60 phút (Red Team blind spot 3)
 
+/** Nhịp làm mới mốc thời gian để nhãn "Còn Nm" tự trôi mà không re-render dồn. */
+const TTL_TICK_MS = 30_000;
+
 export interface McpGrantRecord {
   toolName: string;
   serverId: string;
@@ -24,6 +27,18 @@ export interface McpGrantRecord {
 export function McpToolGrantsPanel() {
   const [grants, setGrants] = useState<McpGrantRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  /**
+   * Một mốc thời gian duy nhất cho CẢ lần render, nhãn "Còn Nm" mới nhất quán
+   * với nhau. Đọc `Date.now()` ở từng dòng list thì mỗi dòng một giá trị khác
+   * nhau (và render lại bất cứ lúc nào) — nên render chỉ đọc mốc đã lưu,
+   * còn effect mới là nơi ghi mốc mới.
+   */
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), TTL_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   const loadGrants = async () => {
     setLoading(true);
@@ -31,11 +46,11 @@ export function McpToolGrantsPanel() {
       // Đọc từ Dexie kv table
       const stored = await db.kv.get('mcp:tool-grants');
       if (stored && Array.isArray(stored.value)) {
-        const now = Date.now();
+        const loadedAt = Date.now();
         const normalized: McpGrantRecord[] = (stored.value as McpGrantRecord[]).map((g) => {
-          const hardCap = (g.grantedAt || now) + MAX_GRANT_TTL_MS;
+          const hardCap = (g.grantedAt || loadedAt) + MAX_GRANT_TTL_MS;
           const cappedExpires = Math.min(g.expiresAt || hardCap, hardCap);
-          const isExpired = now >= cappedExpires;
+          const isExpired = loadedAt >= cappedExpires;
           return {
             ...g,
             expiresAt: cappedExpires,
@@ -64,29 +79,38 @@ export function McpToolGrantsPanel() {
   };
 
   const handleRevokeAll = async () => {
+    if (
+      !window.confirm(
+        `Thu hồi toàn bộ ${grants.length} quyền MCP đang lưu? Các công cụ này sẽ phải phê duyệt lại từ đầu.`,
+      )
+    )
+      return;
     setGrants([]);
     await db.kv.put({ key: 'mcp:tool-grants', value: [] });
   };
 
   return (
-    <div className="border border-border-hairline bg-surface-raised p-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className="settings-card settings-card-body">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Key size={14} className="text-status-info" />
-          <h4 className="text-xs font-semibold text-text-primary">Quyền MCP Động &amp; Schema Governance</h4>
+          <Key size={14} className="flex-none text-info" aria-hidden="true" />
+          <h4 className="field-label text-ui">Quyền MCP Động &amp; Schema Governance</h4>
         </div>
         <div className="flex items-center gap-1.5">
           <button
+            type="button"
             onClick={loadGrants}
-            className="p-1 text-text-muted hover:text-text-primary rounded hover:bg-surface"
+            className="icon-btn icon-btn-sm"
             title="Làm mới"
+            aria-label="Làm mới danh sách quyền MCP"
           >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={12} className={loading ? 'animate-spin' : undefined} aria-hidden="true" />
           </button>
           {grants.length > 0 && (
             <button
+              type="button"
               onClick={handleRevokeAll}
-              className="px-2 py-0.5 text-[10px] text-status-error hover:bg-status-error/10 border border-status-error/30 rounded font-medium transition-colors"
+              className="btn-secondary border-danger px-2 py-0.5 text-micro text-danger hover:border-danger hover:text-danger"
             >
               Thu hồi tất cả
             </button>
@@ -94,48 +118,48 @@ export function McpToolGrantsPanel() {
         </div>
       </div>
 
-      <p className="text-[11px] text-text-muted mb-3 leading-relaxed">
+      <p className="field-hint">
         Quản lý các quyền công cụ Model Context Protocol được cấp phép vĩnh viễn hoặc có thời hạn. Hệ thống tự động vô hiệu hóa quyền nếu cấu trúc công cụ (Schema) bị thay đổi nhằm chống tấn công Dynamic Tool Poisoning.
       </p>
 
       {grants.length === 0 ? (
-        <div className="text-center py-4 text-xs text-text-muted bg-surface/50 border border-border-hairline rounded">
+        <p className="border border-dashed border-default bg-surface px-3 py-4 text-center text-ui text-tertiary">
           Chưa có công cụ MCP nào được lưu quyền tự động. Mọi công cụ sẽ yêu cầu phê duyệt thủ công.
-        </div>
+        </p>
       ) : (
-        <div className="space-y-1.5">
+        <ul className="space-y-1.5">
           {grants.map((grant) => {
             const isMutated = grant.status === 'SCHEMA_MUTATED';
-            const isExpired = grant.status === 'EXPIRED' || Date.now() >= grant.expiresAt;
-            const remainingMins = Math.max(0, Math.round((grant.expiresAt - Date.now()) / 60000));
+            const isExpired = grant.status === 'EXPIRED' || now >= grant.expiresAt;
+            const remainingMins = Math.max(0, Math.round((grant.expiresAt - now) / 60000));
             const isInvalid = isMutated || isExpired;
 
             return (
-              <div
+              <li
                 key={`${grant.serverId}:${grant.toolName}`}
-                className={`flex items-center justify-between p-2 rounded text-xs border ${
-                  isInvalid ? 'border-status-error/40 bg-status-error/5' : 'border-border-hairline bg-surface'
+                className={`flex items-center justify-between border px-2 py-2 text-ui ${
+                  isInvalid ? 'border-danger/40 bg-danger/5' : 'border-subtle bg-surface'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   {isInvalid ? (
-                    <ShieldAlert size={14} className="text-status-error shrink-0" />
+                    <ShieldAlert size={14} className="shrink-0 text-danger" aria-hidden="true" />
                   ) : (
-                    <ShieldCheck size={14} className="text-status-success shrink-0" />
+                    <ShieldCheck size={14} className="shrink-0 text-success" aria-hidden="true" />
                   )}
                   <div>
-                    <div className="font-mono font-medium text-text-primary">
+                    <div className="font-mono font-medium text-primary">
                       {grant.serverId}/{grant.toolName}
                     </div>
-                    <div className="text-[10px] text-text-muted flex items-center gap-2 mt-0.5">
+                    <div className="mt-0.5 flex items-center gap-2 font-mono text-micro text-tertiary">
                       <span>Hash: {grant.schemaHash.slice(0, 8)}…</span>
                       {isMutated ? (
-                        <span className="text-status-error font-medium">SCHEMA MUTATED — BỊ VÔ HIỆU HÓA</span>
+                        <span className="font-medium text-danger">SCHEMA MUTATED — BỊ VÔ HIỆU HÓA</span>
                       ) : isExpired ? (
-                        <span className="text-status-warning font-medium">HẾT HẠN (MAX 60M TTL)</span>
+                        <span className="font-medium text-warning">HẾT HẠN (MAX 60M TTL)</span>
                       ) : (
                         <span className="flex items-center gap-1">
-                          <Clock size={10} /> Còn {remainingMins}p
+                          <Clock size={10} aria-hidden="true" /> Còn {remainingMins}p
                         </span>
                       )}
                     </div>
@@ -143,16 +167,18 @@ export function McpToolGrantsPanel() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => handleRevoke(grant.toolName, grant.serverId)}
-                  className="p-1 text-text-muted hover:text-status-error transition-colors"
+                  className="icon-btn icon-btn-sm icon-btn-danger"
                   title="Thu hồi quyền này"
+                  aria-label={`Thu hồi quyền ${grant.serverId}/${grant.toolName}`}
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={13} aria-hidden="true" />
                 </button>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </div>
   );

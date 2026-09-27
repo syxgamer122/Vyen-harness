@@ -35,7 +35,7 @@ export function UsageStats() {
     <div className="space-y-3 font-mono">
       {/* Bộ lọc thời gian */}
       <div className="flex items-center justify-between gap-2">
-        <div role="group" aria-label="Khoảng thời gian" className="flex gap-1 border border-border-hairline bg-surface-raised p-0.5">
+        <div role="group" aria-label="Khoảng thời gian" className="flex gap-1 border border-subtle bg-raised p-0.5">
           {RANGES.map((r) => (
             <button
               key={r.days}
@@ -44,7 +44,7 @@ export function UsageStats() {
               onClick={() => setDays(r.days)}
               className={`rounded-none px-2.5 py-1 text-[11px] font-medium transition ${
                 days === r.days
-                  ? 'bg-[#6a9fcc] text-[#0d1116] font-semibold'
+                  ? 'bg-accent text-sunken font-semibold'
                   : 'text-text-muted hover:text-text-primary hover:bg-panel-bg'
               }`}
             >
@@ -56,7 +56,7 @@ export function UsageStats() {
       </div>
 
       {totalAll === 0 ? (
-        <div className="flex flex-col items-center gap-2 border border-dashed border-border-hairline bg-surface-raised py-6 text-center">
+        <div className="flex flex-col items-center gap-2 border border-dashed border-subtle bg-raised py-6 text-center">
           <BarChart3 size={20} aria-hidden="true" className="text-text-muted" />
           <p className="px-3 text-xs text-text-muted">
             Chưa có dữ liệu — thống kê được ghi tự động từ các tin nhắn mới
@@ -67,22 +67,22 @@ export function UsageStats() {
         <>
           {/* Tổng quan */}
           <div className={`grid gap-2 ${summary.costUsd !== null ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            <div className="border border-border-hairline bg-surface-raised p-2.5">
+            <div className="border border-subtle bg-raised p-2.5">
               <div className="text-[11px] uppercase tracking-wide text-text-muted">Token vào</div>
               <div className="text-sm font-semibold text-text-primary">{formatTokens(summary.promptTokens)}</div>
             </div>
-            <div className="border border-border-hairline bg-surface-raised p-2.5">
+            <div className="border border-subtle bg-raised p-2.5">
               <div className="text-[11px] uppercase tracking-wide text-text-muted">Token ra</div>
               <div className="text-sm font-semibold text-text-primary">{formatTokens(summary.completionTokens)}</div>
             </div>
-            <div className="border border-border-hairline bg-surface-raised p-2.5">
+            <div className="border border-subtle bg-raised p-2.5">
               <div className="text-[11px] uppercase tracking-wide text-text-muted">Tổng cộng</div>
               <div className="text-sm font-semibold text-accent-steel">{formatTokens(totalAll)}</div>
             </div>
             {summary.costUsd !== null && (
               <div
                 title="Ước lượng theo bảng giá công khai — gateway riêng của bạn có thể khác"
-                className="border border-border-hairline bg-surface-raised p-2.5"
+                className="border border-subtle bg-raised p-2.5"
               >
                 <div className="text-[11px] uppercase tracking-wide text-text-muted">Chi phí ước tính</div>
                 <div className="text-sm font-semibold text-accent-steel">{formatUsd(summary.costUsd)}</div>
@@ -92,7 +92,7 @@ export function UsageStats() {
 
           {/* Theo ngày — cột xếp chồng vào/ra */}
           {summary.byDay.length > 1 && (
-            <div className="border border-border-hairline bg-surface-raised p-3">
+            <div className="border border-subtle bg-raised p-3">
               <div className="mb-2 text-[11px] font-medium text-text-primary">Theo ngày</div>
               <div className="flex h-20 items-end gap-1">
                 {summary.byDay.map((d) => {
@@ -106,8 +106,8 @@ export function UsageStats() {
                       className="flex h-full min-w-0 flex-1 flex-col justify-end"
                     >
                       <div className="flex w-full flex-col overflow-hidden" style={{ height: `${h}%` }}>
-                        <div className="w-full bg-[#4b607c]" style={{ height: `${100 - inPct}%` }} />
-                        <div className="w-full bg-[#6a9fcc]" style={{ height: `${inPct}%` }} />
+                        <div className="w-full bg-accent-dim" style={{ height: `${100 - inPct}%` }} />
+                        <div className="w-full bg-accent" style={{ height: `${inPct}%` }} />
                       </div>
                     </div>
                   );
@@ -121,7 +121,7 @@ export function UsageStats() {
           )}
 
           {/* Theo model */}
-          <div className="space-y-1.5 border border-border-hairline bg-surface-raised p-3">
+          <div className="space-y-1.5 border border-subtle bg-raised p-3">
             <div className="mb-1 text-[11px] font-medium text-text-primary">Theo model</div>
             {summary.byModel.map((m) => {
               const t = m.promptTokens + m.completionTokens;
@@ -138,7 +138,7 @@ export function UsageStats() {
                   </div>
                   <div className="h-1.5 overflow-hidden bg-panel-bg">
                     <div
-                      className="h-full bg-[#6a9fcc]"
+                      className="h-full bg-accent"
                       style={{ width: `${Math.max(2, (t / totalBarMax) * 100)}%` }}
                     />
                   </div>

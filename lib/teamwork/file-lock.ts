@@ -30,8 +30,17 @@ export function normalizeLockPath(rawPath: string, workspaceRoot?: string): stri
   // If workspaceRoot is provided, strip workspaceRoot prefix if present
   if (workspaceRoot) {
     const rootNorm = workspaceRoot.trim().replace(/\\/g, '/').replace(/\/+$/, '');
-    if (p.toLowerCase().startsWith(rootNorm.toLowerCase())) {
-      p = p.slice(rootNorm.length);
+    if (rootNorm) {
+      // Phải kiểm tra ranh giới phân cách: root "/a/proj" là tiền tố chuỗi của
+      // "/a/project/..." nhưng đó là thư mục KHÁC. Cắt bằng `startsWith` đơn thuần
+      // biến "/a/project/src/a.ts" thành "ect/src/a.ts" — trùng lock key với một
+      // file hoàn toàn khác, tức hai tiến trình có thể cùng ghi 1 file.
+      const isSameRoot = p.toLowerCase() === rootNorm.toLowerCase();
+      const isInsideRoot =
+        p.toLowerCase().startsWith(rootNorm.toLowerCase()) && p[rootNorm.length] === '/';
+      if (isSameRoot || isInsideRoot) {
+        p = p.slice(rootNorm.length);
+      }
     }
   }
 
@@ -177,6 +186,8 @@ export class FileLockManager {
 
   /**
    * Releases all file locks owned by workerId and unregisters the worker.
+   * Khi `files` được truyền vào thì chỉ nhả các file đó (partial release);
+   * worker vẫn giữ slot cho tới khi không còn file nào.
    */
   public release(workerId: string, files?: string[]): void {
     if (!workerId) return;
@@ -185,6 +196,10 @@ export class FileLockManager {
       for (const file of files) {
         this.releaseFile(workerId, file);
       }
+      // Partial release cũng phải trả lại slot nếu worker đã hết file. KHÔNG
+      // bỏ được: `releaseFile` trả về sớm (không prune) khi file không thuộc
+      // worker, nên `release(w, [file-w-khong-giu])` không đi qua prune nào.
+      this.pruneInactiveWorker(workerId);
       return;
     }
 
@@ -209,14 +224,24 @@ export class FileLockManager {
     }
 
     this.activeLocks.delete(norm);
+    this.workerLocks.get(workerId)?.delete(norm);
+    this.pruneInactiveWorker(workerId);
+    return true;
+  }
+
+  /**
+   * Gỡ worker khỏi activeWorkers khi worker không còn giữ lock nào.
+   * Đảm bảo partial release luôn trả lại đúng một slot concurrency (nếu không,
+   * canAcquire sẽ chặn vĩnh viễn mọi worker mới khi chạm cap) và dọn luôn entry
+   * rỗng trong workerLocks. Idempotent: gọi lại nhiều lần vẫn an toàn.
+   */
+  private pruneInactiveWorker(workerId: string): void {
     const workerSet = this.workerLocks.get(workerId);
     if (workerSet) {
-      workerSet.delete(norm);
-      if (workerSet.size === 0) {
-        this.activeWorkers.delete(workerId);
-      }
+      if (workerSet.size > 0) return;
+      this.workerLocks.delete(workerId);
     }
-    return true;
+    this.activeWorkers.delete(workerId);
   }
 
   /**

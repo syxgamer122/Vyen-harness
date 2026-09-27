@@ -9,6 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import TextareaAutosize from 'react-textarea-autosize';
 import {
   ArrowUp,
@@ -31,12 +32,14 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useHaptics } from '@/components/effects';
+import { PulseGlow, SiriWave, useHaptics } from '@/components/effects';
 import { filterPrompts } from '@/lib/slash-commands';
 import { ModelSelector } from '@/components/model-selector';
 import type { ModelOption, ModelFavorite, RecentModel } from '@/components/model-selector';
 import { TOOL_CATALOG } from '@/lib/tool-catalog';
 import { useSpeechRecognition } from '@/lib/use-speech-recognition';
+import { useAnchoredPanel } from '@/lib/hooks/use-anchored-panel';
+import { Z_CLASS } from '@/lib/ui-z';
 
 export interface Attachment {
   id: string;
@@ -103,15 +106,15 @@ function ToolbarButton({
       aria-label={label}
       aria-expanded={ariaExpanded}
       title={label}
-      className={`relative flex h-8 w-8 flex-none items-center justify-center rounded-none transition-colors duration-100 after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6a9fcc] ${
+      className={`relative flex h-8 w-8 flex-none items-center justify-center rounded-none transition-colors duration-100 after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
         active
-          ? 'bg-panel-soft text-accent-steel'
-          : 'text-text-muted hover:bg-surface-raised hover:text-text-primary'
+          ? 'bg-raised text-accent'
+          : 'text-tertiary hover:bg-raised hover:text-primary'
       } disabled:cursor-not-allowed disabled:opacity-30 ${className ?? ''}`}
     >
       <Icon size={14} />
       {badge && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#e8993a] px-0.5 text-[9px] font-mono font-bold text-[#0d1116]">
+        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-warning px-0.5 text-micro font-mono font-bold text-base">
           {badge}
         </span>
       )}
@@ -134,12 +137,12 @@ function SendButton({
       onClick={isStreaming ? onStop : undefined}
       disabled={!isStreaming && !canSubmit}
       aria-label={isStreaming ? 'Dừng tạo' : 'Gửi tin nhắn'}
-      className={`relative flex h-8 w-8 flex-none items-center justify-center rounded-none transition-colors duration-100 after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6a9fcc] ${
+      className={`relative flex h-8 w-8 flex-none items-center justify-center transition-all duration-200 after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
         isStreaming
-          ? 'bg-panel-soft text-text-primary hover:bg-[#495059]'
+          ? 'rounded-md bg-danger/20 text-danger border border-danger/40 animate-pulse hover:bg-danger/30'
           : canSubmit
-            ? 'bg-[#6a9fcc] text-[#0d1116] hover:bg-[#6a9fcc]/85 active:scale-95'
-            : 'bg-white/[0.04] text-text-muted/40'
+            ? 'rounded-full bg-accent text-base hover:scale-105 active:scale-95 transition-transform'
+            : 'rounded-full bg-raised text-disabled cursor-not-allowed'
       }`}
     >
       {isStreaming ? (
@@ -186,16 +189,20 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
 
   const flatItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-    };
-  }, [open]);
+  const close = useCallback((returnFocus = true) => {
+    setOpen(false);
+    if (returnFocus) triggerRef.current?.focus();
+  }, []);
+
+  const { pos, panelRef } = useAnchoredPanel({
+    open,
+    triggerRef,
+    width: 288,
+    align: 'left',
+    placement: 'auto',
+    withMaxHeight: true,
+    close,
+  });
 
   useEffect(() => {
     if (open) {
@@ -236,10 +243,9 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
       itemRefs.current[enabledIndices[enabledIndices.length - 1]]?.focus();
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      setOpen(false);
-      triggerRef.current?.focus();
+      close();
     } else if (e.key === 'Tab') {
-      setOpen(false);
+      close(false);
     }
   };
 
@@ -256,70 +262,83 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
         ariaExpanded={open}
         buttonRef={triggerRef}
       />
-      {open && (
-        <div
-          role="menu"
-          aria-label="Tác vụ"
-          tabIndex={-1}
-          onKeyDown={onMenuKeyDown}
-          className="surface-panel absolute bottom-full right-0 z-40 mb-2 w-[min(18rem,calc(100vw-2rem))] animate-slide-up overflow-hidden p-1.5"
-        >
-          {groups.map((group) => (
-            <div key={group.key} role="presentation">
-              <div
-                aria-hidden="true"
-                className="px-2 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-accent-steel"
-              >
-                {group.label}
-              </div>
-              {group.items.map((t) => {
-                const flatIndex = flatItems.findIndex((it) => it.key === t.key);
-                const Icon = t.icon;
-                return (
-                  <button
-                    key={t.key}
-                    ref={(el) => {
-                      itemRefs.current[flatIndex] = el;
-                    }}
-                    type="button"
-                    role="menuitem"
-                    disabled={t.disabled}
-                    onClick={() => {
-                      if (t.returnsFocusToTrigger) triggerRef.current?.focus();
-                      t.onClick();
-                      setOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-none px-2 py-2 text-left transition-colors hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Icon
-                      size={15}
-                      className={`flex-none ${t.active ? 'text-status-success' : 'text-text-muted'}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] text-text-primary">
-                        {t.shortLabel ?? t.label}
+      {open &&
+        pos &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="menu"
+            aria-label="Tác vụ"
+            tabIndex={-1}
+            onKeyDown={onMenuKeyDown}
+            style={{
+              position: 'fixed',
+              ...(pos.top !== undefined ? { top: pos.top } : {}),
+              ...(pos.bottom !== undefined ? { bottom: pos.bottom } : {}),
+              left: pos.left,
+              width: pos.width,
+              maxHeight: pos.maxHeight,
+            }}
+            className={`surface-panel ${Z_CLASS.dropdown} flex animate-slide-up flex-col overflow-y-auto p-1.5 custom-scrollbar`}
+          >
+            {groups.map((group) => (
+              <div key={group.key} role="presentation">
+                <div
+                  aria-hidden="true"
+                  className="px-2 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-accent"
+                >
+                  {group.label}
+                </div>
+                {group.items.map((t) => {
+                  const flatIndex = flatItems.findIndex((it) => it.key === t.key);
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.key}
+                      ref={(el) => {
+                        itemRefs.current[flatIndex] = el;
+                      }}
+                      type="button"
+                      role="menuitem"
+                      disabled={t.disabled}
+                      onClick={() => {
+                        if (t.returnsFocusToTrigger) triggerRef.current?.focus();
+                        t.onClick();
+                        setOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-none px-2 py-2 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Icon
+                        size={15}
+                        className={`flex-none ${t.active ? 'text-success' : 'text-tertiary'}`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] text-primary">
+                          {t.shortLabel ?? t.label}
+                        </span>
+                        {t.description && (
+                          <span className="block truncate text-[10.5px] leading-tight text-tertiary">
+                            {t.description}
+                          </span>
+                        )}
                       </span>
-                      {t.description && (
-                        <span className="block truncate text-[10.5px] leading-tight text-text-muted">
-                          {t.description}
+                      {t.badge && (
+                        <span className="flex-none rounded-full bg-warning px-1.5 text-micro font-bold text-base">
+                          {t.badge}
                         </span>
                       )}
-                    </span>
-                    {t.badge && (
-                      <span className="flex-none rounded-full bg-[#e8993a] px-1.5 text-[10px] font-bold text-[#0d1116]">
-                        {t.badge}
-                      </span>
-                    )}
-                    {t.active && !t.badge && (
-                      <Check size={13} className="flex-none text-status-success" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
+                      {t.active && !t.badge && (
+                        <Check size={13} className="flex-none text-success" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -441,10 +460,19 @@ export const Composer = memo(function Composer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
+  /**
+   * Khoá gửi ĐỒNG BỘ (P1 double-send). `onSubmit` await `db.chats.put` +
+   * `gatherWebContext` (~15s) TRƯỚC khi append, nên `isLoading` phía
+   * orchestration vẫn là giá trị closure cũ suốt cửa sổ đó và không chặn
+   * được Enter thứ hai. State không đóng được cửa sổ (setState là bất đồng
+   * bộ) nên phải dùng ref: set rồi mới await, clear trong finally.
+   */
+  const submittingRef = useRef(false);
   const [dragging, setDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [pickPending, setPickPending] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -829,239 +857,277 @@ export const Composer = memo(function Composer({
   ].filter((g) => g.items.length > 0);
 
   return (
-    // Terminal Input Box (DESIGN.md): full-bleed, dính mép trái/phải, viền
-    // hairline 1px, góc vuông. Chỉ chừa safe-area dưới cho iOS.
-    <div className="w-full pb-[env(safe-area-inset-bottom)]">
-      {canContinue && !isStreaming && (
-        <div className="mb-1.5 flex justify-center">
-          <button
-            type="button"
-            onClick={onContinue}
-            className="flex items-center gap-1.5 rounded-none border border-border-hairline bg-surface-raised px-3 py-1.5 font-mono text-[12px] font-medium text-accent-steel transition-colors duration-100 hover:border-border-hover hover:bg-panel-bg hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6a9fcc]"
-          >
-            <CornerDownLeft size={12} aria-hidden="true" />
-            Viết tiếp
-          </button>
-        </div>
-      )}
-
-      {fileError && (
-        <div role="status" className="notice-warn mb-2 px-2">
-          {fileError}
-        </div>
-      )}
-
-      <form
-        onSubmit={handleFormSubmit}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          acceptFiles(e.dataTransfer?.files ?? null);
-        }}
-        className={`group relative rounded-none border border-border-hairline bg-panel-bg transition-colors duration-100 focus-within:border-accent-steel ${
-          dragging ? 'border-accent-steel' : ''
-        }`}
-      >
-        {slashOpen && (
-          <div
-            role="listbox"
-            aria-label="Danh sách prompt"
-            className="absolute bottom-full left-0 right-0 z-30 mb-2 max-h-64 overflow-y-auto rounded-none border border-border-hairline bg-panel-bg p-1 font-mono"
-            onMouseDown={(e) => e.preventDefault()}
-          >
-            {slashMatches.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                role="option"
-                aria-selected={i === slashIndex}
-                id={`slash-opt-${p.id}`}
-                onClick={() => applyPrompt(p)}
-                onMouseEnter={() => setSlashIndex(i)}
-                className={`flex w-full flex-col items-start gap-0.5 rounded-none px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc] ${
-                  i === slashIndex ? 'bg-panel-soft text-text-primary' : 'text-text-primary hover:bg-surface-raised'
-                }`}
-              >
-                <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-text-primary">
-                  {p.kind === 'recipe' ? (
-                    <ChefHat size={11} aria-hidden="true" className="flex-none text-accent-steel" />
-                  ) : null}
-                  {p.kind === 'command' ? (
-                    <ListChecks size={11} aria-hidden="true" className="flex-none text-accent-steel" />
-                  ) : null}
-                  /{p.title}
-                </span>
-                <span className="line-clamp-1 w-full text-[11px] text-text-muted">
-                  {p.kind === 'recipe'
-                    ? 'workflow · mở panel để chạy'
-                    : p.kind === 'command'
-                      ? 'lệnh · lập kế hoạch bằng planner model (PLAN mode)'
-                      : p.content.replace(/\n+/g, ' ').trim()}
-                </span>
-              </button>
-            ))}
+    <div className="w-full pb-[env(safe-area-inset-bottom)] px-4 flex-none">
+      <div className="sticky bottom-4 mx-auto max-w-4xl z-20">
+        {canContinue && !isStreaming && (
+          <div className="mb-2 flex justify-center">
+            <button
+              type="button"
+              onClick={onContinue}
+              className="flex items-center gap-1.5 rounded-full border border-default bg-overlay px-3.5 py-1.5 font-mono text-ui font-medium text-accent transition-all duration-150 hover:border-strong hover:bg-raised hover:text-primary"
+            >
+              <CornerDownLeft size={12} aria-hidden="true" />
+              Viết tiếp
+            </button>
           </div>
         )}
 
-        {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-3 pt-3">
-            {attachments.map((a) => (
-              <span
-                key={a.id}
-                className="flex max-w-[200px] items-center gap-1.5 rounded-none border border-border-hairline bg-surface-raised px-2 py-1 font-mono text-[11px] text-text-primary"
-              >
-                <Paperclip size={10} aria-hidden="true" className="flex-shrink-0 text-accent-steel" />
-                <span className="truncate">{a.name}</span>
+        {fileError && (
+          <div role="status" className="notice-warn mb-2 px-3 py-1.5 rounded-none border border-warning/40 bg-warning/10 text-amber-warn text-xs">
+            {fileError}
+          </div>
+        )}
+
+        <form
+          onSubmit={handleFormSubmit}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            acceptFiles(e.dataTransfer?.files ?? null);
+          }}
+          className={`group relative rounded-none shadow-bevel-in transition-all duration-300 ${
+            isFocused
+              ? 'ring-1 ring-accent/30 border-accent/40'
+              : 'border border-subtle'
+          } ${dragging ? 'border-accent ring-1 ring-accent/40' : ''}`}
+        >
+          <PulseGlow active={isFocused} />
+
+          {/* Top Micro-Bar */}
+          <div className="flex items-center justify-between border-b border-white/[0.04] px-3.5 py-2">
+            <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar min-w-0">
+              <ModelSelector
+                models={models}
+                value={model}
+                onChange={onModelChange}
+                disabled={modelSelectorDisabled}
+                providerId={modelProviderId}
+                builtinCatalog={modelCatalogBuiltin}
+                favorites={modelFavorites}
+                recents={modelRecents}
+                onToggleFavorite={onToggleModelFavorite}
+              />
+              <TaskMenu groups={taskGroups} />
+              {approvalPolicy && (
                 <button
                   type="button"
-                  onClick={() => onRemoveAttachment(a.id)}
-                  aria-label={`Gỡ ${a.name}`}
-                  className="ml-0.5 rounded-none p-1 text-text-muted transition-colors hover:bg-panel-soft hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+                  onClick={onCycleAutoPilot}
+                  title="Chế độ phê duyệt (bấm để đổi)"
+                  className="inline-flex items-center gap-1 rounded-none bg-white/[0.03] hover:bg-white/[0.08] transition-colors px-2.5 py-1 text-xs text-tertiary hover:text-primary"
                 >
-                  <X size={10} aria-hidden="true" />
+                  <Zap size={11} className={approvalPolicy === 'never' ? 'text-amber-warn' : 'text-accent'} />
+                  <span>{approvalPolicy === 'never' ? 'Autonomous' : approvalPolicy === 'always' ? 'Manual' : approvalPolicy === 'chat_only' ? 'Chat Only' : 'Smart'}</span>
                 </button>
+              )}
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-tertiary select-none">
+              <span>(Ctrl+K / / for Commands)</span>
+            </div>
+          </div>
+
+          {slashOpen && (
+            <div
+              role="listbox"
+              aria-label="Danh sách prompt"
+              className="absolute bottom-full left-0 right-0 z-30 mb-2 max-h-64 overflow-y-auto rounded-none border border-default bg-overlay p-1.5 font-mono shadow-bevel-out custom-scrollbar"
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              {slashMatches.map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="option"
+                  aria-selected={i === slashIndex}
+                  id={`slash-opt-${p.id}`}
+                  onClick={() => applyPrompt(p)}
+                  onMouseEnter={() => setSlashIndex(i)}
+                  className={`flex w-full flex-col items-start gap-0.5 rounded-none px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
+                    i === slashIndex ? 'bg-panel-soft text-primary' : 'text-primary hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
+                    {p.kind === 'recipe' ? (
+                      <ChefHat size={11} aria-hidden="true" className="flex-none text-accent" />
+                    ) : null}
+                    {p.kind === 'command' ? (
+                      <ListChecks size={11} aria-hidden="true" className="flex-none text-accent" />
+                    ) : null}
+                    /{p.title}
+                  </span>
+                  <span className="line-clamp-1 w-full text-[11px] text-tertiary">
+                    {p.kind === 'recipe'
+                      ? 'workflow · mở panel để chạy'
+                      : p.kind === 'command'
+                        ? 'lệnh · lập kế hoạch bằng planner model (PLAN mode)'
+                        : p.content.replace(/\n+/g, ' ').trim()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-4 pt-3">
+              {attachments.map((a) => (
+                <span
+                  key={a.id}
+                  className="group/chip flex max-w-[220px] items-center gap-1.5 rounded-none border border-subtle bg-raised px-2.5 py-1 font-mono text-meta text-primary transition-colors hover:border-default"
+                >
+                  <Paperclip size={11} aria-hidden="true" className="flex-shrink-0 text-accent" />
+                  <span className="truncate">{a.name}</span>
+                  {a.size !== undefined && (
+                    <span className="text-micro text-tertiary">
+                      ({a.size > 1024 * 1024 ? `${(a.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(a.size / 1024)} KB`})
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveAttachment(a.id)}
+                    aria-label={`Gỡ ${a.name}`}
+                    className="ml-0.5 rounded-full p-0.5 text-tertiary opacity-40 transition-opacity hover:opacity-100 group-hover/chip:opacity-100 hover:bg-raised hover:text-primary"
+                  >
+                    <X size={10} aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {webBusy && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-3 font-mono text-[12px] leading-relaxed">
+              <span className="flex min-w-0 items-center gap-1.5 text-tertiary">
+                <span aria-hidden="true" className="terminal-cursor" />
+                <span className="truncate">Đang tra cứu web…</span>
               </span>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
 
-        {webBusy && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 pt-3 font-mono text-[12px] leading-relaxed">
-            <span className="flex min-w-0 items-center gap-1.5 text-text-muted">
-              <span aria-hidden="true" className="terminal-cursor" />
-              <span className="truncate">Đang tra cứu web…</span>
-            </span>
-          </div>
-        )}
-
-        <div className="relative flex items-start">
-          <span className="select-none pl-3.5 pt-3 font-mono text-[14px] text-[#757d89] group-focus-within:text-accent-steel">
-            $
-          </span>
-          <TextareaAutosize
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onCompositionStart={() => {
-              composingRef.current = true;
-            }}
-            onCompositionEnd={() => {
-              composingRef.current = false;
-            }}
-            onPaste={(e) => {
-              const files = Array.from(e.clipboardData?.files ?? []);
-              if (files.length > 0) {
-                e.preventDefault();
-                acceptFiles(files);
+          <div className="relative flex items-start px-3.5 pt-2">
+            <TextareaAutosize
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              onKeyDown={handleKeyDown}
+              onCompositionStart={() => {
+                composingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                composingRef.current = false;
+              }}
+              onPaste={(e) => {
+                const files = Array.from(e.clipboardData?.files ?? []);
+                if (files.length > 0) {
+                  e.preventDefault();
+                  acceptFiles(files);
+                }
+              }}
+              minRows={1}
+              maxRows={10}
+              aria-label="Nội dung tin nhắn"
+              aria-autocomplete={slashOpen ? 'list' : undefined}
+              aria-activedescendant={
+                slashOpen ? `slash-opt-${slashMatches[slashIndex]?.id}` : undefined
               }
+              placeholder="Soạn thảo prompt hoặc tác vụ, gõ / để mở danh sách lệnh..."
+              className="w-full resize-none border-none bg-transparent p-0 font-sans text-[14px] leading-relaxed text-primary outline-none focus:ring-0 placeholder:text-tertiary"
+            />
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              acceptFiles(e.target.files);
+              e.target.value = '';
             }}
-            minRows={1}
-            maxRows={10}
-            aria-label="Nội dung tin nhắn"
-            aria-autocomplete={slashOpen ? 'list' : undefined}
-            aria-activedescendant={
-              slashOpen ? `slash-opt-${slashMatches[slashIndex]?.id}` : undefined
-            }
-            placeholder="Nêu việc cho agent, hoặc gõ / để dùng prompt mẫu..."
-              className="w-full resize-none bg-transparent pl-2 pr-4 pb-1 pt-3 font-mono text-[14px] leading-relaxed text-text-primary outline-none placeholder:text-text-muted"
           />
-        </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          hidden
-          onChange={(e) => {
-            acceptFiles(e.target.files);
-            e.target.value = '';
-          }}
-        />
+          {((speech.listening && speech.interim) || speech.error) && (
+            <div className="border-t border-subtle/40 px-4 py-1.5 font-mono text-[11px]">
+              {speech.error ? (
+                <span className="text-status-error">{speech.error}</span>
+              ) : (
+                <span className="flex items-center gap-2 truncate italic text-accent">
+                  <SiriWave active={true} />
+                  <span>Đang nghe: {speech.interim}</span>
+                </span>
+              )}
+            </div>
+          )}
 
-        {((speech.listening && speech.interim) || speech.error) && (
-          <div className="border-t border-border-hairline/40 px-3 py-1 font-mono text-[11px]">
-            {speech.error ? (
-              <span className="text-status-error">{speech.error}</span>
-            ) : (
-              <span className="block truncate italic text-accent-steel">
-                Đang nghe: {speech.interim}
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 px-2 pb-2 pt-1">
-          {/* Cụm TRÁI: đính kèm + thư mục + Tác vụ. Vùng chứa co được (min-w-0). */}
-          <div className="flex min-w-0 grow shrink-0 items-center gap-0.5 sm:shrink">
-            <ToolbarButton
-              icon={Paperclip}
-              label="Đính kèm tệp"
-              onClick={() => fileInputRef.current?.click()}
-            />
-            {onPickWorkspace && (
+          <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-2">
+            {/* Cụm TRÁI: đính kèm + thư mục + Voice STT */}
+            <div className="flex min-w-0 items-center gap-1">
               <ToolbarButton
-                icon={pickPending ? Loader2 : FolderOpen}
-                className={pickPending ? 'animate-spin' : undefined}
-                active={workspace?.connected}
-                label={
-                  workspace?.connected
-                    ? `Workspace: ${workspace.name}`
-                    : 'Kết nối thư mục làm việc'
-                }
-                onClick={handlePickWorkspace}
+                icon={Paperclip}
+                label="Đính kèm tệp"
+                className="rounded-none hover:bg-white/[0.06]"
+                onClick={() => fileInputRef.current?.click()}
               />
-            )}
-            {speech.supported && (
-              <ToolbarButton
-                icon={speech.listening ? MicOff : Mic}
-                active={speech.listening}
-                className={speech.listening ? 'animate-pulse text-status-error' : undefined}
-                label={
-                  speech.listening
-                    ? 'Dừng nhận diện giọng nói (đang nghe)'
-                    : 'Nhập bằng giọng nói'
-                }
-                onClick={speech.toggle}
-              />
-            )}
-          </div>
+              {onPickWorkspace && (
+                <ToolbarButton
+                  icon={pickPending ? Loader2 : FolderOpen}
+                  className={`rounded-none hover:bg-white/[0.06] ${pickPending ? 'animate-spin' : ''}`}
+                  active={workspace?.connected}
+                  label={
+                    workspace?.connected
+                      ? `Workspace: ${workspace.name}`
+                      : 'Kết nối thư mục làm việc'
+                  }
+                  onClick={handlePickWorkspace}
+                />
+              )}
+              {speech.supported && (
+                <div className="flex items-center gap-1.5">
+                  <ToolbarButton
+                    icon={speech.listening ? MicOff : Mic}
+                    active={speech.listening}
+                    className={`rounded-none hover:bg-white/[0.06] ${speech.listening ? 'animate-pulse text-status-error' : ''}`}
+                    label={
+                      speech.listening
+                        ? 'Dừng nhận diện giọng nói (đang nghe)'
+                        : 'Nhập bằng giọng nói'
+                    }
+                    onClick={speech.toggle}
+                  />
+                  {speech.listening && <SiriWave active={true} />}
+                </div>
+              )}
+            </div>
 
-          <div className="flex flex-none items-center gap-1.5">
-            {/*
-             * Chọn model nằm ngay đây — nơi tay đang gõ — thay vì status line
-             * trên cùng. Trigger tự giới hạn bề rộng (nhãn cắt ở 30vw / 160px)
-             * nên không đè các nút khác trên màn hình hẹp.
-             */}
-            <ModelSelector
-              models={models}
-              value={model}
-              onChange={onModelChange}
-              disabled={modelSelectorDisabled}
-              providerId={modelProviderId}
-              builtinCatalog={modelCatalogBuiltin}
-              favorites={modelFavorites}
-              recents={modelRecents}
-              onToggleFavorite={onToggleModelFavorite}
-            />
-            <TaskMenu groups={taskGroups} />
-            <div className="hidden h-4 w-px flex-none bg-[#495059] sm:block" />
-            <SendButton
-              isStreaming={isStreaming}
-              canSubmit={canSubmit}
-              onStop={onStop}
-            />
+            {/* Cụm GIỮA: Autonomous / Smart Budget Badge */}
+            <div className="hidden md:flex items-center gap-2">
+              {(approvalPolicy === 'never' || approvalPolicy === 'smart' || autoPilot) && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] px-2.5 py-0.5 font-mono text-[11px] text-tertiary">
+                  <Zap size={11} className="text-amber-warn" />
+                  <span>{goalLoopInfo || 'Autonomous Tools Active'}</span>
+                </span>
+              )}
+            </div>
+
+            {/* Cụm PHẢI: Gửi */}
+            <div className="flex flex-none items-center gap-2">
+              <SendButton
+                isStreaming={isStreaming}
+                canSubmit={canSubmit}
+                onStop={onStop}
+              />
+            </div>
           </div>
-        </div>
-      </form>
-        <div className="mt-1.5 px-2 font-mono text-[10.5px] text-text-muted">
+        </form>
+        <div className="mt-2 hidden sm:block text-center font-mono text-[10.5px] text-tertiary">
           Enter để gửi · Shift+Enter xuống dòng · Enter/Alt+Enter khi AI chạy = xếp hàng · Alt+↑ lấy lại · / lệnh nhanh
         </div>
+      </div>
     </div>
   );
 });

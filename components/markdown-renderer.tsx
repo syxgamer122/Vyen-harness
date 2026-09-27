@@ -20,7 +20,7 @@ import { rehypeSanitizer } from '@/lib/rehype-sanitizer';
 /** Khối code thuần — dùng cho cả nhánh không tô màu lẫn lúc chờ nạp chunk. */
 function PlainCode({ value }: { value: string }) {
   return (
-    <pre className="m-0 overflow-x-auto bg-surface-code px-4 py-[0.9rem] font-mono text-[13px] leading-[1.6] text-[rgb(212,212,216)]">
+    <pre className="m-0 overflow-x-auto bg-sunken px-4 py-[0.9rem] font-mono text-[13px] leading-[1.6] text-[rgb(212,212,216)]">
       <code>{value}</code>
     </pre>
   );
@@ -178,7 +178,7 @@ class MarkdownErrorBoundary extends React.Component<BoundaryProps, BoundaryState
   render() {
     if (this.state.failed) {
       return (
-        <pre className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-zinc-600">
+        <pre className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-tertiary">
           {this.props.fallbackText}
         </pre>
       );
@@ -223,7 +223,7 @@ const CodeBlock = memo(function CodeBlock({
   return (
     <div className="claude-code-block my-4">
       {/* Thanh công cụ nằm trên nền tối → dùng border/chữ sáng cho đủ tương phản. */}
-      <div className="flex items-center justify-between border-b border-border-hairline bg-surface-raised px-3 py-1.5">
+      <div className="flex items-center justify-between border-b border-subtle bg-raised px-3 py-1.5">
         <span className="font-mono text-[11px] font-medium text-text-muted">
           {language || 'text'}
         </span>
@@ -233,7 +233,7 @@ const CodeBlock = memo(function CodeBlock({
           className="flex items-center gap-1 rounded-none px-1 py-0.5 text-[11px] text-text-muted transition-colors hover:bg-white/10 hover:text-text-primary"
           aria-label={copied ? 'Đã chép đoạn mã' : 'Chép đoạn mã'}
         >
-          {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+          {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
           <span>{copied ? 'Đã chép' : 'Chép'}</span>
         </button>
       </div>
@@ -306,7 +306,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
         katexModule,
         {
           throwOnError: false,
-          errorColor: '#a1a1aa',
+          errorColor: 'rgb(167 176 187)',
           strict: 'ignore',
           trust: false,
           maxSize: 60,
@@ -360,7 +360,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
               src={href}
               controls
               preload="metadata"
-              className="my-2 max-h-[480px] w-auto max-w-full rounded-xl border border-zinc-200 bg-black shadow-sm"
+              className="my-2 max-h-[480px] w-auto max-w-full rounded-none border border-subtle bg-sunken"
               onLoadedMetadata={emitImageLoaded}
             />
           );
@@ -391,7 +391,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
               src={src}
               controls
               preload="metadata"
-              className="my-2 max-h-[480px] w-auto max-w-full rounded-xl border border-zinc-200 bg-black shadow-sm"
+              className="my-2 max-h-[480px] w-auto max-w-full rounded-none border border-subtle bg-sunken"
               onLoadedMetadata={emitImageLoaded}
             />
           );
@@ -410,7 +410,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
               loading="lazy"
               decoding="async"
               referrerPolicy={MEDIA_REFERRER_POLICY}
-              className="max-h-[420px] w-auto max-w-full rounded-xl border border-zinc-200 bg-white object-contain shadow-sm"
+              className="max-h-[420px] w-auto max-w-full rounded-none border border-subtle bg-sunken object-contain"
               onLoad={emitImageLoaded}
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';

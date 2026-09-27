@@ -27,14 +27,14 @@ export function Toast({ message, onClose }: ToastProps) {
       aria-live="polite"
       className={`pointer-events-none fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] ${Z_CLASS.toast} flex justify-center px-4`}
     >
-      <div className="pointer-events-auto flex max-w-md items-start gap-2.5 rounded-none border border-status-warning/40 bg-panel-bg p-3 text-xs font-mono text-text-primary animate-slide-up">
+      <div className="pointer-events-auto flex max-w-md items-start gap-2.5 rounded-none border border-warning/40 bg-panel-bg p-3 text-xs font-mono text-text-primary animate-slide-up">
         <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-status-warning" />
         <p className="min-w-0 flex-1">{message}</p>
         <button
           type="button"
           onClick={onClose}
           aria-label="Đóng thông báo"
-          className="-mr-1 -mt-0.5 flex-shrink-0 rounded-none p-0.5 text-status-warning transition-colors hover:bg-[#e8993a]/10"
+          className="-mr-1 -mt-0.5 flex-shrink-0 rounded-none p-0.5 text-status-warning transition-colors hover:bg-warning/10"
         >
           <X size={13} />
         </button>

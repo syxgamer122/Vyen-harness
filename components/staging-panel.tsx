@@ -2,6 +2,7 @@
 
 import { Z_CLASS } from '@/lib/ui-z';
 import { useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, X, Trash2, FileText } from 'lucide-react';
 import { lineDiff, renderUnifiedDiff } from '@/lib/naive-diff';
 import type { StagingStore, StagingStats } from '@/lib/staging';
@@ -53,9 +54,9 @@ export function StagingPanel({
     onEscape: onClose,
   });
 
-  if (!files.length) return null;
+  if (!files.length || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div
       ref={containerRef}
       role="dialog"
@@ -65,28 +66,28 @@ export function StagingPanel({
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-none border border-border-hairline bg-panel-bg font-mono"
+        className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-none border border-subtle bg-panel-bg font-mono"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between gap-2 border-b border-border-hairline bg-surface-raised px-4 py-3">
+        <div className="flex items-center justify-between gap-2 border-b border-subtle bg-raised px-4 py-3">
           <div className="min-w-0">
             <h2 id="staging-panel-title" className="flex items-center gap-2 font-pixel text-[16px] font-semibold text-text-primary [image-rendering:pixelated]">
-              <span className="font-bold text-accent-steel">$</span>
-              <span className="text-accent-steel">staged</span>
+              <span className="font-bold text-accent">$</span>
+              <span className="text-accent">staged</span>
               <span>· {stats.files} file{stats.files !== 1 ? 's' : ''}</span>
               <EvidenceBadge level="reported_done" className="ml-1" />
             </h2>
-            <div className="text-[11px] text-text-muted">
+            <div className="text-meta text-tertiary">
               {stats.newFiles > 0 && `${stats.newFiles} new · `}
               Thay đổi chưa ghi vào đĩa. Review rồi Apply hoặc Reject.
             </div>
           </div>
-          <div className="flex flex-shrink-0 gap-1.5 text-[11px] font-mono">
-            <span className="rounded-none border border-status-success/30 bg-[#5db87a]/10 px-1.5 py-0.5 text-status-success">
+          <div className="flex flex-shrink-0 gap-1.5 text-meta font-mono">
+            <span className="rounded-none border border-success/30 bg-success/10 px-1.5 py-0.5 text-success">
               +{stats.addedLines}
             </span>
-            <span className="rounded-none border border-status-error/30 bg-[#e8704f]/10 px-1.5 py-0.5 text-status-error">
+            <span className="rounded-none border border-danger/30 bg-danger/10 px-1.5 py-0.5 text-danger">
               -{stats.removedLines}
             </span>
           </div>
@@ -97,13 +98,13 @@ export function StagingPanel({
           {files.map((file) => {
             const diff = renderUnifiedDiff(lineDiff(file.original ?? '', file.content), { contextLines: 2 });
             return (
-              <div key={file.path} className="rounded-none border border-border-hairline bg-surface-raised overflow-hidden">
-                <div className="flex items-center justify-between gap-2 bg-surface-raised border-b border-border-hairline px-3 py-1.5">
+              <div key={file.path} className="rounded-none border border-subtle bg-raised overflow-hidden">
+                <div className="flex items-center justify-between gap-2 bg-raised border-b border-subtle px-3 py-1.5">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <FileText size={12} className="flex-shrink-0 text-accent-steel" />
-                    <span className="truncate font-mono text-[11px] text-text-primary">{file.path}</span>
+                    <FileText size={12} className="flex-shrink-0 text-accent" />
+                    <span className="truncate font-mono text-meta text-text-primary">{file.path}</span>
                     {file.original === null && (
-                      <span className="flex-shrink-0 rounded-none border border-accent-steel/40 bg-[#6a9fcc]/10 px-1 py-0.5 text-[9.5px] font-mono text-accent-steel">
+                      <span className="flex-shrink-0 rounded-none border border-accent/40 bg-accent/10 px-1 py-0.5 text-micro font-mono text-accent">
                         NEW
                       </span>
                     )}
@@ -112,13 +113,13 @@ export function StagingPanel({
                     type="button"
                     onClick={() => onRejectFile(file.path)}
                     title="Reject this file"
-                    className="flex items-center gap-1 rounded-none px-1.5 py-0.5 text-[11px] text-text-muted hover:bg-[#e8704f]/10 hover:text-status-error"
+                    className="flex items-center gap-1 rounded-none px-1.5 py-0.5 text-meta text-tertiary hover:bg-danger/10 hover:text-danger"
                   >
                     <X size={12} />
                     Reject
                   </button>
                 </div>
-                <div className="max-h-48 overflow-auto bg-bg-deep p-2.5 font-mono text-[11px] leading-relaxed">
+                <div className="max-h-48 overflow-auto bg-sunken p-2.5 font-mono text-meta leading-relaxed">
                   {diff.text.split('\n').map((line, idx) => {
                     const isAdd = line.startsWith('+');
                     const isDel = line.startsWith('-');
@@ -128,12 +129,12 @@ export function StagingPanel({
                         key={idx}
                         className={
                           isAdd
-                            ? 'text-status-success bg-[#5db87a]/10 px-1'
+                            ? 'text-success bg-success/10 px-1'
                             : isDel
-                              ? 'text-status-error bg-[#e8704f]/10 px-1'
+                              ? 'text-danger bg-danger/10 px-1'
                               : isHunk
-                                ? 'text-accent-steel font-semibold'
-                                : 'text-text-muted'
+                                ? 'text-accent font-semibold'
+                                : 'text-tertiary'
                         }
                       >
                         {line || ' '}
@@ -147,11 +148,11 @@ export function StagingPanel({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 border-t border-border-hairline bg-surface-raised px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2 border-t border-subtle bg-raised px-4 py-2.5">
           <button
             type="button"
             onClick={onRejectAll}
-            className="flex items-center gap-1.5 rounded-none border border-status-error/30 bg-bg-deep px-3 py-1.5 text-xs text-status-error transition-colors hover:bg-[#e8704f]/10"
+            className="flex items-center gap-1.5 rounded-none border border-danger/30 bg-sunken px-3 py-1.5 text-xs text-danger transition-colors hover:bg-danger/10"
           >
             <Trash2 size={13} />
             Reject All
@@ -161,14 +162,14 @@ export function StagingPanel({
               ref={closeBtnRef}
               type="button"
               onClick={onClose}
-              className="rounded-none border border-border-hairline bg-panel-soft px-3 py-1.5 text-xs text-text-primary transition-colors hover:border-border-hover"
+              className="rounded-none border border-subtle bg-panel-soft px-3 py-1.5 text-xs text-text-primary transition-colors hover:border-border-hover"
             >
               Close
             </button>
             <button
               type="button"
               onClick={onApplyAll}
-              className="flex items-center gap-1.5 rounded-none bg-[#6a9fcc] px-3.5 py-1.5 text-xs font-semibold text-[#0d1116] transition-colors hover:bg-[#6a9fcc]/85"
+              className="flex items-center gap-1.5 rounded-none bg-accent px-3.5 py-1.5 text-xs font-semibold text-sunken transition-colors hover:bg-accent/85"
             >
               <Check size={13} />
               Apply All ({stats.files} files)
@@ -176,6 +177,7 @@ export function StagingPanel({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -225,6 +225,7 @@ export const MessageList = memo(function MessageList({
   const lastMsg = messages[messages.length - 1];
   const lastRole = lastMsg?.role;
   const lastContentLen = lastMsg?.content?.length ?? 0;
+  const hasToolInvocations = Boolean((lastMsg as any)?.toolInvocations && (lastMsg as any).toolInvocations.length > 0);
 
   /**
    * Đang chờ token đầu tiên mà tin nhắn assistant cuối vẫn rỗng: hàng rỗng
@@ -233,10 +234,7 @@ export const MessageList = memo(function MessageList({
    * đầu tiên tới → hàng hiện lại và indicator tự ẩn (caret tiếp quản).
    */
   const pendingEmptyAssistant =
-    isLoading &&
-    lastRole === 'assistant' &&
-    lastContentLen === 0 &&
-    !(lastMsg as any)?.reasoning;
+    isLoading && lastRole === 'assistant' && lastContentLen === 0 && !(lastMsg as any)?.reasoning && !hasToolInvocations;
 
   /**
    * P2.1: Tin nhắn assistant đang stream (đã có nội dung hoặc reasoning)
@@ -244,9 +242,7 @@ export const MessageList = memo(function MessageList({
    * triệt tiêu hoàn toàn đo đạc giật lag (measurement thrashing) trên từng token.
    */
   const isStreamingAssistant =
-    isLoading &&
-    lastRole === 'assistant' &&
-    (Boolean((lastMsg as any)?.reasoning) || lastContentLen > 0);
+    isLoading && lastRole === 'assistant' && (Boolean((lastMsg as any)?.reasoning) || lastContentLen > 0 || hasToolInvocations);
 
   const visibleMessages = useMemo(() => {
     if (pendingEmptyAssistant || isStreamingAssistant) {
@@ -447,7 +443,7 @@ export const MessageList = memo(function MessageList({
                   key={prompt}
                   type="button"
                   onClick={() => onSelectSuggestion(prompt)}
-                  className="rounded-none border border-border-hairline bg-panel-bg px-3 py-2 text-left font-mono text-xs text-text-primary transition-colors duration-150 hover:border-border-hover hover:bg-panel-soft"
+                  className="rounded-none border border-subtle bg-panel-bg px-3 py-2 text-left font-mono text-xs text-text-primary transition-colors duration-150 hover:border-border-hover hover:bg-panel-soft"
                 >
                   {prompt}
                 </button>
@@ -487,7 +483,7 @@ export const MessageList = memo(function MessageList({
                     {compaction && compactionBannerBeforeId === m.id && (
                       <div className="mb-2">
                         {compaction.summary ? (
-                          <details className="rounded-none border border-[#4b607c] bg-surface-raised px-3 py-1.5 font-mono text-xs text-status-warning">
+                          <details className="rounded-none border border-[accent-dim] bg-raised px-3 py-1.5 font-mono text-xs text-status-warning">
                             <summary className="cursor-pointer select-none font-medium text-accent-steel">
                               Đã nén {compaction.compactedCount} tin nhắn trước đó. Bấm để xem tóm tắt
                             </summary>
@@ -496,7 +492,7 @@ export const MessageList = memo(function MessageList({
                             </div>
                           </details>
                         ) : (
-                          <div className="rounded-none border border-[#4b607c] bg-surface-raised px-3 py-1.5 font-mono text-xs text-status-warning">
+                          <div className="rounded-none border border-[accent-dim] bg-raised px-3 py-1.5 font-mono text-xs text-status-warning">
                             Đã lược bỏ {compaction.compactedCount} tin nhắn cũ
                           </div>
                         )}
@@ -532,6 +528,7 @@ export const MessageList = memo(function MessageList({
             </div>
 
             {isLoading &&
+              !hasToolInvocations &&
               !(
                 lastRole === 'assistant' &&
                 ((lastMsg as any)?.reasoning || lastContentLen > 0)
@@ -575,7 +572,7 @@ export const MessageList = memo(function MessageList({
             <button
               type="button"
               onClick={onReload}
-              className="flex-shrink-0 rounded-none bg-[#e8704f] px-3 py-1 font-mono text-xs font-medium text-[#0d1116] transition-colors hover:bg-[#e8704f]/85"
+              className="flex-shrink-0 rounded-none bg-danger px-3 py-1 font-mono text-xs font-medium text-sunken transition-colors hover:bg-danger/85"
             >
               Thử lại
             </button>
@@ -588,7 +585,7 @@ export const MessageList = memo(function MessageList({
           type="button"
           onClick={onScrollToBottom}
           aria-label="Xuống tin nhắn mới nhất"
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-border-hairline bg-panel-bg p-2 text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-soft hover:text-text-primary"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-subtle bg-panel-bg p-2 text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-soft hover:text-text-primary"
         >
           <ArrowDown size={16} />
         </button>

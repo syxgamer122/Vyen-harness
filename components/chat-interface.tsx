@@ -8,8 +8,6 @@ import { isVyenDesktop } from '@/lib/desktop-bridge';
 import { ToolRunner } from '@/core/agent-runtime/tool-runner';
 import { useAgentRuntime } from '@/react/use-agent-runtime';
 import { useApprovalBridge } from '@/react/use-approval-bridge';
-import { useStreamingText } from '@/react/use-streaming-text';
-import { StreamBubble } from '@/components/chat/stream-bubble';
 import { useChatOrchestration } from '@/react/use-chat-orchestration';
 
 import { StatusLine } from '@/components/chat/status-line';
@@ -84,13 +82,6 @@ export default function ChatInterface() {
   // Layer 2: useAgentRuntime điều phối Web Locks đa tab
   const { isLeader, tabMode, isLeaderFrozen, forceStealLock, startTurn, stopTurn } = orch.agentRuntime;
 
-  // Layer 2: useStreamingText buffer 60fps RAF điều tiết stream token
-  const { displayText: streamText, displayReasoning: streamReasoning } = useStreamingText({
-    rawText: orch.streamingContent,
-    rawReasoning: orch.streamingReasoning,
-    isStreaming: orch.isLoading,
-  });
-
   // Layer 1: ToolRunner thực thi công cụ an toàn CWD jail + TOCTOU
   const toolRunner = useMemo(
     () =>
@@ -114,10 +105,10 @@ export default function ChatInterface() {
   return (
     <div {...orch.swipeHandlers} className="flex h-full flex-col overflow-hidden bg-transparent touch-pan-y">
       {!isLeader && (
-        <div data-testid="observer-banner" className="bg-amber-950/40 border-b border-amber-800/40 px-3 py-1.5 text-center text-xs font-mono text-amber-300 flex items-center justify-center gap-2">
+        <div data-testid="observer-banner" className="bg-warning/10 border-b border-warning/40 px-3 py-1.5 text-center text-xs font-mono text-warning flex items-center justify-center gap-2">
           <span>{isLeaderFrozen ? 'Tab chính (Leader) bị đóng băng ở nền.' : `Tab đang ở chế độ Chỉ đọc (Observer — TabRuntimeMode: ${tabMode}).`}</span>
           {isLeaderFrozen && (
-            <button type="button" onClick={forceStealLock} className="px-2 py-0.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[10px] font-semibold transition-colors">
+            <button type="button" onClick={forceStealLock} className="px-2 py-0.5 bg-warning/20 hover:bg-warning/30 text-warning border border-warning/40 text-[10px] font-semibold transition-colors">
               Chiếm quyền điều khiển
             </button>
           )}
@@ -154,7 +145,7 @@ export default function ChatInterface() {
       {orch.swipeDirection && (
         <div
           className={[
-            'pointer-events-none fixed top-1/2 z-50 -translate-y-1/2 rounded-full border border-border-hairline bg-panel-bg px-3.5 py-1.5 font-mono text-xs text-text-primary animate-pop-in',
+            'pointer-events-none fixed top-1/2 z-50 -translate-y-1/2 rounded-full border border-subtle bg-panel-bg px-3.5 py-1.5 font-mono text-xs text-primary animate-pop-in',
             orch.swipeDirection === 'left' ? 'right-4' : 'left-4',
           ].join(' ')}
           aria-live="polite"
@@ -196,37 +187,27 @@ export default function ChatInterface() {
             orch.lastMessageId && orch.handleRegenerate(orch.lastMessageId)}
           onContinueGenerating={orch.continueGenerating}
         />
-
-        {/* Layer 3: StreamBubble hiển thị streaming độc lập ngoài TanStack Virtualizer */}
-        {orch.isLoading && isLeader && (
-          <StreamBubble
-            content={streamText}
-            reasoning={streamReasoning}
-            isStreaming={orch.isLoading}
-            onStop={handleStop}
-          />
-        )}
       </div>
 
       <aside aria-label="Trạng thái phiên làm việc" className="w-full flex-none">
         {orch.workspaceReconnectRequired && !orch.dismissedReconnect && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="flex items-center justify-between gap-3 rounded-none border border-border-hairline bg-surface-raised px-3.5 py-2 text-xs">
-              <span className="text-text-muted truncate">
-                Phiên này từng dùng workspace <strong className="text-text-primary font-mono font-medium">{orch.workspace?.name}</strong>. Bạn có muốn kết nối lại để agent truy cập file?
+            <div className="flex items-center justify-between gap-3 rounded-none border border-subtle bg-raised px-3.5 py-2 text-xs">
+              <span className="text-tertiary truncate">
+                Phiên này từng dùng workspace <strong className="text-primary font-mono font-medium">{orch.workspace?.name}</strong>. Bạn có muốn kết nối lại để agent truy cập file?
               </span>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   type="button"
                   onClick={orch.reconnectWorkspace}
-                  className="bg-accent-steel hover:bg-accent-steel/80 text-background px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer"
+                  className="bg-accent hover:bg-accent/80 text-base px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer"
                 >
                   Kết nối lại
                 </button>
                 <button
                   type="button"
                   onClick={() => orch.setDismissedReconnect(true)}
-                  className="text-text-muted hover:text-text-primary px-1.5 py-1 text-[11px] transition-colors cursor-pointer"
+                  className="text-tertiary hover:text-primary px-1.5 py-1 text-[11px] transition-colors cursor-pointer"
                 >
                   Bỏ qua
                 </button>
@@ -243,19 +224,19 @@ export default function ChatInterface() {
 
         {orch.hintsChip && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="rounded-none border border-border-hairline bg-[#1b2430] font-mono text-[11.5px] text-text-muted">
+            <div className="rounded-none border border-subtle bg-raised font-mono text-[11.5px] text-tertiary">
               <button
                 type="button"
                 onClick={() => orch.setShowHints((v) => !v)}
                 aria-expanded={orch.showHints}
-                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left transition-colors hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[accent]"
               >
-                <span className="text-accent-steel">hints loaded</span>
+                <span className="text-accent">hints loaded</span>
                 <span className="truncate">{orch.hintsChip.file}</span>
-                <span className="ml-auto flex-none text-[10.5px] text-[#5c6470]">{orch.showHints ? 'thu gọn' : 'xem nội dung'}</span>
+                <span className="ml-auto flex-none text-[10.5px] text-secondary">{orch.showHints ? 'thu gọn' : 'xem nội dung'}</span>
               </button>
               {orch.showHints && (
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap border-t border-border-hairline bg-[#12181f] px-3 py-2 text-[11px] leading-relaxed">
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap border-t border-subtle bg-surface px-3 py-2 text-[11px] leading-relaxed">
                   {orch.hintsChip.content}
                 </pre>
               )}
@@ -265,19 +246,19 @@ export default function ChatInterface() {
 
         {orch.activeRecallPack && orch.activeRecallPack.items.length > 0 && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="flex items-center justify-between gap-2 rounded-none border border-border-hairline bg-surface-raised px-3 py-1.5 text-xs text-text-primary">
+            <div className="flex items-center justify-between gap-2 rounded-none border border-subtle bg-raised px-3 py-1.5 text-xs text-primary">
               <button
                 type="button"
                 onClick={() => orch.setShowRecalledDetail((v) => !v)}
-                className="flex items-center gap-1.5 font-medium hover:underline text-[12px] text-text-primary"
+                className="flex items-center gap-1.5 font-medium hover:underline text-[12px] text-primary"
               >
                 <span>🧠 Đã nhớ {orch.activeRecallPack.items.length} ghi chú</span>
-                <span className="text-[10px] text-accent-steel">({orch.showRecalledDetail ? 'thu gọn' : 'xem chi tiết'})</span>
+                <span className="text-[10px] text-accent">({orch.showRecalledDetail ? 'thu gọn' : 'xem chi tiết'})</span>
               </button>
               <button
                 type="button"
                 onClick={() => orch.setActiveRecallPack(null)}
-                className="rounded-none p-0.5 text-text-muted hover:text-text-primary"
+                className="rounded-none p-0.5 text-tertiary hover:text-primary"
                 aria-label="Đóng thông báo ghi nhớ"
               >
                 <X size={13} />
@@ -285,21 +266,21 @@ export default function ChatInterface() {
             </div>
 
             {orch.showRecalledDetail && (
-              <div className="mt-1.5 rounded-none border border-border-hairline bg-panel-bg p-2.5 text-xs">
-                <div className="mb-1.5 text-[11px] font-semibold text-text-primary">
+              <div className="mt-1.5 rounded-none border border-subtle bg-panel-bg p-2.5 text-xs">
+                <div className="mb-1.5 text-[11px] font-semibold text-primary">
                   Ghi chú đã nạp vào ngữ cảnh ({orch.activeRecallPack.budget.usedTokens}/{orch.activeRecallPack.budget.limitTokens} tokens):
                 </div>
                 <ul className="space-y-1.5">
                   {orch.activeRecallPack.items.map((item) => (
-                    <li key={item.id} className="flex items-start gap-1.5 text-[11px] text-text-primary">
-                      <span className="text-accent-steel font-bold">•</span>
+                    <li key={item.id} className="flex items-start gap-1.5 text-[11px] text-primary">
+                      <span className="text-accent font-bold">•</span>
                       <span className="flex-1 leading-relaxed">{item.text}</span>
-                      <span className="shrink-0 text-[10px] text-text-muted">[{item.why}]</span>
+                      <span className="shrink-0 text-[10px] text-tertiary">[{item.why}]</span>
                     </li>
                   ))}
                 </ul>
                 {orch.activeRecallPack.budget.droppedIds.length > 0 && (
-                  <div className="mt-1.5 border-t border-border-hairline pt-1 text-[10px] text-text-muted italic">
+                  <div className="mt-1.5 border-t border-subtle pt-1 text-[10px] text-tertiary italic">
                     Đã cắt {orch.activeRecallPack.budget.droppedIds.length} ghi chú do giới hạn ngân sách token.
                   </div>
                 )}

@@ -53,12 +53,12 @@ export function SubagentCard({ annotation }: SubagentCardProps) {
   const StatusIcon = isRunning ? Loader2 : isDone ? CheckCircle2 : XCircle;
 
   return (
-    <div className="my-2 rounded-none border border-border-hairline bg-panel-bg font-mono text-xs">
+    <div className="my-2 rounded-xl border border-subtle bg-panel-bg font-mono text-xs overflow-hidden transition-all duration-200">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-raised rounded-none transition-colors"
+        className="flex w-full items-center gap-2 px-3.5 py-2 text-left hover:bg-raised transition-colors"
       >
         {expanded ? (
           <ChevronDown className="h-3.5 w-3.5 text-text-muted" />
@@ -92,7 +92,7 @@ export function SubagentCard({ annotation }: SubagentCardProps) {
       </button>
 
       {expanded && (
-        <div className="border-t border-border-hairline bg-surface-raised px-3 py-2 space-y-1">
+        <div className="border-t border-subtle bg-raised px-3.5 py-2.5 space-y-1.5">
           {task && (
             <p className="text-[11.5px] text-text-primary">
               <span className="font-semibold text-accent-steel">Task:</span> {task}

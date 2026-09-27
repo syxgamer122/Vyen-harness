@@ -18,7 +18,7 @@ import { TOOL_CATEGORY_MAP } from '@/lib/store';
 import { getEffectiveToolPermission, isDynamicMcpTool } from '@/lib/tool-permissions';
 import { evaluateToolcallRules, type ToolcallRule } from '@/lib/toolcall-rules';
 import { isProtectedPath, validateSafeRelativePath } from '@/lib/path-utils';
-import { compileShellCommand } from '@/lib/shell-policy';
+import { compileShellCommand } from '@/lib/shell-policy.cjs';
 import {
   isTurnTainted,
   isEgressTool,

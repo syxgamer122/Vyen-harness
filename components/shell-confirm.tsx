@@ -1,10 +1,17 @@
 'use client';
 
 import { Z_CLASS } from '@/lib/ui-z';
-import { useEffect, useRef } from 'react';
-import { Check, Terminal, X } from 'lucide-react';
+import { useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, Terminal, X, AlertTriangle } from 'lucide-react';
 import { useHaptics } from '@/components/effects';
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap';
+
+/**
+ * Modal phê duyệt chạy lệnh shell — cổng an toàn trước khi lệnh chạm vào
+ * máy người dùng. KHÔNG có phím tắt duyệt: chỉ bấm, hoặc Tab rồi Enter trên
+ * nút, mới chạy lệnh.
+ */
 
 export interface ShellConfirmState {
   open: boolean;
@@ -12,6 +19,9 @@ export interface ShellConfirmState {
   cwd?: string;
   resolve: (approved: boolean) => void;
 }
+
+/** Lệnh phá huỷ dữ liệu — hiện cảnh báo đỏ trên tiêu đề. */
+const DESTRUCTIVE = /\b(rm|rmdir|del|erase|sudo|format|mkfs|drop|truncate|shutdown|reboot)\b/i;
 
 export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | null; onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,77 +37,146 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
   useFocusTrap(containerRef, {
     active: Boolean(state?.open),
     onEscape: () => decide(false),
+    initialFocusSelector: '[data-shell-discard]',
   });
 
-  if (!state?.open) return null;
+  if (!state?.open || typeof document === 'undefined') return null;
 
-  return (
+  const isDestructive = DESTRUCTIVE.test(state.command);
+
+  return createPortal(
     <div
       ref={containerRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="shell-confirm-title"
-      className={`fixed inset-0 ${Z_CLASS.approval} flex items-center justify-center bg-black/70 p-4`}
+      className={`fixed inset-0 ${Z_CLASS.approval} flex items-end sm:items-center justify-center bg-black/70 p-3 sm:p-4`}
       onClick={() => decide(false)}
     >
+      {/*
+       * PHẲNG, không kính. `.glass-panel` ép `box-shadow` bằng `!important` —
+       * thứ hợp đồng token cấm, vì chỉ `shadow-bevel-out` / `shadow-bevel-in`
+       * được sinh bóng. Modal là tầng trên cùng nên `bg-overlay` + bevel đã đủ
+       * tách khỏi nền (cùng cách làm với diff-confirm).
+       */}
       <div
-        className="pi-frame relative flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-none border border-border-hairline bg-panel-bg font-mono"
+        className={`relative mb-2 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-none border bg-overlay font-mono shadow-bevel-out animate-pop-in sm:mb-0 ${
+          isDestructive ? 'border-danger' : 'border-default'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="pi-corner-tl" />
-        <span className="pi-corner-tr" />
-        <span className="pi-corner-bl" />
-        <span className="pi-corner-br" />
+        {/* Terminal Header */}
+        <div className="flex items-center justify-between border-b border-subtle bg-raised px-4 py-3 sm:px-5">
+          <div className="flex items-center gap-3">
+            {/* macOS/Linux 3 terminal dots — `rounded-full` chỉ ở đây, vì đây
+                là hình tròn thật, không phải khối chứa nội dung. */}
+            <div className="flex items-center gap-1.5" aria-hidden="true">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-danger" />
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-warning" />
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-success" />
+            </div>
 
-        <div className="flex items-center gap-2 border-b border-border-hairline bg-surface-raised px-4 py-3">
-          <Terminal size={14} className="text-accent-steel" />
-          <h2 id="shell-confirm-title" className="flex items-center gap-1.5 text-xs font-semibold">
-            <span className="font-bold text-accent-steel">$</span>
-            <span className="text-accent-steel">bash</span>
-            <span className="text-text-muted">· execution permission</span>
-          </h2>
+            <div className="flex items-center gap-2">
+              <Terminal size={14} className="text-accent" />
+              <h2 id="shell-confirm-title" className="font-sans text-ui font-semibold text-primary">
+                Execute Shell Command
+              </h2>
+            </div>
+          </div>
+
+          {isDestructive && (
+            <span className="inline-flex items-center gap-1 rounded-none border border-danger/40 bg-danger/10 px-2 py-0.5 text-micro font-bold uppercase tracking-wider text-danger">
+              <AlertTriangle size={11} />
+              Destructive Action
+            </span>
+          )}
         </div>
 
-        <div className="px-4 py-3 space-y-2">
+        {/* Terminal Body */}
+        <div className="space-y-3 bg-base px-4 py-4 sm:px-5 sm:py-5">
           {state.cwd && (
-            <div className="truncate text-[11px] text-text-muted">
-              cwd: {state.cwd || '.'}
+            <div className="flex items-center gap-1.5 font-mono text-meta text-tertiary">
+              <span>cwd:</span>
+              <span className="truncate text-secondary">{state.cwd || '.'}</span>
             </div>
           )}
-          <div className="rounded-none border border-border-hairline bg-bg-deep p-3 font-mono text-xs text-text-primary">
-            <div className="flex items-start gap-2">
-              <span className="select-none font-bold text-accent-steel">$</span>
-              <span className="break-all leading-relaxed">{state.command}</span>
+
+          {/*
+           * Lệnh là MÁY — `font-mono` toàn khối, và dấu `$` nằm ở CỘT RIÊNG
+           * (không lẫn vào nội dung lệnh) để lệnh không bao giờ bị đọc sai
+           * ký tự đầu. `break-all` vì lệnh dài không có chỗ trắng.
+           */}
+          <div
+            className={`rounded-none border p-3.5 font-mono ${
+              isDestructive ? 'border-danger/40 bg-danger/5' : 'border-subtle bg-sunken'
+            }`}
+          >
+            <div className="flex items-start gap-2.5">
+              <span className="select-none font-bold text-accent" aria-hidden="true">
+                $
+              </span>
+              <span className="min-w-0 flex-1 break-all text-body font-semibold leading-relaxed text-accent">
+                {state.command}
+              </span>
             </div>
           </div>
-          <div className="text-[11px] text-text-muted leading-relaxed">
-            Lệnh sẽ chạy trong workspace desktop của bạn.
-          </div>
+
+          <p className="font-sans text-meta leading-relaxed text-secondary">
+            Lệnh sẽ thực thi trực tiếp trên hệ thống của bạn qua runtime shell.
+          </p>
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-border-hairline bg-surface-raised px-4 py-2.5">
-          <span className="text-[11px] text-text-muted">$ Esc to reject</span>
-          <div className="flex gap-2">
+        {/* Action bar */}
+        <div className="flex items-center justify-between gap-3 border-t border-subtle bg-raised px-4 py-3 sm:px-5">
+          <div className="hidden items-center gap-2 font-mono text-meta text-tertiary sm:flex">
+            <span className="flex items-center gap-1">
+              <kbd className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-secondary">
+                Esc
+              </kbd>
+              <span>reject</span>
+            </span>
+            <span className="text-disabled" aria-hidden="true">
+              •
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-secondary">
+                Tab
+              </kbd>
+              <span>then ↵ on the chosen button</span>
+            </span>
+          </div>
+
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+            {/*
+             * Mở dialog phải đứng ở lựa chọn AN TOÀN: Enter phản xạ không được
+             * chạy lệnh. Giữ `data-shell-discard` vì `useFocusTrap` trỏ vào nó.
+             */}
             <button
               ref={discardRef}
+              data-shell-discard=""
               type="button"
               onClick={() => decide(false)}
-              className="flex items-center gap-1.5 rounded-none border border-border-hairline bg-panel-soft px-3 py-1.5 text-xs text-text-primary transition-colors hover:border-border-hover"
+              className="flex items-center justify-center gap-1.5 rounded-none border border-default bg-raised px-4 py-2 text-ui font-medium text-secondary transition-all hover:border-strong hover:text-primary active:scale-[0.98]"
             >
-              <X size={13} />
-              Từ chối
+              <X size={14} />
+              <span>[ Esc ] Từ chối</span>
             </button>
             <button
               type="button"
               onClick={() => decide(true)}
-              className="flex items-center gap-1.5 rounded-none bg-[#6a9fcc] px-3.5 py-1.5 text-xs font-semibold text-[#0d1116] transition-colors hover:bg-[#6a9fcc]/85"
+              className={`flex items-center justify-center gap-1.5 rounded-none px-4 py-2 text-ui font-semibold shadow-bevel-in transition-all active:scale-[0.98] ${
+                isDestructive
+                  ? 'bg-danger text-sunken hover:bg-danger/85'
+                  : 'bg-accent text-sunken hover:bg-accent/85'
+              }`}
             >
-              <Check size={13} />
-              Duyệt & chạy
+              <Check size={14} />
+              <span>Duyệt & chạy</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -58,11 +58,8 @@ export const ContextMeter = memo(function ContextMeter({
 }) {
   const { fillRatio, percent, tone, safeMax } = computeMeter(used, max);
 
-  // Chỉ tô màu khi gần đầy (token DESIGN.md): #e8993a warning, #e8704f error
-  const barTone =
-    tone === 'error' ? 'bg-[#e8704f]' : tone === 'warning' ? 'bg-[#e8993a]' : 'bg-[#4b607c]';
   const textTone =
-    tone === 'error' ? 'text-status-error' : tone === 'warning' ? 'text-status-warning' : 'text-text-muted';
+    percent > 80 ? 'text-status-error' : percent >= 50 ? 'text-status-warning' : 'text-status-success';
 
   return (
     <div
@@ -78,14 +75,27 @@ export const ContextMeter = memo(function ContextMeter({
         aria-valuemax={100}
         className="flex items-center gap-2"
       >
-        <div className="h-0.5 flex-1 bg-surface-code">
-          <div
-            className={`h-full ${barTone}`}
-            style={{ width: `${Math.round(fillRatio * 100)}%` }}
-          />
+        <div className="flex flex-1 items-center gap-1">
+          {[...Array(10)].map((_, i) => {
+            const filled = fillRatio >= (i + 1) / 10;
+            const segColor =
+              percent > 80
+                ? 'bg-status-error animate-pulse'
+                : percent >= 50
+                  ? 'bg-status-warning'
+                  : 'bg-status-success';
+            return (
+              <div
+                key={i}
+                className={`h-2 flex-1 rounded-[1px] transition-colors ${
+                  filled ? segColor : 'bg-sunken'
+                }`}
+              />
+            );
+          })}
         </div>
         <span className={`flex-shrink-0 text-[10px] tabular-nums ${textTone}`}>
-          {fmt(used)} / {fmt(safeMax)}
+          {fmt(used)} / {fmt(safeMax)} ({percent}%)
         </span>
       </div>
     </div>

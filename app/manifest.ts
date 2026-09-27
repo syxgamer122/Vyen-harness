@@ -1,5 +1,14 @@
 import type { MetadataRoute } from 'next';
 
+/**
+ * App dark-only (app/layout.tsx gắn cứng `dark`). `background_color` và
+ * `theme_color` phải trùng `viewport.themeColor` của layout — cùng `#0d1116`.
+ * Nếu để nền sáng ở đây thì lúc mở bằng "install as app" màn hình splash
+ * trắng nháy trước khi shell tối kịp vẽ, đúng thứ `theme_color` sinh ra để
+ * chống.
+ */
+const APP_BACKGROUND = '#0d1116';
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Vyen — AI Innovations',
@@ -11,8 +20,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    background_color: '#F7F9FC',
-    theme_color: '#F7F9FC',
+    background_color: APP_BACKGROUND,
+    theme_color: APP_BACKGROUND,
     icons: [
       {
         src: '/icons/icon-192.png',

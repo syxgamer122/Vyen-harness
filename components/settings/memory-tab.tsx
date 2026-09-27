@@ -25,28 +25,28 @@ import { AgentMemorySection } from '@/components/settings-agent-memory';
 export function MemoryTab() {
   return (
     <>
-      <div className="border-b border-border-hairline pb-2">
-        <h3 className="text-sm font-semibold text-text-primary">Bộ nhớ</h3>
-        <p className="mt-0.5 text-[11px] text-text-muted">
-          Hai đường vào bộ nhớ dài hạn — khác nhau ở <strong className="font-semibold text-text-primary">ai tạo ra ký ức</strong>:
+      <div className="border-b border-subtle pb-2">
+        <h3 className="text-read font-semibold text-primary">Bộ nhớ</h3>
+        <p className="mt-0.5 text-meta text-tertiary">
+          Hai đường vào bộ nhớ dài hạn — khác nhau ở <strong className="font-semibold text-primary">ai tạo ra ký ức</strong>:
         </p>
-        <ul className="mt-1.5 space-y-1 text-[11px] leading-relaxed text-text-muted">
+        <ul className="mt-1.5 space-y-1 text-meta leading-relaxed text-tertiary">
           <li className="flex gap-1.5">
-            <span aria-hidden="true" className="text-accent-steel">▸</span>
+            <span aria-hidden="true" className="text-accent">▸</span>
             <span>
-              <strong className="font-semibold text-text-primary">Agent đề xuất, bạn duyệt</strong> — không
+              <strong className="font-semibold text-primary">Agent đề xuất, bạn duyệt</strong> — không
               ghi nhớ im lặng. Mục chưa duyệt không bao giờ được nạp vào ngữ cảnh.
             </span>
           </li>
           <li className="flex gap-1.5">
-            <span aria-hidden="true" className="text-accent-steel">▸</span>
+            <span aria-hidden="true" className="text-accent">▸</span>
             <span>
-              <strong className="font-semibold text-text-primary">Bạn tự viết sổ có cấu trúc</strong> — tổ
+              <strong className="font-semibold text-primary">Bạn tự viết sổ có cấu trúc</strong> — tổ
               chức theo category / tag / scope, xuất ra JSON được.
             </span>
           </li>
         </ul>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">
+        <p className="mt-1.5 text-meta leading-relaxed text-tertiary">
           Cả hai đều được nạp vào ngữ cảnh khi liên quan tới lượt đang chạy.
         </p>
       </div>

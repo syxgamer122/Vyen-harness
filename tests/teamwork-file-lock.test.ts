@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acquireDiskLock } from '../lib/file-lock';
 import { FileLockManager, normalizeLockPath } from '../lib/teamwork/file-lock';
 
 describe('normalizeLockPath', () => {
@@ -36,6 +40,29 @@ describe('normalizeLockPath', () => {
     expect(normalizeLockPath('C:\\projects\\vyen\\lib\\teamwork\\types.ts', root)).toBe(
       'lib/teamwork/types.ts'
     );
+  });
+
+  it('không cắt nhầm workspaceRoot khi path chỉ trùng TIỀN TỐ với root', () => {
+    const root = '/a/proj';
+
+    // "/a/project" KHÔNG nằm trong "/a/proj" dù chuỗi là prefix của nhau
+    expect(normalizeLockPath('/a/project/src/a.ts', root)).toBe('a/project/src/a.ts');
+
+    // Path nằm thật sự trong root thì vẫn phải được cắt bỏ root
+    expect(normalizeLockPath('/a/proj/src/a.ts', root)).toBe('src/a.ts');
+
+    // Hệ quả quan trọng: hai file hoàn toàn khác nhau không được gộp về cùng một lock key
+    expect(normalizeLockPath('/a/proj/src/a.ts', root)).not.toBe(
+      normalizeLockPath('/a/project/src/a.ts', root),
+    );
+  });
+
+  it('không cắt root khi path nằm ngoài root dù dùng backslash và khác hoa/thường', () => {
+    const root = 'C:/projects/vyen';
+    expect(normalizeLockPath('C:\\projects\\vyen-other\\lib\\a.ts', root)).toBe(
+      'c:/projects/vyen-other/lib/a.ts',
+    );
+    expect(normalizeLockPath('C:\\PROJECTS\\VYEN\\lib\\a.ts', root)).toBe('lib/a.ts');
   });
 
   it('handles empty and whitespace inputs gracefully', () => {
@@ -166,6 +193,72 @@ describe('FileLockManager — Concurrency Ceiling (Max 2 Parallel Workers)', () 
     expect(lockMgr.getLockOwner('lib/extra.ts')).toBe('worker-1');
   });
 
+  it('partial release giải phóng đúng slot khi worker không còn giữ file nào', () => {
+    const lockMgr = new FileLockManager(2);
+    lockMgr.acquire('worker-1', ['lib/a.ts', 'lib/b.ts']);
+    lockMgr.acquire('worker-2', ['lib/c.ts']);
+
+    // Chạm cap: worker mới bị chặn
+    expect(lockMgr.canAcquire('worker-3', ['lib/d.ts'])).toBe(false);
+
+    // worker-1 nhả 1 file nhưng vẫn còn file khác → vẫn giữ slot
+    lockMgr.release('worker-1', ['lib/a.ts']);
+    expect(lockMgr.getWorkerFiles('worker-1')).toEqual(['lib/b.ts']);
+    expect(lockMgr.getActiveWorkers().sort()).toEqual(['worker-1', 'worker-2']);
+    expect(lockMgr.canAcquire('worker-3', ['lib/d.ts'])).toBe(false);
+
+    // worker-1 nhả nốt file cuối cùng → slot phải được trả lại
+    lockMgr.release('worker-1', ['lib/b.ts']);
+    expect(lockMgr.getActiveWorkers()).toEqual(['worker-2']);
+    expect(lockMgr.isLocked('lib/a.ts')).toBe(false);
+    expect(lockMgr.isLocked('lib/b.ts')).toBe(false);
+
+    // worker mới phải vào được ngay
+    expect(lockMgr.canAcquire('worker-3', ['lib/d.ts'])).toBe(true);
+    lockMgr.acquire('worker-3', ['lib/d.ts']);
+    expect(lockMgr.getActiveWorkers().sort()).toEqual(['worker-2', 'worker-3']);
+  });
+
+  it('partial release qua releaseFile() cũng trả lại slot concurrency', () => {
+    const lockMgr = new FileLockManager(2);
+    lockMgr.acquire('worker-1', ['lib/a.ts']);
+    lockMgr.acquire('worker-2', ['lib/b.ts']);
+    expect(lockMgr.canAcquire('worker-3', ['lib/c.ts'])).toBe(false);
+
+    expect(lockMgr.releaseFile('worker-1', 'lib/a.ts')).toBe(true);
+    expect(lockMgr.getActiveWorkers()).toEqual(['worker-2']);
+    expect(lockMgr.canAcquire('worker-3', ['lib/c.ts'])).toBe(true);
+    lockMgr.acquire('worker-3', ['lib/c.ts']);
+    expect(lockMgr.getActiveWorkers().sort()).toEqual(['worker-2', 'worker-3']);
+  });
+
+  it('double release là idempotent và không làm hỏng state', () => {
+    const lockMgr = new FileLockManager(2);
+    lockMgr.acquire('worker-1', ['lib/a.ts']);
+    lockMgr.acquire('worker-2', ['lib/b.ts']);
+
+    lockMgr.release('worker-1', ['lib/a.ts']);
+    // Gọi lại lần nữa (partial + releaseFile + full release) không được ném lỗi
+    expect(() => {
+      lockMgr.release('worker-1', ['lib/a.ts']);
+      expect(lockMgr.releaseFile('worker-1', 'lib/a.ts')).toBe(false);
+      lockMgr.release('worker-1');
+    }).not.toThrow();
+
+    // State phải nhất quán: worker-1 biến mất hoàn toàn, worker-2 nguyên vẹn
+    expect(lockMgr.getActiveWorkers()).toEqual(['worker-2']);
+    expect(lockMgr.getWorkerFiles('worker-1')).toEqual([]);
+    expect(lockMgr.getActiveLocks().size).toBe(1);
+    expect(lockMgr.getLockOwner('lib/b.ts')).toBe('worker-2');
+    expect(lockMgr.isLocked('lib/a.ts')).toBe(false);
+
+    // Slot không bị đốt cháy: vẫn còn đúng 1 slot trống
+    expect(lockMgr.canAcquire('worker-3', ['lib/c.ts'])).toBe(true);
+    lockMgr.acquire('worker-3', ['lib/c.ts']);
+    expect(lockMgr.getActiveWorkers().sort()).toEqual(['worker-2', 'worker-3']);
+    expect(lockMgr.getActiveLocks().size).toBe(2);
+  });
+
   it('allows 3rd worker to acquire as soon as one worker releases', () => {
     const lockMgr = new FileLockManager(2);
     lockMgr.acquire('worker-1', ['lib/a.ts']);
@@ -276,6 +369,101 @@ describe('FileLockManager — Disjointness & Parallel Execution Verification', (
         ['lib/b.ts'], // collision with first set
       ])
     ).toBe(false);
+  });
+});
+
+/**
+ * Test cho `lib/file-lock.ts` (lock workspace trên đĩa .vyen/.lock).
+ * Dùng fs thật trong os.tmpdir() + fake timer để điều khiển nhịp heartbeat 5s.
+ *
+ * LƯU Ý (2026-09): `acquireDiskLock` của lib/file-lock.ts HIỆN CHƯA CÓ CONSUMER
+ * THẬT — grep toàn repo chỉ ra tests/teamwork-file-lock.test.ts là file duy
+ * nhất import nó. Đừng tưởng 4 test dưới đây đang bảo vệ một đường sống thật:
+ * chúng chỉ là regression protection cho logic heartbeat/owner-pid (đã từng
+ * đỏ khi đột biến kiểm tra owner-pid), và sẽ bảo vệ tiếp ngay khi ai đó nối
+ * `acquireDiskLock` vào luồng chạy workspace.
+ *
+ * KHÁC với `lib/teamwork/file-lock.ts` (FileLockManager) — cái đó CÓ consumer
+ * thật (lib/teamwork/engine.ts, tools.ts, cli.ts) và đã có bộ test riêng.
+ */
+describe('acquireDiskLock — heartbeat trên .vyen/.lock (lib/file-lock.ts, chưa có consumer)', () => {
+  const OTHER_PID = process.pid + 1;
+  let tmpDir: string;
+  let lockPath: string;
+  let releaseLock: (() => void) | undefined;
+
+  /** Ghi đè .vyen/.lock để mô phỏng "process khác đã evict và chiếm lại lock". */
+  const stealLock = (): void => {
+    fs.writeFileSync(
+      lockPath,
+      JSON.stringify({ pid: OTHER_PID, acquiredAt: 1, heartbeatAt: 111 }),
+    );
+  };
+
+  const readLock = (): { pid: number; heartbeatAt: number } =>
+    JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { pid: number; heartbeatAt: number };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vyen-disk-lock-'));
+    lockPath = path.join(tmpDir, '.vyen', '.lock');
+  });
+
+  afterEach(() => {
+    releaseLock?.();
+    releaseLock = undefined;
+    vi.useRealTimers();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('chiếm lock và ghi heartbeat khi record vẫn thuộc về mình', async () => {
+    releaseLock = await acquireDiskLock(tmpDir);
+
+    const before = readLock();
+    expect(before.pid).toBe(process.pid);
+
+    vi.advanceTimersByTime(5_000);
+    const after = readLock();
+    expect(after.pid).toBe(process.pid);
+    expect(after.heartbeatAt).toBeGreaterThan(before.heartbeatAt);
+  });
+
+  it('heartbeat KHÔNG ghi đè lock khi record đã thuộc về tiến trình khác (chống split-brain)', async () => {
+    releaseLock = await acquireDiskLock(tmpDir);
+
+    // Process bị freeze > 30s, process khác evict rồi chiếm lại lock
+    stealLock();
+
+    vi.advanceTimersByTime(5_000);
+    const afterSteal = readLock();
+    expect(afterSteal.pid).toBe(OTHER_PID);
+    expect(afterSteal.heartbeatAt).toBe(111);
+
+    // Heartbeat phải tự dừng: các tick sau cũng không được ghi gì
+    fs.writeFileSync(lockPath, JSON.stringify({ pid: OTHER_PID, acquiredAt: 1, heartbeatAt: 222 }));
+    vi.advanceTimersByTime(30_000);
+    expect(readLock().heartbeatAt).toBe(222);
+  });
+
+  it('heartbeat không ghi gì khi file lock đã bị xoá', async () => {
+    releaseLock = await acquireDiskLock(tmpDir);
+    fs.rmSync(lockPath);
+
+    expect(() => vi.advanceTimersByTime(30_000)).not.toThrow();
+    expect(fs.existsSync(lockPath)).toBe(false);
+  });
+
+  it('release() không xoá lock của tiến trình khác và gọi hai lần vẫn an toàn', async () => {
+    const release = await acquireDiskLock(tmpDir);
+    stealLock();
+
+    expect(() => {
+      release();
+      release();
+    }).not.toThrow();
+
+    expect(fs.existsSync(lockPath)).toBe(true);
+    expect(readLock().pid).toBe(OTHER_PID);
   });
 });
 

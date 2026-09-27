@@ -108,17 +108,33 @@ export async function acquireDiskLock(workspaceRoot: string): Promise<() => void
       };
       fs.writeFileSync(lockPath, JSON.stringify(lockData), { flag: 'wx' });
 
-      // Start heartbeat
+      // Start heartbeat: chỉ ghi lại .vyen/.lock khi record vẫn thuộc về process
+      // này. Nếu process bị freeze > LOCK_STALE_TIMEOUT_MS, process khác đã evict
+      // và chiếm lại lock — lúc đó phải dừng ngay, tuyệt đối không ghi đè record
+      // của chủ mới (nếu không cả hai đều tưởng mình là leader: split-brain).
       const heartbeatTimer = setInterval(() => {
+        let ownerPid: number;
         try {
-          if (fs.existsSync(lockPath)) {
-            lockData.heartbeatAt = Date.now();
-            fs.writeFileSync(lockPath, JSON.stringify(lockData));
-          }
+          const data = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as LockFileData;
+          ownerPid = data.pid;
+        } catch {
+          // Lock vừa bị xoá / hỏng / chưa đọc được: không ghi gì, tick sau thử lại.
+          return;
+        }
+
+        if (ownerPid !== currentPid) {
+          clearInterval(heartbeatTimer); // đã mất lock
+          return;
+        }
+
+        try {
+          lockData.heartbeatAt = Date.now();
+          fs.writeFileSync(lockPath, JSON.stringify(lockData));
         } catch {}
       }, 5_000);
+      heartbeatTimer.unref?.();
 
-      // Release callback
+      // Release callback — idempotent, chỉ xoá lock do chính process này tạo.
       return () => {
         clearInterval(heartbeatTimer);
         try {

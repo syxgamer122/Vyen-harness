@@ -2,8 +2,17 @@
 
 /*
  * Status line thay cho ChatHeader kiểu web chat: một hàng hairline mang toàn
- * bộ trạng thái run theo ngôn ngữ terminal (DESIGN.md) — model, mode, workspace,
- * ngữ cảnh, trạng thái — và các tác vụ phiên (xuất/nén/xóa) dạng icon.
+ * bộ trạng thái run theo ngôn ngữ terminal (DESIGN.md) — mode, trạng thái,
+ * model, workspace, ngữ cảnh — rồi tới các tác vụ phiên (suy nghĩ/xuất/nén/xóa).
+ *
+ * NGUYÊN TẮC BỐ TRÍ: HÌNH DẠNG CỐ ĐỊNH, TỪ MANG NGHĨA, MÀU CHỈ NHẤN LẠI.
+ *   {mode} · {model} · {workspace} · {context} · …NÚT
+ * Mọi thứ trước dấu "·" cuối là CHỮ THUẦN trên một nền, không viền, không nền
+ * riêng, không badge tròn. Màu chỉ tô lên khi trạng thái thật sự đáng báo; người
+ * đọc phải hiểu được cả khi không nhìn thấy màu.
+ *
+ * Cụm phải `flex-none` (nút suy nghĩ/xuất/nén/xóa) và cụm trái co lại trước —
+ * nhờ vậy thanh cuộn ngang không bao giờ đẩy nút ra ngoài khung hẹp.
  * Dữ liệu chỉ đọc từ props mà ChatInterface đã có; không tự tính gì mới.
  */
 import React, { memo, useMemo } from 'react';
@@ -12,6 +21,7 @@ import type { ModelOption } from '@/components/model-selector';
 import { ThinkingMenu } from '@/components/thinking-menu';
 import { ChatExportMenu } from '@/components/chat-export-menu';
 import { computeMeter, fmt, type ContextMeterTone } from '@/components/context-meter';
+
 import type { ModelFavorite, RecentModel } from '@/lib/model-meta';
 import type { ThinkingLevel } from '@/lib/provider-url';
 
@@ -55,17 +65,31 @@ interface StatusLineProps {
   onDeleteChat: () => void;
 }
 
+/**
+ * Ngưỡng cảnh báo KHÔNG tự đặt ở đây — lấy thẳng `tone` mà `computeMeter`
+ * trả về (≥75% warning, ≥90% error) để số trên thanh khớp với ngưỡng nén
+ * thật trong lib/context-budget.ts. Đừng viết lại điều kiện so sánh.
+ */
 const TONE_TEXT: Record<ContextMeterTone, string> = {
-  ok: 'text-text-muted',
-  warning: 'text-status-warning',
-  error: 'text-status-error',
+  ok: 'text-tertiary',
+  warning: 'text-warning',
+  error: 'text-danger',
 };
 
 const TONE_BAR: Record<ContextMeterTone, string> = {
-  ok: 'bg-[#4b607c]',
-  warning: 'bg-[#e8993a]',
-  error: 'bg-[#e8704f]',
+  ok: 'bg-accent-dim',
+  warning: 'bg-warning',
+  error: 'bg-danger',
 };
+
+/** Chữ phân cách giữa các mảnh của thanh trạng thái. */
+function Sep() {
+  return (
+    <span aria-hidden="true" className="flex-none text-disabled">
+      ·
+    </span>
+  );
+}
 
 export const StatusLine = memo(function StatusLine({
   onOpenSidebar,
@@ -101,105 +125,139 @@ export const StatusLine = memo(function StatusLine({
     return found?.label || model || 'chưa chọn model';
   }, [models, model]);
 
-  const runLabel = run.webBusy
-    ? 'web'
-    : run.streaming
-      ? 'running'
-      : 'idle';
-  const runTone = run.webBusy || run.streaming
-    ? 'text-accent-steel'
-    : 'text-text-muted';
+  /*
+   * Trạng thái chạy gộp chung với mode thành MỘT mảnh dẫn đầu: `plan · idle`
+   * đọc như một câu, thay vì hai pill rời rạc cạnh tranh sự chú ý.
+   */
+  const runLabel = run.webBusy ? 'web' : run.streaming ? 'running' : 'idle';
+  const running = run.webBusy || run.streaming;
 
   return (
-    <header className="sticky top-0 z-20 flex h-9 min-w-0 flex-shrink-0 items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-border-hairline bg-bg-deep px-2 font-mono text-[11.5px] pt-safe-2 md:px-3">
+    <header className="sticky top-0 z-20 flex h-7 min-w-0 flex-shrink-0 items-center gap-1.5 overflow-x-auto no-scrollbar border-b border-subtle bg-surface/90 px-2 font-mono text-meta text-secondary">
       <button
         type="button"
         onClick={onOpenSidebar}
         aria-label={sidebarCollapsed ? 'Mở rộng thanh bên' : 'Mở thanh bên'}
-        className={`icon-btn-sm flex-none ${sidebarCollapsed ? '' : 'md:hidden'}`}
+        className={`icon-btn-sm -ml-1 ${sidebarCollapsed ? '' : 'md:hidden'}`}
       >
-        <Menu size={15} />
+        <Menu size={14} />
       </button>
 
       {/*
-       * Model — hiển thị TĨNH. Việc chọn model đã chuyển xuống composer (nơi tay
-       * đang gõ); ở đây chỉ còn vai trò "biết đang chạy model nào" khi mắt đang
-       * ở phần trên màn hình. Một control tương tác duy nhất, không nhân đôi.
+       * Cụm trái co lại trước khi cụm phải bị đẩy: thanh cuộn ngang giữ mọi nút
+       * phải (nén/xóa) ở trong khung nhìn, đồng thời giữ CHỈ SỐ ngữ cảnh ở mọi
+       * bề rộng — dưới `md` nó rút còn đúng con số, không biến mất.
        */}
-      <div
-        className="min-w-0 max-w-[13rem] flex-none truncate font-mono text-[11.5px] text-text-muted"
-        title={activeModelLabel}
-      >
-        {activeModelLabel}
-      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+        {/* Mode + trạng thái chạy: từ quyết định có thể đổi bằng một chạm. */}
+        {onToggleAgentMode && (
+          <button
+            type="button"
+            onClick={onToggleAgentMode}
+            disabled={agentModeDisabled}
+            aria-label={
+              agentMode === 'plan' ? 'Chuyển sang ACT mode' : 'Chuyển sang PLAN mode'
+            }
+            title={
+              agentMode === 'plan'
+                ? 'PLAN: agent chỉ đọc và hỏi, bấm để cho phép ghi'
+                : 'ACT: agent đọc + ghi file, chạy lệnh, bấm để về PLAN'
+            }
+            className={`flex-none rounded-none px-1 uppercase tracking-[0.08em] text-micro transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 ${
+              agentMode === 'plan'
+                ? 'text-warning'
+                : 'text-tertiary hover:text-primary'
+            }`}
+          >
+            {agentMode === 'plan' ? 'plan' : 'act'}
+          </button>
+        )}
 
-      {onToggleAgentMode && (
+        <span
+          className={`flex flex-none items-center gap-1.5 ${running ? 'text-accent' : 'text-tertiary'}`}
+          role="status"
+          aria-label={`Trạng thái: ${runLabel}`}
+        >
+          {running ? (
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+          ) : (
+            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-disabled" />
+          )}
+          {runLabel}
+        </span>
+
+        {/* Model — bấm để mở ModelSelector ở composer. */}
+        <Sep />
         <button
           type="button"
-          onClick={onToggleAgentMode}
-          disabled={agentModeDisabled}
-          aria-label={
-            agentMode === 'plan' ? 'Chuyển sang ACT mode' : 'Chuyển sang PLAN mode'
-          }
-          title={
-            agentMode === 'plan'
-              ? 'PLAN: agent chỉ đọc và hỏi, bấm để cho phép ghi'
-              : 'ACT: agent đọc + ghi file, chạy lệnh, bấm để về PLAN'
-          }
-          className={`flex-none rounded-none px-1.5 py-0.5 uppercase tracking-[0.08em] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6a9fcc] disabled:cursor-not-allowed disabled:opacity-40 ${
-            agentMode === 'plan'
-              ? 'bg-panel-soft text-status-warning'
-              : 'text-text-muted hover:bg-surface-raised hover:text-text-primary'
-          }`}
+          onClick={() => {
+            document.getElementById('model-selector-trigger')?.click();
+          }}
+          aria-label={`Model: ${activeModelLabel} (bấm để đổi)`}
+          title={`Model: ${activeModelLabel} (bấm để đổi)`}
+          className="min-w-0 max-w-[9rem] lg:max-w-[16rem] shrink truncate rounded-none px-1 text-left text-secondary transition-colors hover:bg-raised hover:text-primary"
         >
-          {agentMode === 'plan' ? 'plan' : 'act'}
+          {activeModelLabel}
         </button>
-      )}
 
-      {workspace && (
-        <span
-          className="hidden flex-none text-text-muted sm:inline"
-          title={
-            workspace.connected
-              ? `Thư mục làm việc: ${workspace.name}${workspace.branch ? ` (nhánh ${workspace.branch})` : ''}`
-              : 'Chưa kết nối thư mục làm việc, nút thư mục trong thanh nhập'
-          }
-        >
-          ws:{workspace.connected ? workspace.name : '-'}
-          {workspace.connected && workspace.branch ? `·${workspace.branch}` : ''}
-        </span>
-      )}
+        {/* Workspace + nhánh: chỉ khi còn chỗ, là chi tiết phụ. */}
+        {workspace && (
+          <>
+            <Sep />
+            <span
+              className="hidden flex-none truncate text-tertiary lg:inline"
+              title={
+                workspace.connected
+                  ? `Thư mục làm việc: ${workspace.name}${workspace.branch ? ` (nhánh ${workspace.branch})` : ''}`
+                  : 'Chưa kết nối thư mục làm việc, nút thư mục trong thanh nhập'
+              }
+            >
+              {workspace.connected ? workspace.name : 'no workspace'}
+              {workspace.connected && workspace.branch ? ` @${workspace.branch}` : ''}
+            </span>
+          </>
+        )}
 
-      {meter && (
-        <div
-          className="hidden min-w-0 flex-none items-center gap-1.5 md:flex"
-          title={`Ngữ cảnh: ${fmt(ctxUsed!)} / ${fmt(meter.safeMax)} token (${meter.percent}%)`}
-        >
-          <div className="h-0.5 w-16 bg-surface-code" aria-hidden="true">
+        {/*
+         * Ngữ cảnh: MỘT thanh mảnh tỉ lệ + con số. Mười vạch cũ nặng quá cho
+         * hàng 28px và tốn thêm chỗ ngang cạnh cụm phải; đổi lại độ chính xác
+         * giảm từ 10 bậc xuống liên tục — chấp nhận được, vì số phần trăm vẫn
+         * in ra ngay cạnh. Dưới `lg` chỉ còn phần trăm.
+         */}
+        {meter && (
+          <>
+            <Sep />
             <div
-              className={`h-full ${TONE_BAR[meter.tone]}`}
-              style={{ width: `${Math.round(meter.fillRatio * 100)}%` }}
-            />
-          </div>
-          <span className={`flex-none text-[10px] tabular-nums ${TONE_TEXT[meter.tone]}`}>
-            {fmt(ctxUsed!)} / {fmt(meter.safeMax)}
-          </span>
-        </div>
-      )}
+              className="flex min-w-0 flex-none items-center gap-1.5"
+              title={`Ngữ cảnh: ${fmt(ctxUsed!)} / ${fmt(meter.safeMax)} token (${meter.percent}%)`}
+            >
+              <div
+                role="progressbar"
+                aria-label="Mức sử dụng ngữ cảnh"
+                aria-valuenow={Math.min(100, meter.percent)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="hidden h-1 w-10 overflow-hidden rounded-full bg-sunken lg:block"
+              >
+                <div
+                  className={`h-full rounded-full ${TONE_BAR[meter.tone]}`}
+                  style={{ width: `${Math.round(meter.fillRatio * 100)}%` }}
+                />
+              </div>
+              <span className={`flex-none tabular-nums text-micro ${TONE_TEXT[meter.tone]}`}>
+                <span className="sm:hidden">{meter.percent}%</span>
+                <span className="hidden sm:inline">
+                  {fmt(ctxUsed!)}/{fmt(meter.safeMax)}
+                </span>
+              </span>
+            </div>
+          </>
+        )}
+      </div>
 
-      <div className="flex-1" aria-hidden="true" />
-
-      <span
-        className={`flex flex-none items-center gap-1.5 ${runTone}`}
-        role="status"
-        aria-label={`Trạng thái: ${runLabel}`}
-      >
-        {run.streaming && <span aria-hidden="true" className="terminal-cursor" />}
-        {runLabel}
-      </span>
-
-      {thinkingLevel && onThinkingLevelChange && (
-        <div className="flex-none">
+      {/* Cụm phải: không bao giờ co lại, luôn tới tay được. */}
+      <div className="flex flex-none items-center gap-0.5 pl-1">
+        {thinkingLevel && onThinkingLevelChange && (
           <ThinkingMenu
             value={thinkingLevel}
             onChange={onThinkingLevelChange}
@@ -207,57 +265,57 @@ export const StatusLine = memo(function StatusLine({
             supportedLevels={thinkingSupportedLevels}
             mandatory={thinkingMandatory}
           />
-        </div>
-      )}
+        )}
 
-      <ChatExportMenu chatId={currentChatId} />
+        <ChatExportMenu chatId={currentChatId} />
 
-      {hasMessages && canCompact && onCompact && (
-        <button
-          type="button"
-          onClick={onCompact}
-          disabled={compactBusy}
-          aria-label={compactBusy ? 'Đang nén hội thoại' : 'Nén hội thoại'}
-          title={
-            compactBusy
-              ? 'Đang nén hội thoại...'
-              : 'Nén phần hội thoại cũ thành tóm tắt'
-          }
-          className="icon-btn-sm flex-none text-text-muted hover:text-accent-steel"
-        >
-          <Scissors size={13} />
-        </button>
-      )}
-
-      {hasMessages &&
-        (confirmClear ? (
-          <div className="flex flex-none items-center gap-1 rounded-none border border-border-hairline bg-surface-raised p-0.5 font-mono text-[11px]">
-            <button
-              type="button"
-              onClick={onDeleteChat}
-              className="rounded-none px-1.5 py-0.5 font-medium text-status-error transition-colors hover:bg-[#e8704f]/10"
-            >
-              Xóa
-            </button>
-            <button
-              type="button"
-              onClick={() => onSetConfirmClear(false)}
-              className="rounded-none px-1.5 py-0.5 text-text-muted transition-colors hover:bg-panel-soft"
-            >
-              Hủy
-            </button>
-          </div>
-        ) : (
+        {hasMessages && canCompact && onCompact && (
           <button
             type="button"
-            onClick={() => onSetConfirmClear(true)}
-            aria-label="Xóa cuộc trò chuyện"
-            title="Xóa cuộc trò chuyện này"
-            className="icon-btn-sm icon-btn-danger flex-none text-text-muted hover:text-status-error"
+            onClick={onCompact}
+            disabled={compactBusy}
+            aria-label={compactBusy ? 'Đang nén hội thoại' : 'Nén hội thoại'}
+            title={
+              compactBusy
+                ? 'Đang nén hội thoại...'
+                : 'Nén phần hội thoại cũ thành tóm tắt'
+          }
+            className="icon-btn-sm flex-none"
           >
-            <Trash2 size={13} />
+            <Scissors size={13} />
           </button>
-        ))}
+        )}
+
+        {hasMessages &&
+          (confirmClear ? (
+            <div className="flex flex-none items-center gap-0.5 pl-0.5">
+              <button
+                type="button"
+                onClick={onDeleteChat}
+                className="rounded-none px-1.5 py-0.5 font-medium text-danger transition-colors hover:bg-danger/10"
+              >
+                Xóa
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetConfirmClear(false)}
+                className="rounded-none px-1.5 py-0.5 text-tertiary transition-colors hover:bg-raised"
+              >
+                Hủy
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onSetConfirmClear(true)}
+              aria-label="Xóa cuộc trò chuyện"
+              title="Xóa cuộc trò chuyện này"
+              className="icon-btn-sm icon-btn-danger flex-none"
+            >
+              <Trash2 size={13} />
+            </button>
+          ))}
+      </div>
     </header>
   );
 });

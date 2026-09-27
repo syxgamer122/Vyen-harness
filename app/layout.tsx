@@ -35,8 +35,8 @@ export const viewport: Viewport = {
   interactiveWidget: 'resizes-content',
   colorScheme: 'dark',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#0d1116' },
-    { media: '(prefers-color-scheme: dark)', color: '#0d1116' },
+    { media: '(prefers-color-scheme: light)', color: '#07090d' },
+    { media: '(prefers-color-scheme: dark)', color: '#07090d' },
   ],
 };
 
@@ -61,7 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="relative min-h-dvh bg-bg-deep font-sans text-text-primary antialiased overscroll-none selection:bg-[#6a9fcc]/30 selection:text-text-primary">
+      <body className="relative min-h-dvh bg-sunken font-sans text-primary antialiased overscroll-none selection:bg-accent/30 selection:text-primary">
         <script dangerouslySetInnerHTML={{ __html: THEME_NO_FLASH_SCRIPT }} />
         <PWARegister />
         {children}

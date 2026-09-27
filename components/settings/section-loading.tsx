@@ -8,7 +8,7 @@
  */
 export function SectionLoading() {
   return (
-    <div className="flex items-center gap-2 py-6 font-mono text-xs text-text-muted" role="status">
+    <div className="flex items-center gap-2 py-6 font-mono text-ui text-tertiary" role="status">
       <span className="terminal-cursor" aria-hidden="true" />
       <span>Đang tải mục cài đặt…</span>
     </div>

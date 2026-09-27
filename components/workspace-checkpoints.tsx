@@ -165,7 +165,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
           type="button"
           disabled={busy || running}
           onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 rounded-full border border-border-hairline bg-surface-raised px-3 py-1 font-mono text-[11px] text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-bg hover:text-text-primary disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-full border border-subtle bg-raised px-3 py-1 font-mono text-[11px] text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-bg hover:text-text-primary disabled:opacity-40"
           title="Khôi phục các file agent vừa sửa về trạng thái trước đó"
         >
           <History size={12} className="text-accent-steel" aria-hidden />
@@ -184,7 +184,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
           }}
         >
           <div
-            className="pi-frame relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-none border border-border-hairline bg-panel-bg font-mono"
+            className="pi-frame relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-none border border-subtle bg-panel-bg font-mono"
             onClick={(e) => e.stopPropagation()}
           >
             <span className="pi-corner-tl" />
@@ -192,7 +192,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
             <span className="pi-corner-bl" />
             <span className="pi-corner-br" />
 
-            <div className="border-b border-border-hairline bg-surface-raised px-4 py-3">
+            <div className="border-b border-subtle bg-raised px-4 py-3">
               <div className="flex items-center gap-2 font-pixel text-[16px] font-semibold text-text-primary [image-rendering:pixelated]">
                 <span className="font-bold text-accent-steel">$</span>
                 <span className="text-accent-steel">undo</span>
@@ -210,7 +210,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                   return (
                     <li
                       key={f.path}
-                      className="rounded-none border border-border-hairline bg-surface-raised px-3 py-2"
+                      className="rounded-none border border-subtle bg-raised px-3 py-2"
                     >
                       <details
                         onToggle={(e) => {
@@ -222,8 +222,8 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                           <span
                             className={`mr-2 rounded-none px-1.5 py-0.5 font-mono text-[10px] ${
                               f.existedBefore
-                                ? 'border border-accent-steel/30 bg-[#6a9fcc]/10 text-accent-steel'
-                                : 'border border-status-error/30 bg-[#e8704f]/10 text-status-error'
+                                ? 'border border-accent/40/30 bg-accent/10 text-accent-steel'
+                                : 'border border-danger/40/30 bg-danger/10 text-status-error'
                             }`}
                           >
                             {f.existedBefore ? 'restore' : 'delete new'}
@@ -247,7 +247,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                               <span className="text-status-success">+{pv.adds}</span>{' '}
                               <span className="text-status-error">-{pv.dels}</span> — nội dung sẽ khôi phục:
                             </p>
-                            <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-none border border-border-hairline bg-bg-deep p-2 font-mono text-[11px] leading-relaxed text-text-primary">
+                            <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-none border border-subtle bg-bg-deep p-2 font-mono text-[11px] leading-relaxed text-text-primary">
                               {pv.text}
                             </pre>
                           </>
@@ -259,7 +259,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
               </ul>
             </div>
 
-            <div className="flex items-center justify-between gap-2 border-t border-border-hairline bg-surface-raised px-4 py-2.5">
+            <div className="flex items-center justify-between gap-2 border-t border-subtle bg-raised px-4 py-2.5">
               <span className="text-[11px] text-text-muted">
                 $ Esc to cancel
               </span>
@@ -268,7 +268,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                   type="button"
                   disabled={running}
                   onClick={() => setOpen(false)}
-                  className="rounded-none border border-border-hairline bg-panel-soft px-3 py-1.5 text-xs text-text-primary transition-colors hover:border-border-hover disabled:opacity-50"
+                  className="rounded-none border border-subtle bg-panel-soft px-3 py-1.5 text-xs text-text-primary transition-colors hover:border-border-hover disabled:opacity-50"
                 >
                   Để nguyên
                 </button>
@@ -276,7 +276,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                   type="button"
                   disabled={running || busy}
                   onClick={() => void performRestore()}
-                  className="flex items-center gap-1.5 rounded-none bg-[#6a9fcc] px-3.5 py-1.5 text-xs font-semibold text-[#0d1116] transition-colors hover:bg-[#6a9fcc]/85 disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-none bg-accent px-3.5 py-1.5 text-xs font-semibold text-sunken transition-colors hover:bg-accent/85 disabled:opacity-60"
                 >
                   {running ? (
                     <Loader2 size={13} className="animate-spin" aria-hidden />

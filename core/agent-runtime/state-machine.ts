@@ -30,10 +30,10 @@ export function transitionTurnState(
   context: TurnContext,
   event: TurnEvent,
 ): { nextState: TurnState; nextContext: TurnContext } {
-  // Clone context để đảm bảo immutability
+  // Clone context để đảm bảo immutability (copy sâu từng tool call để không mutate object của caller)
   const ctx: TurnContext = {
     ...context,
-    pendingToolCalls: [...context.pendingToolCalls],
+    pendingToolCalls: context.pendingToolCalls.map((c) => ({ ...c })),
   };
 
   switch (state) {
@@ -58,7 +58,7 @@ export function transitionTurnState(
         return { nextState: 'streaming', nextContext: ctx };
       }
       if (event.type === 'TOOL_CALLS_DISCOVERED') {
-        ctx.pendingToolCalls = event.calls;
+        ctx.pendingToolCalls = event.calls.map((c) => ({ ...c }));
         return { nextState: 'gating', nextContext: ctx };
       }
       if (event.type === 'STOP') {
@@ -76,7 +76,7 @@ export function transitionTurnState(
         return { nextState: 'executing_tool', nextContext: ctx };
       }
       if (event.type === 'REQUIRE_APPROVAL') {
-        ctx.pendingToolCalls = event.calls;
+        ctx.pendingToolCalls = event.calls.map((c) => ({ ...c }));
         return { nextState: 'awaiting_approval', nextContext: ctx };
       }
       if (event.type === 'STOP') {
@@ -90,8 +90,11 @@ export function transitionTurnState(
         const target = ctx.pendingToolCalls.find((c) => c.id === event.toolCallId);
         if (target) {
           target.approvalToken = event.token;
+          return { nextState: 'executing_tool', nextContext: ctx };
         }
-        return { nextState: 'executing_tool', nextContext: ctx };
+        // Fail-closed: toolCallId không khớp call nào đang chờ duyệt (UI cũ, call đã bị huỷ,
+        // id bị đoán) -> KHÔNG được sang 'executing_tool' khi chưa có token hợp lệ (INV-3, INV-2).
+        break;
       }
       if (event.type === 'USER_DENY') {
         // Hủy lời gọi công cụ

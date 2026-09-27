@@ -83,6 +83,11 @@ export default function Home() {
         e.preventDefault();
         setSidebarCollapsed(!latest.current.isSidebarCollapsed);
       }
+      // Ctrl+, — mở/đóng Cài đặt (Studio Settings).
+      if (mod && e.key === ',') {
+        e.preventDefault();
+        setSettingsOpen(!latest.current.isSettingsOpen);
+      }
       if (e.key === 'Escape' && latest.current.isSettingsOpen) setSettingsOpen(false);
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -138,7 +143,7 @@ export default function Home() {
       <div
         role="status"
         aria-live="polite"
-        className="flex h-dvh items-center justify-center bg-surface text-sm text-zinc-500"
+        className="flex h-dvh items-center justify-center bg-surface text-sm text-tertiary"
       >
         Đang mở không gian làm việc…
       </div>

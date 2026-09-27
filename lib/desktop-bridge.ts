@@ -291,8 +291,19 @@ export interface VyenBridge {
       toolCallId?: string;
       chatId?: string;
     }): Promise<VyenRunResult>;
-    /** Spawn detached — trả jobId NGAY, output ghi file, sống qua restart. */
-    runBg(opts: { command: string; timeoutSecs?: number }): Promise<{ jobId: string; pid?: number; note?: string; error?: string }>;
+    /**
+     * Spawn detached — trả jobId NGAY, output ghi file, sống qua restart.
+     *
+     * `approvalToken`/`chatId` mang CÙNG ý nghĩa với `shell.run`: bg_run là một
+     * đường spawn, nên caller phải cấp token phê duyệt và chuyển tiếp xuống
+     * main process (giống `shell-run`, tầng privileged mới tiêu token).
+     */
+    runBg(opts: {
+      command: string;
+      timeoutSecs?: number;
+      approvalToken?: string;
+      chatId?: string;
+    }): Promise<{ jobId: string; pid?: number; note?: string; error?: string }>;
     /** Không có id → liệt kê mọi job (đã reconcile job pid chết sau restart). */
     bgStatus(id?: string): Promise<{ jobs: VyenBgJob[] }>;
     bgStop(id: string): Promise<{ ok: true; note?: string }>;

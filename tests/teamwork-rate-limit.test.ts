@@ -252,5 +252,49 @@ describe('Teamwork Rate Limit & Overload Protection', () => {
       expect(manager.isPaused()).toBe(false);
       expect(manager.getRecordCount()).toBe(0); // history cleared
     });
+
+    /* timestamp 0 (epoch) là giá trị HỢP LỆ nhưng falsy — bản cũ falsy-check
+       nên coi như "chưa pause" và bỏ qua trọn cooldown. Mỗi test dưới đây bắt
+       buộc đi qua trạng thái "cooldown CHƯA hết" ở timestamp 0: chỉ assert
+       trạng thái "đã hết cooldown" thì cả bản đúng lẫn bản hỏng đều trả
+       true/0 nên test pass vô hạng dù hồi quy. */
+    it('pauseTimestamp = 0 vẫn phải chờ hết cooldown (chưa được resume)', () => {
+      manager.recordRateLimit('429 ngay tại epoch', { timestamp: 0 });
+
+      expect(manager.isPaused()).toBe(true);
+      expect(manager.getPauseTimestamp()).toBe(0);
+      expect(manager.canResume(0)).toBe(false);
+      expect(manager.canResume(2_000)).toBe(false);
+      expect(manager.getWaitRecommendation(2_000)).toBeGreaterThan(0);
+      // defaultCooldownMs = 10_000 (xem beforeEach) ⇒ còn 8s ở mốc 2s.
+      expect(manager.getWaitRecommendation(2_000)).toBe(8_000);
+    });
+
+    it('pauseTimestamp = 0 + đã trôi qua cooldown → resume được, chờ 0', () => {
+      manager.recordRateLimit('429 ngay tại epoch', { timestamp: 0 });
+
+      // Chưa hết cooldown: bản falsy-check trả sai true/0 ngay tại epoch.
+      expect(manager.canResume(2_000)).toBe(false);
+      expect(manager.getWaitRecommendation(2_000)).toBe(8_000);
+
+      expect(manager.canResume(10_000)).toBe(true);
+      expect(manager.getWaitRecommendation(10_000)).toBe(0);
+      expect(manager.getWaitRecommendation(99_000)).toBe(0);
+    });
+
+    it('resume() xoá timestamp → canResume true, không chờ thêm', () => {
+      manager.recordRateLimit('429 ngay tại epoch', { timestamp: 0 });
+
+      // Trước resume vẫn phải chờ trọn cooldown — neo trạng thái để resume()
+      // thật sự thay đổi hành vi chứ không phải chỉ xoá biến.
+      expect(manager.canResume(0)).toBe(false);
+      expect(manager.getWaitRecommendation(0)).toBeGreaterThan(0);
+
+      manager.resume();
+
+      expect(manager.getPauseTimestamp()).toBeUndefined();
+      expect(manager.canResume(0)).toBe(true);
+      expect(manager.getWaitRecommendation(0)).toBe(0);
+    });
   });
 });

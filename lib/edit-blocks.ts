@@ -172,6 +172,14 @@ function prep(text: string): { text: string; lines: string[] } {
 }
 
 /**
+ * `prep` cắt phần tử rỗng cuối, nên mọi `join('\n')` từ `lines` mất newline
+ * cuối của file. Ghép lại đúng hình dạng file GỐC (gốc không có thì không thêm).
+ */
+function keepTrailingNewline(text: string, whole: string): string {
+  return whole.endsWith('\n') && !text.endsWith('\n') ? `${text}\n` : text;
+}
+
+/**
  * Đếm mọi vị trí khớp NGUYÊN VĂN (không chồng lấn) của `partLines`.
  * Cần cho kiểm tra tính duy nhất — xem ghi chú ở perfectReplace.
  */
@@ -305,7 +313,10 @@ function tryDotDotDots(whole: string, part: string, replace: string): string | n
     }
     const count = out.split(p).length - 1;
     if (count !== 1) return null; // 0 hoặc >1 lần → từ chối (fail-closed)
-    out = out.replace(p, r);
+    // Function replacer: `r` do model sinh nên có thể chứa $&, $`, $', $$, $1…
+    // Nếu truyền string replacement, chúng bị hiểu thành backreference và
+    // nội dung file bị hỏng âm thầm. KHÔNG dùng replaceAll (đã guard 1 lần).
+    out = out.replace(p, () => r);
   }
   return out;
 }
@@ -366,19 +377,37 @@ export function replaceMostSimilarChunk(
 
   let res = perfectOrWhitespace(wholeLines, partLines, replaceLines);
   if (res === 'ambiguous') return { ok: false, hint: ambiguousHint };
-  if (res !== null) return { ok: true, text: res.text, strategy: res.strategy };
+  if (res !== null) {
+    return { ok: true, text: keepTrailingNewline(res.text, whole), strategy: res.strategy };
+  }
 
   // GPT hay tự thêm dòng trắng đầu khối (model tự thêm).
   if (partLines.length > 2 && !partLines[0].trim()) {
     res = perfectOrWhitespace(wholeLines, partLines.slice(1), replaceLines);
     if (res === 'ambiguous') return { ok: false, hint: ambiguousHint };
-    if (res !== null) return { ok: true, text: res.text, strategy: `skip-blank+${res.strategy}` };
+    if (res !== null) {
+      return {
+        ok: true,
+        text: keepTrailingNewline(res.text, whole),
+        strategy: `skip-blank+${res.strategy}`,
+      };
+    }
   }
 
   // Elision "..." — chia mảnh khớp duy nhất.
   try {
     const dots = tryDotDotDots(wholeN, part, replace);
-    if (dots !== null) return { ok: true, text: dots, strategy: 'dotdotdots' };
+    if (dots !== null) {
+      // `wholeN` LUÔN kết thúc bằng newline nên kết quả ghép mảnh có thể
+      // thừa newline ở file gốc không có (và mất newline nếu REPLACE nuốt mất)
+      // → cắt bớt/đắp lại cho đúng hình dạng file gốc, y các nhánh trên.
+      const shaped = keepTrailingNewline(dots, whole);
+      return {
+        ok: true,
+        text: whole.endsWith('\n') ? shaped : shaped.replace(/\n$/, ''),
+        strategy: 'dotdotdots',
+      };
+    }
   } catch {
     /* Lỗi parse tương ứng return null ở đây */
   }
@@ -412,7 +441,10 @@ export function replaceMostSimilarChunk(
     if (bestRatio >= 0.8 && bestStart >= 0) {
       return {
         ok: true,
-        text: [...wholeLines.slice(0, bestStart), ...replaceLines, ...wholeLines.slice(bestEnd)].join('\n'),
+        text: keepTrailingNewline(
+          [...wholeLines.slice(0, bestStart), ...replaceLines, ...wholeLines.slice(bestEnd)].join('\n'),
+          whole,
+        ),
         strategy: `fuzzy(${bestRatio.toFixed(2)})`,
       };
     }

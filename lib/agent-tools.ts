@@ -110,13 +110,7 @@ export function summarizeToolArgs(name: string, args: unknown): string {
   /* Tool MCP: tên đã encode server + tool, arg thì tuỳ server ngoài kia nên
      không có case riêng — gom key/value ngắn để chip có nội dung thay vì trống. */
   if (isMcpToolKey(name)) {
-    return Object.entries(a)
-      .slice(0, 3)
-      .map(([k, v]) => {
-        const raw = typeof v === 'string' ? v : JSON.stringify(v);
-        return `${k}=${String(raw ?? '').slice(0, 40)}`;
-      })
-      .join(' ');
+    return briefArgs(a);
   }
   switch (name) {
     case 'web_search':
@@ -135,8 +129,51 @@ export function summarizeToolArgs(name: string, args: unknown): string {
       return Array.isArray(a.paths) ? (a.paths as string[]).join(', ').slice(0, 80) : '';
     case 'git_diff':
       return String(a.path ?? (a.staged ? 'staged' : '')).slice(0, 60);
+    /* Nhóm fs_*: đường dẫn là thứ duy nhất đáng đọc trên chip — nội dung
+       đọc/ghi và khối SEARCH/REPLACE dài hàng trăm dòng, đưa vào chỉ là loãng. */
+    case 'fs_read':
+    case 'fs_edit':
+    case 'fs_write':
+      return String(a.path ?? '').slice(0, 80);
+    case 'fs_list':
+      return String(a.path ?? '.').slice(0, 80);
+    case 'fs_search':
+      return String(a.query ?? '').slice(0, 60);
+    /* Sarsed-Code dùng `file_path` (không phải `path` như nhóm fs_). */
+    case 'code_skeleton':
+    case 'code_patch':
+      return String(a.file_path ?? '').slice(0, 80);
+    case 'code_symbols':
+      return String(a.query ?? a.file_path ?? '').slice(0, 60);
+    case 'code_verify':
+      return String(a.command ?? '').slice(0, 80);
+    case 'delegate': {
+      /* Dạng song song truyền `tasks` (mỗi task có `instructions`), dạng đơn
+         thì `instructions` ở top level — hiện cái nào thì lấy cái đó. */
+      const tasks = Array.isArray(a.tasks) ? (a.tasks as Array<{ instructions?: unknown }>) : [];
+      if (tasks.length) {
+        return `${tasks.length} task · ${String(tasks[0].instructions ?? '')}`.slice(0, 80);
+      }
+      return String(a.instructions ?? '').slice(0, 80);
+    }
+    case 'plan_create':
+      return String(a.title ?? '').slice(0, 60);
+    case 'plan_update':
+      return String(`${a.subtaskId ?? ''} ${a.status ?? ''}`.trim()).slice(0, 40);
+    case 'skill_load':
+      return String(a.name ?? '').slice(0, 60);
+    case 'memory_save':
+    case 'lesson_save':
+      return String(a.text ?? '').slice(0, 60);
+    case 'bg_run':
+      return String(a.command ?? '').slice(0, 80);
+    case 'bg_status':
+      /* Không job_id = xem mọi job (xem mô tả tool). */
+      return String(a.job_id ?? 'tất cả job');
+    case 'bg_stop':
+      return String(a.job_id ?? '').slice(0, 60);
     default:
-      return '';
+      return briefArgs(a);
   }
 }
 
@@ -182,8 +219,72 @@ export function summarizeToolResult(name: string, result: unknown): string {
     case 'git_log':
       return typeof r === 'string' ? `${(r as string).split('\n').filter(Boolean).length} commit` : 'có log';
     default:
-      return typeof r.note === 'string' ? r.note.slice(0, 80) : typeof r.error === 'string' ? (r.error as string).slice(0, 80) : '';
+      if (typeof r.note === 'string') return r.note.slice(0, 80);
+      if (typeof r.error === 'string') return (r.error as string).slice(0, 80);
+      return briefShape(r);
   }
+}
+
+/**
+ * Nhánh default: trước đây rơi về chuỗi rỗng, chip "Hoàn tất" mà vùng output
+ * trống. Chỉ mô TẢ HÌNH DẠNG kết quả (bao nhiêu phần tử / ký tự, bao nhiêu
+ * field) — không suy diễn "thành công"/"x kết quả" khi chưa có bằng chứng.
+ */
+function briefShape(r: unknown): string {
+  if (typeof r === 'string') return `${r.length} ký tự`;
+  if (Array.isArray(r)) return `${r.length} phần tử`;
+  if (!r || typeof r !== 'object') return '';
+  const keys = Object.keys(r as Record<string, unknown>);
+  if (!keys.length) return '';
+  return `${keys.length} trường`;
+}
+
+/* Ngưỡng của `briefArgs` — args nén cho chip dưới dạng `key=value` ngắn. */
+const BRIEF_ARG_KEYS = [
+  'path', 'file', 'file_path', 'name', 'command', 'query', 'url', 'id', 'symbol', 'target',
+];
+const BRIEF_ARG_VAL_CAP = 40;
+const BRIEF_ARG_ARRAY_CAP = 3;
+const BRIEF_ARG_MAX = 3;
+
+/** Gom vài key/value đầu tiên — bỏ giá trị to/noise, ưu tiên key trỏ tới đích. */
+function briefArgs(a: Record<string, unknown>): string {
+  const entries = Object.entries(a).filter(([, v]) => v !== undefined && v !== null);
+  if (!entries.length) return '';
+  /* Xếp key trỏ tới đích lên đầu: chip `k=v` nhiều khi hữu ích nhờ đúng giá trị
+     đích, phần còn lại chỉ bổ sung cho tới khi đủ BRIEF_ARG_MAX ô. */
+  const ranked = [...entries].sort(
+    (x, y) => rankBriefKey(y[0]) - rankBriefKey(x[0]),
+  );
+  const parts: string[] = [];
+  for (const [k, v] of ranked) {
+    if (parts.length >= BRIEF_ARG_MAX) break;
+    const brief = briefArgValue(v);
+    if (brief) parts.push(`${k}=${brief}`);
+  }
+  return parts.join(' ');
+}
+
+/** 2 = key trỏ tới đích, 1 = tên ngắn, 0 = còn lại. */
+function rankBriefKey(key: string): number {
+  if (BRIEF_ARG_KEYS.includes(key)) return 2;
+  return key.length <= 24 ? 1 : 0;
+}
+
+/** Một giá trị args trên chip — chuỗi cắt ngắn, mảng chỉ lấy vài phần tử đầu. */
+function briefArgValue(v: unknown): string {
+  if (typeof v === 'string') return v.slice(0, BRIEF_ARG_VAL_CAP);
+  if (Array.isArray(v)) {
+    const head = v.slice(0, BRIEF_ARG_ARRAY_CAP).map((item) => String(item ?? ''));
+    const more = v.length > BRIEF_ARG_ARRAY_CAP ? `+${v.length - BRIEF_ARG_ARRAY_CAP}` : '';
+    return `${head.join(', ')}${more}`.slice(0, BRIEF_ARG_VAL_CAP);
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  /* Object lồng: kể cả khi bị cắt cũng phải bắt đầu bằng `{` để không giống
+     một giá trị chuỗi thật. */
+  const json = JSON.stringify(v);
+  if (!json || json === '{}' || json === '[]') return '';
+  return `${json.slice(0, BRIEF_ARG_VAL_CAP - 1)}…`;
 }
 
 function shortenUrl(url: string): string {

@@ -53,8 +53,8 @@ export function VyenLogo({ size = 'sm', withWordmark = true, className }: VyenLo
     <div
       className={
         isLarge
-          ? 'relative flex h-16 w-16 items-center justify-center rounded-none bg-surface-raised border border-border-hairline'
-          : 'relative flex h-7 w-7 items-center justify-center rounded-none bg-surface-raised border border-border-hairline'
+          ? 'relative flex h-16 w-16 items-center justify-center rounded-none bg-raised border border-subtle'
+          : 'relative flex h-7 w-7 items-center justify-center rounded-none bg-raised border border-subtle'
       }
     >
       <VyenMark size={isLarge ? 34 : 16} />
@@ -69,11 +69,11 @@ export function VyenLogo({ size = 'sm', withWordmark = true, className }: VyenLo
         {tile}
         <div className="mt-4 flex items-center gap-2">
           <span className="font-pixel text-[32px] font-bold tracking-[0.05em] text-text-primary [image-rendering:pixelated]">Vyen</span>
-          <span className="rounded-none border border-border-hairline bg-[#1a2330] px-1.5 py-0.5 font-pixel text-[11px] uppercase tracking-[0.08em] text-accent-steel">
+          <span className="rounded-none border border-subtle bg-raised px-1.5 py-0.5 font-pixel text-meta uppercase tracking-[0.08em] text-accent">
             agent
           </span>
         </div>
-        <div className="mt-1 font-pixel text-[11px] uppercase tracking-[0.08em] text-text-muted">
+        <div className="mt-1 font-pixel text-meta uppercase tracking-[0.08em] text-text-muted">
           AI Innovations
         </div>
       </div>
@@ -86,7 +86,7 @@ export function VyenLogo({ size = 'sm', withWordmark = true, className }: VyenLo
       <div className="leading-tight">
         <div className="flex items-center gap-1.5">
           <span className="font-pixel text-[16px] font-bold tracking-[0.05em] text-text-primary [image-rendering:pixelated]">Vyen</span>
-          <span className="rounded-none border border-border-hairline bg-[#1a2330] px-1 py-0.5 font-pixel text-[9px] uppercase tracking-[0.08em] text-accent-steel">
+          <span className="rounded-none border border-subtle bg-raised px-1 py-0.5 font-pixel text-micro uppercase tracking-[0.08em] text-accent">
             v0.1
           </span>
         </div>

@@ -84,7 +84,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
       role="region"
       aria-label={`Kế hoạch: ${plan.title}`}
     >
-      <div className="rounded-none border border-border-hairline bg-panel-bg text-xs">
+      <div className="rounded-none border border-subtle bg-panel-bg text-xs">
         <div className="flex items-center gap-2 px-3 py-2">
           <button
             type="button"
@@ -116,7 +116,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
             <button
               type="button"
               onClick={onApprove}
-              className="rounded-none border border-status-success/60 px-2 py-1 text-[11px] font-semibold text-status-success transition-colors hover:bg-[#5db87a]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc]"
+              className="rounded-none border border-success/40/60 px-2 py-1 text-[11px] font-semibold text-status-success transition-colors hover:bg-success/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[accent]"
               title="Chuyển sang ACT mode và bắt đầu thực thi kế hoạch này"
             >
               Duyệt &amp; thực hiện
@@ -133,15 +133,15 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
         </div>
 
         {/* Thanh tiến độ mảnh — luôn hiển thị kể cả khi thu gọn */}
-        <div className="h-1 overflow-hidden bg-surface-raised">
+        <div className="h-1 overflow-hidden bg-raised">
           <div
-            className={`h-full ${anyActive ? "bg-[#6a9fcc]" : "bg-[#5db87a]"}`}
+            className={`h-full ${anyActive ? "bg-accent" : "bg-success"}`}
             style={{ width: `${Math.max(0, Math.min(100, prog.percentComplete))}%` }}
           />
         </div>
 
         {expanded && (
-          <div className="border-t border-border-hairline bg-surface-raised px-3 py-2">
+          <div className="border-t border-subtle bg-raised px-3 py-2">
             <ol className="space-y-1.5">
               {visibleTasks.map((st) => {
                 const meta = STATUS_META[st.status];
@@ -150,7 +150,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
                   <li
                     key={st.id}
                     className={`flex items-start gap-2 rounded px-1.5 py-0.5 transition-colors ${
-                      st.isActive ? "bg-[#6a9fcc]/10 border border-accent-steel/30" : ""
+                      st.isActive ? "bg-accent/10 border border-accent/40/30" : ""
                     }`}
                   >
                     <Icon className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${meta.className}`} aria-hidden />
@@ -189,7 +189,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
 
             {/* Nút toggle fold khi danh sách quá 8 items */}
             {normalizedSubtasks.length > FOLD_LIMIT && (
-              <div className="mt-2 pt-1 border-t border-border-hairline/40 text-center">
+              <div className="mt-2 pt-1 border-t border-subtle/40 text-center">
                 <button
                   type="button"
                   onClick={() => setShowAllTasks(!showAllTasks)}

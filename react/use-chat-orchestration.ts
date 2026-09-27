@@ -1,6 +1,6 @@
 import { useApprovalBridge, type UseApprovalBridgeReturn } from '@/react/use-approval-bridge';
 import { useAgentRuntime, type UseAgentRuntimeReturn } from '@/react/use-agent-runtime';
-import { ToolRunner } from '@/core/agent-runtime/tool-runner';
+import { ToolRunner, validateShellAllowlist } from '@/core/agent-runtime/tool-runner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat, type Message } from 'ai/react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -23,8 +23,7 @@ import {
 } from '@/lib/db';
 import { AVAILABLE_MODELS } from '@/lib/models';
 import { shouldShowThinkingControl } from '@/lib/reasoning-capability';
-import { ApprovalQueue } from '@/lib/approval-queue';
-import { createApprovalToken, consumeApprovalToken } from '@/lib/approval-binding';
+import { createApprovalToken } from '@/lib/approval-binding';
 import { recordAuditLog } from '@/lib/audit-log';
 import { noteUntrustedToolResult, setActiveTaintConversation } from '@/lib/taint-tracker';
 import { deriveModelOption, toggleFavorite, upsertRecent } from '@/lib/model-meta';
@@ -967,193 +966,25 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   }, [workspace?.connected, workspace?.name]);
 
   /* ------------------------------------------------------------------ */
-  /* Hàng đợi PHÊ DUYỆT dùng chung cho diff và shell                     */
+  /* Approval Bridge — điều phối hàng đợi phê duyệt modal an toàn       */
   /* ------------------------------------------------------------------ */
-  /*
-   * Vì sao gộp hai hàng đợi làm một: trước đây diff và shell mỗi loại có hàng
-   * đợi riêng, nên khi agent gọi SONG SONG một fs_edit và một shell_run trong
-   * cùng một step, cả hai modal cùng render ở z-[80] — chồng lên nhau, modal
-   * dưới không bấm được nút nào.
-   *
-   * Logic trọng tài nằm ở `lib/approval-queue.ts` — đơn vị thuần, có test hành
-   * vi thật (tests/approval-queue.test.ts). Ở đây chỉ còn phần nối vào React.
-   */
-  const [diffState, setDiffState] = useState<DiffConfirmState | null>(null);
-  type ShellConfirmState = { command: string; cwd?: string; open: true; resolve: (v: boolean) => void };
-  const [shellState, setShellState] = useState<ShellConfirmState | null>(null);
-
   /* Run lifecycle nằm ở phía DƯỚI file (phụ thuộc useChat), nên modal — vốn
      được định nghĩa trước — đi qua ref. */
   const awaitUserRef = useRef<() => void>(() => {});
   const resumeRef = useRef<() => void>(() => {});
 
-  type ApprovalItem =
-    | { kind: 'diff'; state: DiffConfirmState }
-    | { kind: 'shell'; state: ShellConfirmState };
+  const defaultApprovalBridge = useApprovalBridge({
+    chatId: chatKey,
+    activeLeafId: activeLeafId ?? undefined,
+    onAuditLog: recordAuditLog,
+    onAwaitUser: () => awaitUserRef.current(),
+    onResumeUser: () => resumeRef.current(),
+  });
+  const approvalBridge = options?.approvalBridge ?? defaultApprovalBridge;
 
-  /*
-   * Khởi tạo MỘT LẦN. Callback chỉ chạm setter (ổn định) và ref (ổn định), nên
-   * instance không bao giờ giữ giá trị cũ của lượt render nào.
-   */
-  const [approvalQueue] = useState(
-    () =>
-      new ApprovalQueue<ApprovalItem>({
-        /* Run đậu lại chờ người dùng: KHÔNG được tính là stalled, nếu không
-           modal mở 2 phút là bị reconciler kết luận "stream đứt" và giết run. */
-        onRequest: () => awaitUserRef.current(),
-        /* Dọn state của loại kia trước khi hiện → không bao giờ chồng đôi. */
-        onPresent: (item) => {
-          if (!item) {
-            setDiffState(null);
-            setShellState(null);
-            return;
-          }
-          if (item.kind === 'diff') {
-            setShellState(null);
-            setDiffState(item.state);
-          } else {
-            setDiffState(null);
-            setShellState(item.state);
-          }
-        },
-        onDrained: () => resumeRef.current(),
-      }),
-  );
-
-  const prevActiveLeafIdRef = useRef<string | null>(activeLeafId);
   useEffect(() => {
     activeLeafIdRef.current = activeLeafId;
-    if (prevActiveLeafIdRef.current !== null && prevActiveLeafIdRef.current !== activeLeafId) {
-      // PR 3: Khi activeLeafId thay đổi (khi user switch branch), hủy toàn bộ pending approval để chống race condition áp approval vào nhầm nhánh
-      approvalQueue.abortAll(false);
-    }
-    prevActiveLeafIdRef.current = activeLeafId;
-  }, [activeLeafId, approvalQueue]);
-
-  /**
-   * Diff: cùng cơ chế binding của shell (S3) — token ký payload
-   * `{ path, oldText, newText, toolName }` mà modal hiển thị, hạn 10 phút, một lần.
-   * Lệch ở bất kỳ thành phần nào (kể cả `existedBefore`) ⇒ chặn, không ghi.
-   */
-  const showDiffModal = useCallback(
-    (
-      s: Omit<DiffConfirmState, 'open' | 'resolve'> & { toolName?: string; existedBefore?: boolean; expectedBaseHash?: string },
-    ): Promise<{ approved: boolean; fingerprint: string | null }> =>
-      new Promise((resolve) => {
-        const token = createApprovalToken({
-          kind: 'diff',
-          payload: { path: s.path, oldText: s.oldText, newText: s.newText, toolName: s.toolName },
-          chatId: chatKey,
-          activeLeafId: activeLeafIdRef.current ?? undefined,
-          expectedBaseHash: s.expectedBaseHash,
-        });
-        const resolveOnce = (approved: boolean) =>
-          resolve({ approved, fingerprint: token?.fingerprint ?? null });
-        approvalQueue.request(
-          { kind: 'diff', state: { ...s, open: true, resolve: resolveOnce } },
-          resolveOnce,
-          token ? { kind: 'diff', fingerprint: token.fingerprint } : undefined,
-        );
-      }),
-    [approvalQueue, chatKey],
-  );
-
-  /** Chặn cuối cho diff — xem `consumeShellApproval` (cùng nguyên tắc). */
-  const consumeDiffApproval = useCallback(
-    (
-      fingerprint: string | null | undefined,
-      s: { path: string; oldText: string; newText: string; toolName?: string; expectedBaseHash?: string },
-    ): boolean => {
-      if (!fingerprint) return false;
-      const verdict = consumeApprovalToken(fingerprint, {
-        kind: 'diff',
-        payload: { path: s.path, oldText: s.oldText, newText: s.newText, toolName: s.toolName },
-        chatId: chatKey,
-        activeLeafId: activeLeafIdRef.current ?? undefined,
-        expectedBaseHash: s.expectedBaseHash,
-      });
-      if (verdict.ok) return true;
-      void recordAuditLog({
-        action: 'rejection',
-        tool: s.toolName || 'fs_edit',
-        target: s.path,
-        decision: 'blocked',
-        payload: { path: s.path },
-        chatId: chatKey,
-        details: { reason: verdict.reason ?? 'approval_binding_failed' },
-      });
-      return false;
-    },
-    [chatKey],
-  );
-  /**
-   * Shell / run_code: mỗi lần mở modal sinh MỘT token phê duyệt gắn với đúng
-   * payload sắp hiển thị (P0.5 S3 — chống duyệt A thực thi B). Token chỉ có
-   * hiệu lực 10 phút và dùng đúng một lần; call site verify lại bằng
-   * `consumeApprovalToken` TRƯỚC khi chạy lệnh.
-   */
-  const showShellModal = useCallback(
-    (
-      s: Omit<ShellConfirmState, 'open' | 'resolve'>,
-      kind: 'shell' | 'run_code' = 'shell',
-    ): Promise<{ approved: boolean; fingerprint: string | null }> =>
-      new Promise((resolve) => {
-        const token = createApprovalToken({
-          kind,
-          payload: { command: s.command, cwd: s.cwd },
-          chatId: chatKey,
-          activeLeafId: activeLeafIdRef.current ?? undefined,
-        });
-        const resolveOnce = (approved: boolean) =>
-          resolve({ approved, fingerprint: token?.fingerprint ?? null });
-        approvalQueue.request(
-          { kind: 'shell', state: { ...s, open: true, resolve: resolveOnce } },
-          resolveOnce,
-          token ? { kind: 'shell', fingerprint: token.fingerprint } : undefined,
-        );
-      }),
-    [approvalQueue, chatKey],
-  );
-
-  /**
-   * Chặn cuối trước khi thực thi: duyệt có đúng payload đang chạy không.
-   * Lệch → audit `blocked` và trả false, KHÔNG chạy lệnh.
-   */
-  const consumeShellApproval = useCallback(
-    (fingerprint: string | null | undefined, kind: 'shell' | 'run_code', s: { command: string; cwd?: string }): boolean => {
-      if (!fingerprint) return false;
-      const verdict = consumeApprovalToken(fingerprint, {
-        kind,
-        payload: { command: s.command, cwd: s.cwd },
-        chatId: chatKey,
-        activeLeafId: activeLeafIdRef.current ?? undefined,
-      });
-      if (verdict.ok) return true;
-      void recordAuditLog({
-        action: 'rejection',
-        tool: kind,
-        target: s.command,
-        decision: 'blocked',
-        payload: s,
-        chatId: chatKey,
-        details: { reason: verdict.reason ?? 'approval_binding_failed' },
-      });
-      return false;
-    },
-    [chatKey],
-  );
-
-  /*
-   * Đóng modal đang hiện rồi mở mục kế tiếp; hết hàng đợi thì nhả chốt và cho
-   * run chạy tiếp. Dùng chung cho cả hai loại vì sau khi gộp, "đóng" không còn
-   * phụ thuộc loại modal nào đang mở.
-   */
-  const closeApproval = useCallback(() => {
-    approvalQueue.close();
-  }, [approvalQueue]);
-
-  const closeDiffModal = closeApproval;
-  const closeShellModal = closeApproval;
+  }, [activeLeafId]);
 
   /* ------------------------------------------------------------------ */
   /* MCP tools — danh sách tool từ các server người dùng đã kết nối       */
@@ -1269,7 +1100,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         });
         return { approved: true, token: autoToken?.fingerprint };
       }
-      const outcome = await showShellModal(s, 'shell');
+      const outcome = await approvalBridge.requestShellApproval(s, 'shell');
       const approved = outcome.approved;
       void recordAuditLog({
         action: approved ? 'approval' : 'rejection',
@@ -1281,7 +1112,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       });
       return { approved, token: outcome.fingerprint ?? undefined };
     },
-    [autoPilot, approvalPolicy, toolPermissions, showShellModal, chatKey],
+    [autoPilot, approvalPolicy, toolPermissions, approvalBridge, chatKey],
   );
 
   const autoApproveCode = useCallback(
@@ -1306,10 +1137,10 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         });
         return true;
       }
-      const outcome = await showShellModal({ command: `[run_code]:\n${s.code}` }, 'run_code');
+      const outcome = await approvalBridge.requestShellApproval({ command: `[run_code]:\n${s.code}` }, 'run_code');
       /* run_code chạy `s.code`, modal hiện `[run_code]:\n<code>` — bind đúng payload đã xem. */
       const approved =
-        outcome.approved && consumeShellApproval(outcome.fingerprint, 'run_code', { command: `[run_code]:\n${s.code}` });
+        outcome.approved && approvalBridge.consumeShellApproval(outcome.fingerprint, 'run_code', { command: `[run_code]:\n${s.code}` });
       void recordAuditLog({
         action: approved ? 'approval' : 'rejection',
         tool: 'run_code',
@@ -1320,7 +1151,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       });
       return approved;
     },
-    [autoPilot, approvalPolicy, toolPermissions, showShellModal, consumeShellApproval, chatKey],
+    [autoPilot, approvalPolicy, toolPermissions, approvalBridge, chatKey],
   );
 
   const autoApproveDiff = useCallback(
@@ -1363,8 +1194,8 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         });
         return true;
       }
-      const outcome = await showDiffModal(s);
-      const approved = outcome.approved && consumeDiffApproval(outcome.fingerprint, s);
+      const outcome = await approvalBridge.requestDiffApproval(s);
+      const approved = outcome.approved && approvalBridge.consumeDiffApproval(outcome.fingerprint, s);
       void recordAuditLog({
         action: approved ? 'approval' : 'rejection',
         tool,
@@ -1376,7 +1207,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       });
       return approved;
     },
-    [autoPilot, approvalPolicy, toolPermissions, showDiffModal, consumeDiffApproval, chatKey],
+    [autoPilot, approvalPolicy, toolPermissions, approvalBridge, chatKey],
   );
 
   useEffect(() => {
@@ -2241,13 +2072,33 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
             const command = String(args.command ?? '');
             const timeoutSecs =
               typeof args.timeout_secs === 'number' ? Math.min(Math.max(args.timeout_secs, 1), 3600) : undefined;
+            /* Allowlist TRƯỚC cổng duyệt, đúng thứ tự executeShellRun
+               (core/agent-runtime/tool-runner.ts): lệnh có metachar / binary ngoài
+               allowlist bị chặn ngay ở renderer — không mở hộp thoại cho thứ vốn
+               không thể chạy (fail-closed trước cả consent). */
+            const shellCheck = validateShellAllowlist(command);
+            if (!shellCheck.ok) {
+              return JSON.stringify({
+                approved: false,
+                error: `Lệnh bị từ chối bởi Shell Policy: ${shellCheck.reason}`,
+              });
+            }
             // Cùng cổng duyệt với shell_run — lệnh nền không được bypass approval.
             const approval = await autoApproveShell({ command, cwd: undefined });
             if (!approval.approved) {
               return JSON.stringify({ approved: false, note: 'Người dùng TỪ CHỐI chạy lệnh nền này.' });
             }
             const bridge = (await import('@/lib/desktop-bridge')).vyenDesktop()!;
-            const r = await bridge.shell.runBg({ command, timeoutSecs });
+            /* `approvalToken` + `chatId` đi xuống main process y hệt shell_run
+               (use-chat-orchestration.ts `case 'shell_run'`): token là thứ đã được
+               ký cho CHÍNH lệnh này, main process mới tiêu được nó. Thiếu hai
+               field này thì approval chỉ còn là hộp thoại ở renderer. */
+            const r = await bridge.shell.runBg({
+              command,
+              timeoutSecs,
+              approvalToken: approval.token,
+              chatId: chatKey,
+            });
             return JSON.stringify(r);
           }
           case 'bg_status': {
@@ -3962,7 +3813,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
     closeTurnCapture();
 
     // P0.5: Hủy toàn bộ modal phê duyệt đang mở và promise đang đợi, tránh deadlock / treo lượt chạy
-    approvalQueue.abortAll(false);
+    approvalBridge.abortAll(false);
 
     /**
      * P3.1 (Escape) — abort rồi TRẢ message đã queue về ô nhập: ưu tiên tin
@@ -3996,7 +3847,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
     ) {
       pendingAssistantForkRef.current = null;
     }
-  }, [stop, stopRun, closeTurnCapture, approvalQueue]);
+  }, [stop, stopRun, closeTurnCapture, approvalBridge]);
 
   useEffect(() => {
     if (isLoading) {
@@ -4666,7 +4517,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         }
 
         // PR 3: Hủy toàn bộ pending approval của nhánh cũ khi chuyển nhánh, ngăn deadlock hoặc duyệt nhầm nhánh
-        approvalQueue.abortAll(false);
+        approvalBridge.abortAll(false);
 
         const latestRows = allStoredMessagesRef.current;
         const nextThread = reconstructActiveThread(
@@ -6095,13 +5946,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
     [updateSettings],
   );
 
-
-  const defaultApprovalBridge = useApprovalBridge({
-    chatId: chatKey,
-    activeLeafId: activeLeafId ?? undefined,
-    onAuditLog: recordAuditLog,
-  });
-  const approvalBridge = options?.approvalBridge ?? defaultApprovalBridge;
 
   const defaultAgentRuntime = useAgentRuntime({
     chatId: chatKey,

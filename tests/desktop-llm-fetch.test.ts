@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { llmFetch, LLM_FETCH_ALLOWED_HEADERS, LIMITS } = require('../lib/ipc.cjs');
+const { llmFetch, LIMITS } = require('../lib/ipc.cjs');
 
 /** Response giả đủ shape mà llmFetch đọc: ok/status/headers.get/text. */
 function fakeResponse(
@@ -76,7 +76,11 @@ describe('llmFetch — header allowlist', () => {
       },
     );
     expect(res.ok).toBe(true);
-    expect(seen[0]).toMatchObject({ Authorization: 'Bearer k' });
+    expect(seen[0]).toEqual({
+      Authorization: 'Bearer k',
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    });
   });
 
   it('chặn header ngoài allowlist (Origin/Cookie/Host...)', async () => {
@@ -88,8 +92,60 @@ describe('llmFetch — header allowlist', () => {
       ),
     ).rejects.toThrow(/không được phép/i);
     expect(called).toBe(0);
-    // Export dùng để khóa danh sách — thêm header nào phải sửa test này ý thức.
-    expect([...LLM_FETCH_ALLOWED_HEADERS].sort()).toEqual(['accept', 'authorization', 'content-type']);
+  });
+
+  /* Hành vi cần bảo vệ: allowlist là CỔNG, một header lạ chặn cả request —
+     không phải "bỏ header lạ rồi gửi tiếp". Header hợp lệ đi kèm cũng phải
+     chết theo, nếu không attacker chỉ cần gắn Origin vào request chứa
+     Authorization để lấy được bearer token của main. */
+  it('một header bị chặn kéo theo CẢ request — upstream không thấy gì', async () => {
+    const seen: Array<Record<string, string>> = [];
+    await expect(
+      llmFetch(
+        {
+          ...basePayload,
+          headers: { Authorization: 'Bearer k', 'X-Trace-Id': 'attacker', Origin: 'https://evil.example' },
+        },
+        {
+          fetch: async (_url: unknown, init?: { headers?: Record<string, string> }) => {
+            seen.push(init?.headers as Record<string, string>);
+            return fakeResponse('{}');
+          },
+        },
+      ),
+    ).rejects.toThrow(/không được phép/i);
+    expect(seen).toEqual([]);
+  });
+
+  /* Header "vô hại" nhưng không có trong allowlist (vd header debug của
+     renderer) cũng phải bị chặn: main proxy tồn tại để né CORS, không phải
+     để trở thành proxy tùy ý. */
+  it('header lạ dù không nguy hiểm vẫn bị chặn, không tới upstream', async () => {
+    let called = 0;
+    await expect(
+      llmFetch(
+        { ...basePayload, headers: { 'X-Debug': '1' } },
+        { fetch: async () => { called += 1; return fakeResponse('{}'); } },
+      ),
+    ).rejects.toThrow(/không được phép/i);
+    expect(called).toBe(0);
+  });
+
+  /* So khớp không phân biệt HOA/thường, và tên header gửi lên upstream giữ
+     nguyên như renderer viết. */
+  it('header hợp lệ tới upstream kể cả khi viết HOA chữ', async () => {
+    const seen: Array<Record<string, string>> = [];
+    const res = await llmFetch(
+      { url: OK_URL, method: 'GET', headers: { ACCEPT: 'application/json', AUTHORIZATION: 'Bearer k' } },
+      {
+        fetch: async (_url: unknown, init?: { headers?: Record<string, string> }) => {
+          seen.push(init?.headers as Record<string, string>);
+          return fakeResponse('{"data":[]}');
+        },
+      },
+    );
+    expect(res.ok).toBe(true);
+    expect(seen[0]).toEqual({ ACCEPT: 'application/json', AUTHORIZATION: 'Bearer k' });
   });
 });
 

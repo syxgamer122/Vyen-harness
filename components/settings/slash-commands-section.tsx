@@ -59,34 +59,34 @@ export function CustomSlashCommandsSection() {
   return (
     <div className="space-y-4 pt-2">
       <div>
-        <h4 className="field-label text-[15px]">
+        <h4 className="field-label text-read">
           Lệnh gõ nhanh (Slash Commands)
         </h4>
-        <p className="mt-0.5 text-xs leading-relaxed text-text-muted">
+        <p className="mt-0.5 text-ui leading-relaxed text-tertiary">
           Gõ <code className="claude-inline-code">/</code> trong khung chat để điều khiển nhanh hoặc kích hoạt workflow.
         </p>
       </div>
 
       {/* Danh sách lệnh built-in */}
-      <div className="border border-border-hairline bg-surface-raised p-3">
-        <h5 className="mb-2 text-xs font-semibold text-text-primary">
+      <div className="border border-subtle bg-surface p-3">
+        <h5 className="field-label mb-2 text-ui">
           Lệnh hệ thống mặc định
         </h5>
-        <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 text-ui sm:grid-cols-2">
           {BUILTIN_SLASH_COMMANDS.map((cmd) => (
             <div
               key={cmd.name}
-              className="flex flex-col gap-0.5 border border-border-hairline bg-panel-bg p-2"
+              className="flex flex-col gap-0.5 border border-subtle bg-raised p-2"
             >
-              <div className="flex items-center gap-1.5 font-mono font-medium text-accent-steel">
+              <div className="flex items-center gap-1.5 font-mono font-medium text-accent">
                 <span>/{cmd.name}</span>
                 {cmd.aliases && cmd.aliases.length > 0 && (
-                  <span className="text-[10px] font-normal text-[#757d89]">
+                  <span className="font-mono text-micro font-normal text-disabled">
                     ({cmd.aliases.map((a) => `/${a}`).join(', ')})
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-text-muted">
+              <p className="field-hint">
                 {cmd.description}
               </p>
             </div>
@@ -96,12 +96,12 @@ export function CustomSlashCommandsSection() {
 
       {/* Danh sách custom slash commands */}
       <div className="space-y-2">
-        <h5 className="text-xs font-semibold text-text-primary">
+        <h5 className="field-label text-ui">
           Lệnh tùy biến liên kết Recipe (Custom /&lt;tên&gt; → Recipe)
         </h5>
 
         {commandEntries.length === 0 ? (
-          <p className="text-xs italic text-[#757d89]">
+          <p className="field-hint italic">
             Chưa có lệnh tùy biến nào. Thêm lệnh bên dưới để mở nhanh workflow yêu thích bằng phím tắt <code className="claude-inline-code">/</code>.
           </p>
         ) : (
@@ -111,22 +111,23 @@ export function CustomSlashCommandsSection() {
               return (
                 <div
                   key={name}
-                  className="flex items-center justify-between border border-border-hairline bg-surface-raised px-3 py-2 text-xs"
+                  className="flex items-center justify-between border border-subtle bg-surface px-3 py-2 text-ui"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-semibold text-accent-steel">/{name}</span>
-                    <span className="text-[#757d89]">→</span>
-                    <span className="font-medium text-text-primary">
+                    <span className="font-mono font-semibold text-accent">/{name}</span>
+                    <span className="text-disabled" aria-hidden="true">→</span>
+                    <span className="font-medium text-primary">
                       {rec?.title ?? recipeId}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeCustomSlashCommand(name)}
-                    className="p-1 text-text-muted transition hover:bg-[#e8704f]/10 hover:text-status-error"
+                    className="icon-btn icon-btn-sm icon-btn-danger"
+                    aria-label={`Xóa lệnh /${name}`}
                     title={`Xóa lệnh /${name}`}
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={13} aria-hidden="true" />
                   </button>
                 </div>
               );
@@ -135,7 +136,7 @@ export function CustomSlashCommandsSection() {
         )}
 
         {/* Form thêm custom command */}
-        <div className="space-y-2 border border-dashed border-border-hairline p-2.5">
+        <div className="space-y-2 border border-dashed border-default p-2.5">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div>
               <input
@@ -171,14 +172,13 @@ export function CustomSlashCommandsSection() {
           <button
             type="button"
             onClick={handleAdd}
-            className="btn-secondary w-full py-1.5 text-xs font-medium"
+            className="btn-secondary w-full py-1.5"
           >
             + Gán lệnh slash vào Recipe
           </button>
-          {error && <p className="notice-error text-xs">{error}</p>}
+          {error && <p className="notice-error text-ui" role="alert">{error}</p>}
         </div>
       </div>
     </div>
   );
 }
-

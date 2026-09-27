@@ -19,7 +19,7 @@ import {
   consumeApprovalToken,
 } from '@/lib/approval-binding';
 
-import { compileShellCommand, PolicyError } from '@/lib/shell-policy';
+import { compileShellCommand, PolicyError } from '@/lib/shell-policy.cjs';
 
 /**
  * Kiểm tra và giam giữ đường dẫn file trong workspace an toàn, từ chối System Denylist.
@@ -238,7 +238,13 @@ export interface ToolExecutionContext {
     approvalToken?: string;
     chatId?: string;
   }) => Promise<{ code: number | null; stdout?: string; stderr?: string }>;
-  shellRunBg?: (params: { command: string; timeoutSecs?: number }) => Promise<unknown>;
+  /** Spawn nền — adapter CHƯA được wire ở bất kỳ call site nào; xem `executeBgRun`. */
+  shellRunBg?: (params: {
+    command: string;
+    timeoutSecs?: number;
+    approvalToken?: string;
+    chatId?: string;
+  }) => Promise<unknown>;
   shellBgStatus?: (jobId?: string) => Promise<unknown>;
   shellBgStop?: (jobId: string) => Promise<unknown>;
 
@@ -732,10 +738,42 @@ export class ToolRunner {
     return JSON.stringify(result);
   }
 
+  /**
+   * `bg_run` (spawn nền).
+   *
+   * ## Adapter CHƯA được wire — enforcement ở đây KHÔNG nằm trên đường sống thật
+   *
+   * KHÔNG call site nào truyền adapter `shellRunBg` vào `new ToolRunner({...})`
+   * (`components/chat-interface.tsx` và `react/use-chat-orchestration.ts` đều chỉ
+   * truyền chatId/activeLeafId/workspaceRoot/approvalPolicy/toolPermissions/
+   * recordAuditLog). Nên hàm này hiện KHÔNG chạm tới lần spawn nào cả.
+   *
+   * Đường sống THẬT của `bg_run` là `case 'bg_run'` trong `rawHandleClientToolCall`
+   * (`react/use-chat-orchestration.ts`) → `bridge.shell.runBg` → channel
+   * `vyen:bg-run` (`lib/ipc.cjs`). Allowlist + approval + truyền `approvalToken`
+   * của bg_run nằm ở đó, KHÔNG nằm trong file này.
+   *
+   * ## Vì sao vẫn giữ phần enforcement bên dưới
+   *
+   * Đây là defense-in-depth, không phải đường duy nhất: nó có tác dụng thật ngay
+   * khi ai đó wire `shellRunBg` qua `updateContext()` (chỉ một dòng, không cần sửa
+   * thêm file nào) hoặc gọi `executeTool('bg_run', ...)` trực tiếp, và fail-closed
+   * — thiếu allowlist hoặc thiếu consent thì không spawn.
+   */
   private async executeBgRun(args: Record<string, unknown>): Promise<string> {
     const command = String(args.command ?? '');
     const timeoutSecs =
       typeof args.timeout_secs === 'number' ? Math.min(Math.max(args.timeout_secs, 1), 3600) : undefined;
+
+    // Shell Allowlist Check — cùng chokepoint với executeShellRun: bg_run là đường
+    // spawn thứ hai, không được vòng qua allowlist chỉ vì "chạy nền".
+    const shellResult = validateShellAllowlist(command);
+    if (!shellResult.ok) {
+      return JSON.stringify({
+        approved: false,
+        error: `Lệnh bị từ chối bởi Shell Policy: ${shellResult.reason}`,
+      });
+    }
 
     const binding = buildToolApprovalBinding({
       kind: 'shell',
@@ -744,10 +782,23 @@ export class ToolRunner {
       activeLeafId: this.context.activeLeafId,
     });
 
+    let token: string | undefined;
     if (this.context.requestApproval) {
       const approval = await this.withAbort(this.context.requestApproval(binding));
       if (!approval.approved) {
         return JSON.stringify({ approved: false, note: 'Người dùng TỪ CHỐI chạy lệnh nền này.' });
+      }
+      token = approval.token;
+
+      // Xác thực TIÊU THỤ token trước khi spawn — thiếu bước này thì approval
+      // chỉ là hộp thoại, tấn công replay được (đúng bước executeShellRun đang làm).
+      // LƯU Ý: adapter chưa wire (xem docstring) nên token bị tiêu rồi mới rơi
+      // vào nhánh lỗi dưới — vô hại vì cả hai đều fail-closed, không spawn.
+      if (token && this.context.consumeApproval) {
+        const consumed = this.context.consumeApproval(token, binding);
+        if (!consumed) {
+          return JSON.stringify({ approved: false, error: 'Xác thực Approval Token thất bại hoặc token đã bị dùng.' });
+        }
       }
     }
 
@@ -755,7 +806,19 @@ export class ToolRunner {
       return JSON.stringify({ error: 'shellRunBg adapter chưa được cấu hình.' });
     }
 
-    const r = await this.withAbort(this.context.shellRunBg({ command, timeoutSecs }));
+    const r = await this.withAbort(
+      this.context.shellRunBg({ command, timeoutSecs, approvalToken: token, chatId: this.context.chatId }),
+    );
+
+    this.context.recordAuditLog?.({
+      action: 'shell_execution',
+      tool: 'bg_run',
+      target: command,
+      decision: 'executed',
+      payload: { command, timeoutSecs },
+      chatId: this.context.chatId,
+    });
+
     return JSON.stringify(r);
   }
 

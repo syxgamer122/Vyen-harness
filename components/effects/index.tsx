@@ -16,8 +16,40 @@
  *   token khi stream, animation loop sẽ nhân chi phí render).
  * - Mọi effect tự tắt qua useFxEnabled(): settings.perf.animations (máy yếu)
  *   + prefers-reduced-motion của OS. Khi tắt → render fallback tĩnh.
- *  globals.css còn một lớp phòng thủ: media query prefers-reduced-motion và
- *   html[data-animations='off'] ép mọi animation-duration về 0.01ms.
+ *
+ * CƠ CHẾ TẮT ANIMATION — CÓ MỘT NGUỒN SỰ THẬT, HAI LỚP:
+ *
+ *   1. useFxEnabled() (tầng JS, file này) là CỔNG QUYẾT ĐỊNH — nó chọn luôn
+ *      render gì: element có animation, hay phần tử tĩnh thay thế. Không có
+ *      tầng nào khác làm được việc này.
+ *   2. globals.css là LƯỚI AN TOÀN (tầng CSS): media query
+ *      prefers-reduced-motion và html[data-animations='off'] ép
+ *      animation-duration về 0.01ms. Nó phủ được cả những thứ nằm ngoài file
+ *      này — animate-fade-in / animate-pop-in / animate-slide-up ở dialog,
+ *      sidebar, toast, và CSS của thư viện thứ ba — nên phải giữ.
+ *
+ * VÌ SAO JS VẪN CẦN DÙ CÓ LỚP CSS: lưới ở (2) chỉ đặt duration về 0.01ms,
+ * KHÔNG đổi phần tử nào cả. Nhánh animated vẫn render; chỉ là animation chạy
+ * hết một vòng rồi đứng. Nên với effect có nhánh tĩnh riêng (SiriWave) lớp CSS
+ * không thay thế được cổng JS — nó chỉ tạo ra MỘT trạng thái tĩnh thứ hai.
+ *
+ * Quy tắc hội tụ: mọi phần tử ở nhánh animated phải khai báo trạng thái tĩnh
+ * bằng class trùng ĐÚNG giá trị mà keyframe đặt ở khung 0% (fill-mode mặc định
+ * `none` → khi CSS giết animation, phần tử rơi về style gốc chứ không phải khung
+ * 0%). Phần tử ở nhánh fallback phải mang đúng giá trị đó. Như vậy cả ba đường
+ * (bật, JS tắt, CSS tắt) hội tụ về MỘT trạng thái tĩnh. Sửa một bên thì phải
+ * sửa cả bên kia, không được để lệch nhau.
+ *
+ * ANIMATION LOOP KHÔNG ĐƯỢC GẮN VÀO PHẦN TỬ RE-RENDER THEO STREAM. Xem quy
+ * tắc ở đầu file.
+ *
+ * HAI KEYFRAME ĐÃ MẤT NGƯỜI DÙNG: `fx-sweep` và `fx-dot-bounce` không còn
+ * class nào gọi tới, sau khi hai component dựng chúng bị xoá vì zero-usage.
+ * Chúng vẫn nằm trong tailwind.config.ts — `fx-sweep` còn giữ đúng cái stop
+ * 77.8% mà người ta từng tính tay để giả lập `repeatDelay` của framer, nên
+ * đừng xoá vội khi chưa biết còn ý định dùng lại không. Cả hai key KHÔNG sinh
+ * CSS cho tới khi còn class gọi tới, nên chúng chỉ tốn vài dòng config, không
+ * tốn bundle.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -58,14 +90,18 @@ export function SiriWave({ active = true }: { active?: boolean }) {
     <div className="flex h-6 items-center space-x-1" aria-hidden="true">
       {[0, 1, 2, 3, 4].map((i) =>
         fx && active ? (
+          // `h-1` (4px) là TRẠNG THÁI TĨNH của thanh: khớp với 0%/100% của
+          // fx-bar-bounce, nên khi globals.css ép animation-duration về 0.01ms
+          // (reduced-motion hoặc data-animations='off') thanh đứng yên ở 4px —
+          // đúng bằng nhánh fallback bên dưới, không nhảy kích thước lúc tải.
           <span
             key={i}
-            className="w-1 animate-fx-bar-bounce rounded-full bg-brand"
+            className="h-1 w-1 animate-fx-bar-bounce rounded-full bg-brand"
             style={{ animationDelay: `${i * 0.12}s` }}
           />
         ) : (
-          // Fallback tĩnh 6px, transition-[height] giữ độ mượt 0.2s như bản framer.
-          <span key={i} className="h-1.5 w-1 rounded-full bg-brand transition-[height] duration-200" />
+          // Fallback tĩnh — cùng 4px, transition-[height] giữ độ mượt 0.2s như bản framer.
+          <span key={i} className="h-1 w-1 rounded-full bg-brand transition-[height] duration-200" />
         ),
       )}
     </div>
@@ -83,61 +119,17 @@ export function TextShimmer({ text, className = '' }: { text: string; className?
 }
 
 /* ------------------------------------------------------------------ */
-/* ShimmerLine — vệt sáng quét qua chip đang chạy                      */
+/* PulseGlow — hiệu ứng viền thở nhẹ quanh Composer khi active         */
 /* ------------------------------------------------------------------ */
 
-export function ShimmerLine() {
+export function PulseGlow({ active = true, className = '' }: { active?: boolean; className?: string }) {
   const fx = useFxEnabled();
-  if (!fx) return null;
+  if (!fx || !active) return null;
   return (
-    <span aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-[inherit]">
-      <span className="w-1/3 animate-fx-sweep absolute inset-y-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-    </span>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* TypingIndicator — 3 dot nảy sóng (dùng cho thinking)                */
-/* ------------------------------------------------------------------ */
-
-export function TypingIndicator() {
-  const fx = useFxEnabled();
-  return (
-    <span aria-hidden="true" className="flex items-center gap-1">
-      {[0, 1, 2].map((i) =>
-        fx ? (
-          <span
-            key={i}
-            className="h-1.5 w-1.5 animate-fx-dot-bounce rounded-full bg-brand/80"
-            style={{ animationDelay: `${i * 0.15}s` }}
-          />
-        ) : (
-          <span key={i} className="h-1.5 w-1.5 rounded-full bg-brand/80 opacity-60 transition-opacity duration-200" />
-        ),
-      )}
-    </span>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* MorphIcon — crossfade 2 icon trên cùng nút (Send↔Stop, Mic↔Stop)    */
-/* ------------------------------------------------------------------ */
-
-export function MorphIcon({ active, children, inactive }: { active: boolean; children: React.ReactNode; inactive: React.ReactNode }) {
-  const fx = useFxEnabled();
-  if (!fx) return <>{active ? children : inactive}</>;
-  // Crossfade bằng transition CSS: 0.18s ease-out như bản framer, đổi cả
-  // opacity + scale + rotate theo cùng easing.
-  const base = 'absolute inset-0 flex items-center justify-center transition-[opacity,transform] duration-[180ms] ease-out';
-  return (
-    <span className="relative flex h-full w-full items-center justify-center" aria-hidden="true">
-      <span className={`${base} ${active ? 'scale-100 rotate-0 opacity-100' : 'scale-[0.6] rotate-[-30deg] opacity-0'}`}>
-        {children}
-      </span>
-      <span className={`${base} ${active ? 'scale-[0.6] rotate-[30deg] opacity-0' : 'scale-100 rotate-0 opacity-100'}`}>
-        {inactive}
-      </span>
-    </span>
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute -inset-[1px] rounded-[inherit] transition-opacity duration-300 animate-pulse ring-1 ring-accent/30 ${className}`}
+    />
   );
 }
 
@@ -164,18 +156,4 @@ export function useHaptics() {
     }),
     [animations],
   );
-}
-
-/** Hook đồng hồ giây đã chờ — tách để ThinkingIndicator dùng lại. */
-export function useElapsedSeconds(resetKey?: string): number {
-  const [elapsedSec, setElapsedSec] = useState(0);
-  useEffect(() => {
-    const startedAt = Date.now();
-    setElapsedSec(0);
-    const timer = setInterval(() => {
-      setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [resetKey]);
-  return elapsedSec;
 }

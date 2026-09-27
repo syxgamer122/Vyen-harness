@@ -71,9 +71,9 @@ export function AutoBackupSection() {
 
   return (
     <div className="space-y-3">
-      <h4 className="field-label text-[15px]">Tự động sao lưu</h4>
+      <h4 className="field-label text-read">Tự động sao lưu</h4>
       <div>
-        <label htmlFor="backup-interval" className="mb-1.5 block text-xs font-medium text-text-muted">
+        <label htmlFor="backup-interval" className="field-label mb-1.5 block">
           Chu kỳ nhắc / tự động
         </label>
         <select
@@ -97,7 +97,7 @@ export function AutoBackupSection() {
       {fsSupported && (
         <div className="space-y-2">
           {dirName ? (
-            <div className="flex items-center justify-between gap-2 border border-border-hairline bg-surface-raised px-3 py-2 text-xs text-text-primary">
+            <div className="flex items-center justify-between gap-2 border border-subtle bg-surface px-3 py-2 text-ui text-primary">
               <span className="min-w-0 truncate">📁 {dirName}</span>
               <button
                 type="button"
@@ -107,7 +107,7 @@ export function AutoBackupSection() {
                     setMessage('Đã gỡ thư mục tự động — quay lại chế độ nhắc + tải file.');
                   });
                 }}
-                className="flex-shrink-0 px-1.5 py-0.5 text-text-muted transition-colors hover:bg-[#e8704f]/10 hover:text-status-error"
+                className="flex-shrink-0 px-1.5 py-0.5 text-tertiary transition-colors hover:bg-danger/10 hover:text-danger"
               >
                 Gỡ
               </button>
@@ -122,7 +122,7 @@ export function AutoBackupSection() {
               Chọn thư mục lưu tự động…
             </button>
           )}
-          <p className="text-[11px] leading-relaxed text-text-muted">
+          <p className="field-hint">
             Desktop Chrome/Edge: đến kỳ app tự ghi file <code className="claude-inline-code">.json</code> vào
             thư mục này, không cần bấm gì.
           </p>
@@ -138,7 +138,7 @@ export function AutoBackupSection() {
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
         Sao lưu ngay
       </button>
-      <p className="text-[11px] text-text-muted">Lần sao lưu cuối: {lastBackup}</p>
+      <p className="field-hint">Lần sao lưu cuối: {lastBackup}</p>
       {message && <p className="notice-warn" role="status">{message}</p>}
     </div>
   );

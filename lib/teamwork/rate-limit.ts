@@ -319,7 +319,8 @@ export class RateLimitManager {
    */
   public canResume(now: number = Date.now()): boolean {
     if (!this.paused) return true;
-    if (!this.pauseTimestamp) return true;
+    // So sánh tường minh: 0 (epoch) là timestamp hợp lệ, falsy-check sẽ bỏ qua cooldown.
+    if (this.pauseTimestamp === undefined) return true;
     return now - this.pauseTimestamp >= this.currentCooldownMs;
   }
 
@@ -327,7 +328,7 @@ export class RateLimitManager {
    * Returns remaining milliseconds to wait before resuming, or 0 if ready.
    */
   public getWaitRecommendation(now: number = Date.now()): number {
-    if (!this.paused || !this.pauseTimestamp) return 0;
+    if (!this.paused || this.pauseTimestamp === undefined) return 0;
     const elapsed = now - this.pauseTimestamp;
     const remaining = this.currentCooldownMs - elapsed;
     return Math.max(0, remaining);

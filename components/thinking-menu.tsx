@@ -103,7 +103,12 @@ export function resolveOpenFocusIndex(activeIndex: number, enabled: boolean[]): 
  */
 function LevelMeter({ level, inert }: { level: ThinkingLevel; inert?: boolean }) {
   const fill = THINKING_LEVELS.indexOf(level) + 1;
-  const accent = inert ? '#495059' : level === 'max' ? '#e8993a' : '#6a9fcc';
+  // Ô vuông dùng giá trị token (rgb(var(--…))) vì đây là style inline, không phải class.
+  const accent = inert
+    ? 'rgb(var(--text-disabled))'
+    : level === 'max'
+      ? 'rgb(var(--warning))'
+      : 'rgb(var(--accent))';
   return (
     <span className="flex flex-none items-center gap-0.5" aria-hidden="true">
       {THINKING_LEVELS.map((lvl, i) => (
@@ -113,7 +118,10 @@ function LevelMeter({ level, inert }: { level: ThinkingLevel; inert?: boolean })
           style={
             i < fill
               ? { backgroundColor: accent, borderColor: accent }
-              : { backgroundColor: inert ? 'transparent' : '#1c2128', borderColor: '#495059' }
+              : {
+                  backgroundColor: inert ? 'transparent' : 'rgb(var(--bg-sunken))',
+                  borderColor: 'rgb(var(--border-default))',
+                }
           }
         />
       ))}
@@ -266,7 +274,7 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
         aria-expanded={open}
         title={snapped ? snappedLabel : 'Mức độ suy luận của AI'}
         /* `after:-inset-6px` nới vùng chạm 36px lên 48px (mốc 44px trên mobile) mà không đổi khối hiển thị, giống nút icon trong composer. */
-        className={`relative flex h-8 items-center gap-1.5 rounded-none border border-border-hairline bg-surface-raised px-2.5 text-xs font-medium text-text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-border-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#6a9fcc] disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`relative flex h-8 items-center gap-1.5 rounded-none border border-subtle bg-raised px-2.5 text-xs font-medium text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
           open ? 'border-border-hover' : ''
         }`}
       >
@@ -276,7 +284,7 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
           {snapped ? '*' : ''}
         </span>
         <ChevronDown
-          className={`h-3 w-3 text-text-muted transition-transform duration-100 ${open ? 'rotate-180' : ''}`}
+          className={`h-3 w-3 text-tertiary transition-transform duration-100 ${open ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
       </button>
@@ -294,11 +302,11 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
             className="surface-panel z-40 animate-pop-in overflow-hidden p-1.5"
           >
-            <div className="border-b border-border-hairline px-2.5 pb-1.5 pt-1">
-              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-accent-steel">
+            <div className="border-b border-subtle px-2.5 pb-1.5 pt-1">
+              <p className="font-mono text-meta font-semibold uppercase tracking-[0.08em] text-accent-steel">
                 Mức suy luận
               </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
+              <p className="mt-0.5 text-meta leading-relaxed text-tertiary">
                 {menuSubtitle(supportedLevels, !!mandatory)}
               </p>
             </div>
@@ -327,7 +335,7 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
                       onChange(level.key);
                       close();
                     }}
-                    className={`menu-item ${isActive ? 'bg-panel-soft text-text-primary' : ''} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#6a9fcc] ${
+                    className={`menu-item ${isActive ? 'bg-raised text-primary' : ''} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
                       levelSupported ? '' : 'cursor-not-allowed opacity-40'
                     }`}
                   >
@@ -335,12 +343,12 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
                     <span className="min-w-0 flex-1">
                       <span
                         className={`block text-xs font-medium ${
-                          isActive ? activeToneClass : 'text-text-primary'
+                          isActive ? activeToneClass : 'text-primary'
                         }`}
                       >
                         {level.label}
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] leading-tight text-text-muted">
+                      <span className="mt-0.5 block truncate text-meta leading-tight text-tertiary">
                         {level.description}
                       </span>
                     </span>
@@ -352,7 +360,7 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
               })}
             </div>
             {snapped && (
-              <p className="mt-1 border-t border-border-hairline px-2.5 py-1.5 text-[11px] leading-relaxed text-status-warning">
+              <p className="mt-1 border-t border-subtle px-2.5 py-1.5 text-meta leading-relaxed text-status-warning">
                 {levelLabel(value)} không khả dụng, đang gửi {levelLabel(effectiveValue)}
               </p>
             )}

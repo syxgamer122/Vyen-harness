@@ -7,7 +7,7 @@
  * đó (mô tả một dòng, cột help thẳng hàng). main([]) và main(['--help'])
  * phải in help và không đặt exitCode.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COMMANDS,
   buildHelpText,
@@ -105,26 +105,33 @@ describe('RED TEAM buildHelpText — injection đa dòng qua mô tả là bất 
 });
 
 describe('RED TEAM main — argv rỗng và --help', () => {
+  /* `process.exitCode` là trạng thái của cả tiến trình: afterEach dưới đây set
+     nó về 0 nên test thứ hai sẽ thấy giá trị 0 "do test trước để lại". Phải xoá
+     trước khi gọi main() để "không đặt exitCode" thật sự là undefined. */
+  beforeEach(() => {
+    process.exitCode = undefined;
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     process.exitCode = 0;
   });
 
-  it('main([]) in help và không đặt exitCode lỗi', async () => {
+  it('main([]) in help và KHÔNG đặt exitCode', async () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     await main([]);
-    expect(spy).toHaveBeenCalled();
     const printed = spy.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(printed).toContain('Vyen AI Coding Agent Suite');
-    expect(process.exitCode !== 1).toBe(true);
+    // undefined = Node chưa hề được set exitCode. `?? 0` ở đây là tautology:
+    // biến "chưa set" thành "thành công" ⇒ không bao giờ đỏ.
+    expect(process.exitCode).toBeUndefined();
   });
 
   it("main(['--help']) đi qua resolveCommand về help entry, in help, không spawn tiến trình", async () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     await main(['--help']);
-    expect(spy).toHaveBeenCalled();
     const printed = spy.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(printed).toContain('vyen <lệnh> [tùy chọn]');
-    expect(process.exitCode !== 1).toBe(true);
+    expect(process.exitCode).toBeUndefined();
   });
 });

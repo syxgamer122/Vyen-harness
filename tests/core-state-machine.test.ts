@@ -457,6 +457,138 @@ const b = 200;
   coordinator.dispose();
   console.log('✔ TabLockCoordinator instantiates and disposes without resource leak');
 
+  // 23. State machine fail-closed khi USER_APPROVE không khớp pending tool call nào (bảo mật)
+  console.log('--- 23. USER_APPROVE với toolCallId lạ -> fail-closed (INV-3) ---');
+  const staleCalls = [
+    { id: 'call-x', name: 'fs_read', args: { path: 'a.ts' } },
+    { id: 'call-y', name: 'fs_write', args: { path: 'b.ts' } },
+  ];
+  const staleRes = transitionTurnState(
+    'awaiting_approval',
+    { ...createInitialContext('stale-chat', 'leaf-stale'), pendingToolCalls: staleCalls },
+    { type: 'USER_APPROVE', toolCallId: 'call-does-not-exist', token: 'token-stale-999' },
+  );
+  assert.notStrictEqual(
+    staleRes.nextState,
+    'executing_tool',
+    'Approval không khớp call nào không được mở executing_tool (bypass approval)',
+  );
+  assert.strictEqual(
+    staleRes.nextState,
+    'awaiting_approval',
+    'State phải giữ nguyên awaiting_approval khi approval không khớp call nào',
+  );
+  assert.strictEqual(
+    staleRes.nextContext.pendingToolCalls.filter((c) => c.approvalToken !== undefined).length,
+    0,
+    'Không pending tool call nào được gán approvalToken',
+  );
+  assert.strictEqual(
+    staleRes.nextContext.pendingToolCalls.length,
+    2,
+    'Phải giữ nguyên danh sách pendingToolCalls',
+  );
+  console.log('✔ USER_APPROVE với toolCallId không tồn tại bị fail-closed, không bypass được approval');
+
+  // 24. Regression: USER_APPROVE hợp lệ vẫn sang executing_tool và gắn token cho call đích
+  console.log('--- 24. USER_APPROVE hợp lệ -> executing_tool (regression) ---');
+  const validRes = transitionTurnState(
+    'awaiting_approval',
+    {
+      ...createInitialContext('valid-chat', 'leaf-valid'),
+      pendingToolCalls: [
+        { id: 'call-1', name: 'fs_read', args: { path: 'a.ts' } },
+        { id: 'call-2', name: 'fs_write', args: { path: 'b.ts' } },
+      ],
+    },
+    { type: 'USER_APPROVE', toolCallId: 'call-1', token: 'token-valid-111' },
+  );
+  assert.strictEqual(validRes.nextState, 'executing_tool', 'USER_APPROVE hợp lệ phải sang executing_tool');
+  assert.strictEqual(
+    validRes.nextContext.pendingToolCalls.find((c) => c.id === 'call-1')?.approvalToken,
+    'token-valid-111',
+    'Call đích phải được gắn approvalToken',
+  );
+  assert.strictEqual(
+    validRes.nextContext.pendingToolCalls.find((c) => c.id === 'call-2')?.approvalToken,
+    undefined,
+    'Call khác đích không được gắn approvalToken',
+  );
+  console.log('✔ USER_APPROVE hợp lệ vẫn bind token và sang executing_tool');
+
+  // 25. Immutability: context/event của caller không bị mutate
+  console.log('--- 25. Immutability của transitionTurnState ---');
+  const immCtx = createInitialContext('imm-chat', 'leaf-imm');
+  const ctxBefore = JSON.parse(JSON.stringify(immCtx));
+
+  // 25a. TOOL_CALLS_DISCOVERED không được giữ tham chiếu mảng của caller
+  const discoverCalls = [{ id: 'call-a', name: 'fs_read', args: { path: 'a.ts' } }];
+  const discoverCallsBefore = JSON.parse(JSON.stringify(discoverCalls));
+  const discoverRes = transitionTurnState('streaming', immCtx, {
+    type: 'TOOL_CALLS_DISCOVERED',
+    calls: discoverCalls,
+  });
+  assert.deepStrictEqual(discoverCalls, discoverCallsBefore, 'event.calls không được bị mutate khi gán vào context');
+  assert.deepStrictEqual(
+    discoverRes.nextContext.pendingToolCalls,
+    discoverCallsBefore,
+    'nextContext phải chứa giá trị tương đương event.calls',
+  );
+  assert.notStrictEqual(
+    discoverRes.nextContext.pendingToolCalls,
+    discoverCalls,
+    'nextContext phải giữ mảng riêng, không chia sẻ tham chiếu với event.calls',
+  );
+
+  // 25b. REQUIRE_APPROVAL cũng không được giữ tham chiếu mảng của caller
+  const requireCalls = [{ id: 'call-b', name: 'shell_run', args: { command: 'git status' } }];
+  const requireCallsBefore = JSON.parse(JSON.stringify(requireCalls));
+  const requireRes = transitionTurnState('gating', immCtx, { type: 'REQUIRE_APPROVAL', calls: requireCalls });
+  assert.deepStrictEqual(requireCalls, requireCallsBefore, 'event.calls của REQUIRE_APPROVAL không được bị mutate');
+  assert.notStrictEqual(
+    requireRes.nextContext.pendingToolCalls,
+    requireCalls,
+    'nextContext phải giữ mảng riêng, không chia sẻ tham chiếu với event.calls',
+  );
+
+  // 25c. USER_APPROVE không được ghi approvalToken ngược vào object của caller
+  const approveCtx = { ...immCtx, pendingToolCalls: [{ id: 'call-1', name: 'fs_write', args: { path: 'b.ts' } }] };
+  const approveCtxBefore = JSON.parse(JSON.stringify(approveCtx));
+  const approveRes = transitionTurnState('awaiting_approval', approveCtx, {
+    type: 'USER_APPROVE',
+    toolCallId: 'call-1',
+    token: 'token-imm-222',
+  });
+  assert.deepStrictEqual(
+    approveCtx.pendingToolCalls,
+    approveCtxBefore.pendingToolCalls,
+    'context.pendingToolCalls gốc không được bị mutate khi gắn approvalToken',
+  );
+  assert.notStrictEqual(
+    approveRes.nextContext.pendingToolCalls[0],
+    approveCtxBefore.pendingToolCalls[0],
+    'nextContext phải chứa object tool call riêng',
+  );
+
+  // 25d. Gọi lặp lại cùng input -> kết quả phải giống hệt nhau
+  const runAgain = () =>
+    transitionTurnState('awaiting_approval', approveCtx, {
+      type: 'USER_APPROVE',
+      toolCallId: 'call-1',
+      token: 'token-imm-222',
+    });
+  assert.deepStrictEqual(
+    approveRes.nextContext.pendingToolCalls,
+    runAgain().nextContext.pendingToolCalls,
+    'Gọi transitionTurnState 2 lần với cùng input phải cho kết quả giống nhau',
+  );
+  assert.deepStrictEqual(
+    JSON.parse(JSON.stringify(immCtx)),
+    ctxBefore,
+    'context gốc phải được giữ nguyên sau mọi transition',
+  );
+  console.log('✔ transitionTurnState không mutate context/event của caller, gọi lặp cho kết quả ổn định');
+
   console.log('\n=============================================');
   console.log('ALL CORE STATE MACHINE & RUNTIME TESTS PASSED (100%)');
   console.log('=============================================\n');
