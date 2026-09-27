@@ -10,6 +10,21 @@ function readComponent(relPath: string): string {
   return readFileSync(resolve(ROOT, relPath), 'utf-8');
 }
 
+/** Các component vẽ overlay (backdrop/drawer/toast) — nơi z-index quyết định thứ tự chồng. */
+const OVERLAY_FILES = [
+  'components/settings-dialog.tsx',
+  'components/diff-confirm.tsx',
+  'components/shell-confirm.tsx',
+  'components/staging-panel.tsx',
+  'components/tools-panel.tsx',
+  'components/audit-viewer-dialog.tsx',
+  'components/workspace-checkpoints.tsx',
+  'components/mcp/tool-approval-dialog.tsx',
+  'components/recipes/recipes-panel.tsx',
+  'components/sidebar.tsx',
+  'components/toast.tsx',
+];
+
 describe('A11y Contract & Accessibility Compliance', () => {
   describe('Settings Dialog Tab & Panel ARIA linkage', () => {
     it('declares the 7 unified semantic tabs', () => {
@@ -124,6 +139,40 @@ describe('A11y Contract & Accessibility Compliance', () => {
       expect(Z_CLASS.navigation).toBe(`z-[${Z_INDEX.navigation}]`);
       expect(Z_CLASS.system).toBe(`z-[${Z_INDEX.system}]`);
       expect(Z_CLASS.toast).toBe(`z-[${Z_INDEX.toast}]`);
+    });
+
+    it('Tailwind quét `lib/` — nếu không, mọi `z-[NN]` trong Z_CLASS rơi về z-index auto', () => {
+      /*
+       * Lỗi đã từng xảy ra: `Z_CLASS` đặt ở `lib/ui-z.ts`, mà `content` glob của
+       * Tailwind chỉ có pages|components|app. Tailwind là bộ quét TEXT thô, không
+       * theo import, nên nó không thấy `z-[100]` nằm trong hằng số → KHÔNG sinh
+       * rule `.z-\[100\]` → backdrop rơi về `z-index:auto` và nội dung trang
+       * (composer `z-20`) vẽ đè lên modal. Mọi assertion z-index còn lại đều là
+       * so chuỗi nên vẫn xanh; chỉ kiểm tra glob mới bắt được.
+       */
+      const config = readComponent('tailwind.config.ts');
+      const contentBlock = config.slice(config.indexOf('content:'), config.indexOf('theme:'));
+      expect(contentBlock, 'content glob phải quét lib/ để sinh class z-[NN] của Z_CLASS').toMatch(
+        /['"]\.\/lib\/\*\*\/\*\.(?:\{[^}]*\}|js|ts)['"]/,
+      );
+    });
+
+    it('không overlay nào bỏ qua thang, dùng z-[NN] viết tay', () => {
+      /*
+       * Ngược lại với trên: số trong className phải đến từ `Z_CLASS`, không gõ
+       * tay. Gõ tay là cách `settings-dialog.tsx` từng có `z-50` thấp hơn mọi
+       * modal khác (xem chú thích đầu `lib/ui-z.ts`).
+       */
+      const offenders: string[] = [];
+      for (const rel of OVERLAY_FILES) {
+        const src = readComponent(rel);
+        for (const m of src.matchAll(/\bz-\[(\d+)\]/g)) {
+          if (!Object.values(Z_CLASS).includes(m[0])) {
+            offenders.push(`${rel}: ${m[0]}`);
+          }
+        }
+      }
+      expect(offenders, 'z-[NN] viết tay thay vì lấy từ Z_CLASS').toEqual([]);
     });
   });
 

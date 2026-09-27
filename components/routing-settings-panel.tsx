@@ -19,6 +19,76 @@ import {
 } from '@/lib/model-routing';
 import { Download, Upload, RotateCcw, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 
+/**
+ * Ô số của `LeadWorkerRoutingSection`.
+ *
+ * Tách thành component riêng, không phải hàm lồng trong thân panel: bản cũ gọi
+ * `useState` bên trong một hàm tên thường được gọi như hàm (không phải JSX), nên
+ * state gắn với thân `LeadWorkerRoutingSection` chứ không gắn với từng ô — mỗi
+ * lần bấm là cả ba ô cùng remount, mất luôn phần đang gõ dở. Là component thật
+ * thì mỗi ô giữ `raw` riêng và rules-of-hooks hợp lệ.
+ *
+ * HTML5 `min`/`max` KHÔNG chặn gõ — người dùng vẫn nhập được 99, và `Number('')`
+ * là 0 nên xoá trống một ô sẽ ghi 0 xuống store. Vì vậy:
+ *   - rỗng → KHÔNG ghi (giữ nguyên giá trị đang có, ô vẫn cho phép sửa),
+ *   - ngoài khoảng → ghi kèm giá trị đã kẹp về min/max để store không nhận
+ *     con số vô nghĩa, đồng thời hiện viền cảnh báo cho tới lần gõ hợp lệ sau.
+ */
+function NumberField({
+  id,
+  label,
+  min,
+  max,
+  hint,
+  value,
+  onCommit,
+}: {
+  id: string;
+  label: string;
+  min: number;
+  max: number;
+  hint: string;
+  value: number;
+  onCommit: (v: number) => void;
+}) {
+  const [raw, setRaw] = useState<string | null>(null);
+  const parsed = raw === null ? NaN : Number(raw);
+  const outOfRange =
+    raw !== null && raw.trim() !== '' && Number.isFinite(parsed) && (parsed < min || parsed > max);
+  return (
+    <div className="flex-1">
+      <label htmlFor={id} className="field-label mb-1 block">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        /* Đang sửa → hiện đúng thứ người dùng gõ; không sửa → giá trị trong store. */
+        value={raw ?? String(value)}
+        aria-invalid={outOfRange}
+        onChange={(e) => {
+          const next = e.target.value;
+          setRaw(next);
+          if (next.trim() === '') return; // Xoá trống: để nguyên store, không ghi 0
+          const v = Number(next);
+          if (!Number.isFinite(v)) return;
+          onCommit(Math.min(max, Math.max(min, v)));
+        }}
+        onBlur={() => setRaw(null)}
+        className={`field ${outOfRange ? 'border-danger bg-danger/10' : ''}`}
+      />
+      <p className="field-hint mt-0.5">
+        {outOfRange
+          ? `Ngoài khoảng ${min}–${max} — đã kẹp về ${Math.min(max, Math.max(min, parsed))}.`
+          : hint}
+      </p>
+    </div>
+  );
+}
+
 export function RoutingSettingsPanel() {
   const settings = useAppStore((s) => s.settings);
   const updateSettings = useAppStore((s) => s.updateSettings);
@@ -66,7 +136,13 @@ export function RoutingSettingsPanel() {
   };
 
   const handleAdd = () => {
-    const next = [...currentChain, { model: 'gpt-5-6-sol', effort: 'medium' as Effort }];
+    /*
+     * Mặc định phải là id CÓ THẬT trong `AVAILABLE_MODELS` — `<select>` ở dưới
+     * chỉ render option từ catalog, nên một id bịa sẽ khiến hàng mới có
+     * `value` không khớp option nào và trình duyệt hiển thị nhầm option đầu
+     * trong khi chain thật lại trỏ sang model khác.
+     */
+    const next = [...currentChain, { model: AVAILABLE_MODELS[0]!.id, effort: 'medium' as Effort }];
     updateCurrentChain(next);
   };
 
@@ -108,11 +184,11 @@ export function RoutingSettingsPanel() {
   };
 
   return (
-    <div className="space-y-4 text-xs font-mono">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-hairline pb-2.5">
+    <div className="space-y-4 text-ui font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-subtle pb-2.5">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary">Mixture-of-Models Routing</h3>
-          <p className="text-[11px] text-[#757d89]">
+          <h3 className="text-read font-semibold text-primary">Mixture-of-Models Routing</h3>
+          <p className="field-hint">
             Cấu hình chuỗi dự phòng model:effort theo từng hạng mục công việc.
           </p>
         </div>
@@ -121,13 +197,13 @@ export function RoutingSettingsPanel() {
             type="button"
             onClick={handleExportJson}
             title="Xuất cấu hình JSON"
-            className="btn-secondary px-2 py-1 text-[11px] flex items-center gap-1"
+            className="btn-secondary px-2 py-1"
           >
-            <Download size={12} />
+            <Download size={12} aria-hidden="true" />
             Export
           </button>
-          <label className="btn-secondary px-2 py-1 text-[11px] flex items-center gap-1 cursor-pointer">
-            <Upload size={12} />
+          <label className="btn-secondary cursor-pointer px-2 py-1">
+            <Upload size={12} aria-hidden="true" />
             Import
             <input type="file" accept=".json" onChange={handleImportJson} className="hidden" />
           </label>
@@ -135,15 +211,16 @@ export function RoutingSettingsPanel() {
             type="button"
             onClick={handleResetDefaults}
             title="Khôi phục mặc định"
-            className="btn-secondary px-2 py-1 text-[11px] text-[#757d89] hover:text-status-error"
+            aria-label="Khôi phục mặc định chuỗi model"
+            className="icon-btn icon-btn-sm"
           >
-            <RotateCcw size={12} />
+            <RotateCcw size={13} aria-hidden="true" />
           </button>
         </div>
       </div>
 
       {importStatus && (
-        <p className="border border-accent-steel/30 bg-[#6a9fcc]/10 p-2 text-[11px] text-accent-steel">
+        <p className="notice border-accent/40 text-meta text-accent" role="status">
           {importStatus}
         </p>
       )}
@@ -158,11 +235,9 @@ export function RoutingSettingsPanel() {
               key={cat}
               type="button"
               onClick={() => setActiveCat(cat)}
-              className={`rounded-none px-2.5 py-1 text-[11px] transition-colors ${
-                isSelected
-                  ? 'bg-[#6a9fcc] font-semibold text-[#0d1116]'
-                  : 'bg-panel-bg text-text-muted hover:bg-panel-soft hover:text-text-primary'
-              }`}
+              className={
+                isSelected ? 'btn-primary px-2.5 py-1' : 'btn-secondary px-2.5 py-1 text-tertiary'
+              }
             >
               {desc.label}
             </button>
@@ -171,33 +246,33 @@ export function RoutingSettingsPanel() {
       </div>
 
       {/* Active Category Description */}
-      <div className="border border-border-hairline bg-surface-raised p-2.5">
-        <div className="mb-0.5 font-semibold text-text-primary">
+      <div className="border border-subtle bg-raised p-2.5">
+        <div className="mb-0.5 font-semibold text-primary">
           {CATEGORY_DESCRIPTIONS[activeCat]?.label}
         </div>
-        <div className="text-[11px] leading-relaxed text-[#757d89]">
+        <div className="text-meta leading-relaxed text-tertiary">
           {CATEGORY_DESCRIPTIONS[activeCat]?.description}
         </div>
       </div>
 
       {/* Chain list for active category */}
       <div className="space-y-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#757d89]">
+        <div className="text-meta font-semibold uppercase tracking-wider text-tertiary">
           Chuỗi ưu tiên (Fallback Chain) — vị trí 1 thử trước
         </div>
 
         {currentChain.map((entry, idx) => (
           <div
             key={idx}
-            className="flex items-center gap-2 border border-border-hairline bg-surface-raised p-2"
+            className="flex items-center gap-2 border border-subtle bg-raised p-2"
           >
-            <span className="w-5 text-center font-bold text-text-muted">#{idx + 1}</span>
+            <span className="w-5 text-center font-bold text-tertiary">#{idx + 1}</span>
 
             {/* Model select */}
             <select
               value={entry.model}
               onChange={(e) => handleModelChange(idx, e.target.value)}
-              className="flex-1 rounded-none border border-border-hairline bg-bg-deep px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-[#6a9fcc]"
+              className="field-sm flex-1"
             >
               {AVAILABLE_MODELS.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -210,7 +285,7 @@ export function RoutingSettingsPanel() {
             <select
               value={entry.effort}
               onChange={(e) => handleEffortChange(idx, e.target.value as Effort)}
-              className="w-24 rounded-none border border-border-hairline bg-bg-deep px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-[#6a9fcc]"
+              className="field-sm w-24"
             >
               {EFFORT_LEVELS.map((eff) => (
                 <option key={eff} value={eff}>
@@ -225,28 +300,31 @@ export function RoutingSettingsPanel() {
                 type="button"
                 disabled={idx === 0}
                 onClick={() => handleMove(idx, 'up')}
-                className="p-1 text-[#757d89] hover:text-text-primary disabled:opacity-30"
+                className="icon-btn icon-btn-sm"
                 title="Di chuyển lên"
+                aria-label={`Di chuyển model ${idx + 1} lên`}
               >
-                <ArrowUp size={13} />
+                <ArrowUp size={13} aria-hidden="true" />
               </button>
               <button
                 type="button"
                 disabled={idx === currentChain.length - 1}
                 onClick={() => handleMove(idx, 'down')}
-                className="p-1 text-[#757d89] hover:text-text-primary disabled:opacity-30"
+                className="icon-btn icon-btn-sm"
                 title="Di chuyển xuống"
+                aria-label={`Di chuyển model ${idx + 1} xuống`}
               >
-                <ArrowDown size={13} />
+                <ArrowDown size={13} aria-hidden="true" />
               </button>
               <button
                 type="button"
                 disabled={currentChain.length <= 1}
                 onClick={() => handleRemove(idx)}
-                className="p-1 text-[#757d89] hover:text-status-error disabled:opacity-30"
+                className="icon-btn icon-btn-sm icon-btn-danger"
                 title="Xóa model khỏi chuỗi"
+                aria-label={`Xóa model khỏi chuỗi ${idx + 1}`}
               >
-                <Trash2 size={13} />
+                <Trash2 size={13} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -255,14 +333,14 @@ export function RoutingSettingsPanel() {
         <button
           type="button"
           onClick={handleAdd}
-          className="btn-secondary flex w-full items-center justify-center gap-1.5 py-1.5 text-xs text-text-primary"
+          className="btn-secondary w-full py-1.5"
         >
-          <Plus size={14} />
+          <Plus size={14} aria-hidden="true" />
           Thêm model dự phòng vào chuỗi
         </button>
       </div>
 
-      <div className="border-t border-border-hairline pt-3">
+      <div className="border-t border-subtle pt-3">
         <LeadWorkerRoutingSection />
       </div>
     </div>
@@ -287,14 +365,14 @@ function RoutingModelSelect({
   const orphan = Boolean(value) && !options.some((o) => o.id === value);
   return (
     <div className="flex-1">
-      <label htmlFor={id} className="mb-1 block text-[11px] font-semibold text-[#757d89]">
+      <label htmlFor={id} className="field-label mb-1 block">
         {label}
       </label>
       <select
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-none border border-border-hairline bg-bg-deep px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-[#6a9fcc]"
+        className="field-sm w-full"
       >
         <option value="">— Theo model chính —</option>
         {orphan && <option value={value}>{value} (không còn trong danh sách)</option>}
@@ -336,44 +414,34 @@ function LeadWorkerRoutingSection() {
     max: number,
     hint: string,
   ) => (
-    <div className="flex-1">
-      <label htmlFor={id} className="mb-1 block text-[11px] font-semibold text-[#757d89]">
-        {label}
-      </label>
-      <input
-        id={id}
-        type="number"
-        inputMode="numeric"
-        min={min}
-        max={max}
-        value={modelRouting[key]}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (Number.isFinite(v)) patch({ [key]: v } as Partial<ModelRoutingConfig>);
-        }}
-        className="w-full rounded-none border border-border-hairline bg-bg-deep px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-[#6a9fcc]"
-      />
-      <p className="mt-0.5 text-[10px] leading-relaxed text-text-muted">{hint}</p>
-    </div>
+    <NumberField
+      id={id}
+      label={label}
+      min={min}
+      max={max}
+      hint={hint}
+      value={modelRouting[key]}
+      onCommit={(v) => patch({ [key]: v } as Partial<ModelRoutingConfig>)}
+    />
   );
 
   return (
     <div className="space-y-2.5">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary">Lead/Worker Routing</h3>
-          <p className="text-[11px] text-[#757d89]">
+          <h3 className="text-read font-semibold text-primary">Lead/Worker Routing</h3>
+          <p className="field-hint">
             Model mạnh chạy vài lượt đầu (lập kế hoạch) rồi model rẻ thực thi; thất bại liên tiếp
-            thì tự quay lại model mạnh. Lệnh <code className="text-accent-steel">/plan</code> dùng
+            thì tự quay lại model mạnh. Lệnh <code className="text-accent">/plan</code> dùng
             planner model riêng.
           </p>
         </div>
-        <label className="flex flex-none cursor-pointer items-center gap-1.5 pt-1 text-[11px] text-text-primary">
+        <label className="flex flex-none cursor-pointer items-center gap-1.5 pt-1 text-ui text-primary">
           <input
             type="checkbox"
             checked={modelRouting.enabled}
             onChange={(e) => patch({ enabled: e.target.checked })}
-            className="h-3.5 w-3.5 rounded-none accent-[#6a9fcc]"
+            className="h-3.5 w-3.5 rounded-none accent-accent"
           />
           Bật
         </label>
@@ -423,12 +491,12 @@ function LeadWorkerRoutingSection() {
         )}
       </div>
 
-      <p className="text-[10.5px] leading-relaxed text-text-muted">
+      <p className="text-micro leading-relaxed text-tertiary">
         &ldquo;Thất bại&rdquo; = tool trả lỗi / lệnh build-test exit ≠ 0 / bạn phàn nàn
         (&ldquo;sai rồi&rdquo;, &ldquo;làm lại&rdquo;, &ldquo;wrong&rdquo;…). Lỗi mạng 429/5xx
         của gateway KHÔNG được tính — đã có retry im lặng riêng. Việc bạn TỪ CHỐI một phê duyệt
         cũng không tính là thất bại. Vai trò của từng lượt hiện thành badge{' '}
-        <code className="text-accent-steel">lead</code>/<code className="text-text-muted">worker</code>{' '}
+        <code className="text-accent">lead</code>/<code className="text-tertiary">worker</code>{' '}
         dưới câu trả lời.
       </p>
     </div>

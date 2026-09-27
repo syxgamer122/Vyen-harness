@@ -38,3 +38,11 @@ tmp-sast-test-dir/
 # File tạm do tests/web-bridge.test.ts và tests/interactive-agent.test.ts sinh ra
 # (dọn ở finally, đây là lưới an toàn khi môi trường chặn xoá)
 tmp-test-*
+
+# Scratch ở gốc repo: script probe CDP, ảnh chụp màn hình, JSON kết quả debug.
+# Neo "/" đầu dòng như các mục trên — không neo sẽ khớp mọi thư mục tên "tmp"
+# ở mọi cấp, kể cả "components/tmp/".
+/tmp-*.mjs
+/tmp-*.png
+/tmp-*.json
+/tmp-*.css

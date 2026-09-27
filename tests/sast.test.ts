@@ -98,6 +98,49 @@ describe('Chaitin Security SAST Security Engine', () => {
     expect(cryptoRule.match('const h = crypto.createHash("sha256").update(pwd).digest("hex");', 1, '', 'src/auth.ts')).toBe(false);
   });
 
+  it('bỏ qua comment JSX `{/* … */}` nhưng VẪN bắt code thật trên cùng dòng', () => {
+    /*
+     * Regression: bộ lọc comment chỉ nhận dạng block comment khi dòng BẮT ĐẦU
+     * bằng nó. Trong JSX, comment bọc trong `{ ... }` nên `trimmed` mở đầu bằng
+     * dấu ngoặc nhọn và prose trong đó bị quét như code — đúng loại báo động giả
+     * HIGH đã làm đỏ `tests/web-bridge.test.ts` (audit exit 1).
+     */
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vyen-sast-jsx-'));
+    try {
+      // (a) prose nguy hiểm CHỈ nằm trong comment JSX -> phải im lặng.
+      fs.writeFileSync(
+        path.join(testDir, 'commented.tsx'),
+        [
+          'export function Args({ current }: { current: unknown }) {',
+          '  return (',
+          '    <div>',
+          '      {/* JSON là MÁY, và luôn là text child, KHÔNG BAO GIỜ',
+          '          `dangerouslySetInnerHTML`: đây là dữ liệu từ server bên thứ ba. */}',
+          '      <pre>{formatArgs(current)}</pre>',
+          '    </div>',
+          '  );',
+          '}',
+        ].join('\n'),
+        'utf8',
+      );
+      // (b) dangerouslySetInnerHTML THẬT vẫn phải bị bắt.
+      fs.writeFileSync(
+        path.join(testDir, 'real-xss.tsx'),
+        'export const bad = <div dangerouslySetInnerHTML={{ __html: userRawHtml }} />;\n',
+        'utf8',
+      );
+
+      const report = runSecuritySast(testDir);
+      const xss = report.findings.filter((f) => f.ruleId === 'XSS-001');
+      expect(
+        xss.map((f) => f.file),
+        'chỉ file có dangerouslySetInnerHTML thật mới được báo',
+      ).toEqual(['real-xss.tsx']);
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
   it('tính điểm an ninh chính xác theo trọng số mức độ nghiêm trọng', () => {
     /*
      * Dùng thư mục tạm RIÊNG cho mỗi lần chạy (mkdtempSync) thay vì đường dẫn

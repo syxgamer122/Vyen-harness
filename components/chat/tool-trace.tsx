@@ -2,7 +2,9 @@
 
 import React, { memo, useState, useCallback } from 'react';
 import {
+  Activity,
   ArrowLeftRight,
+  Bookmark,
   Brain,
   Check,
   ChevronDown,
@@ -14,7 +16,11 @@ import {
   FilePlus,
   FileText,
   Folder,
+  GitBranch,
+  Globe,
+  ListTodo,
   Loader2,
+  Plug,
   Search,
   Terminal,
   Wrench,
@@ -35,6 +41,8 @@ interface ToolEvent {
 
 interface ToolInvocationLike {
   toolCallId?: string;
+  toolName?: string;
+  args?: unknown;
   state?: string;
   result?: unknown;
 }
@@ -76,6 +84,14 @@ export function collectToolEvents(
   for (const inv of toolInvocations ?? []) {
     if (!inv?.toolCallId) continue;
     const ev = push(String(inv.toolCallId));
+    if (!ev.name && (inv as any).toolName) {
+      ev.name = String((inv as any).toolName);
+    }
+    if (!ev.args && (inv as any).args !== undefined && (inv as any).args !== null) {
+      ev.args = typeof (inv as any).args === 'string'
+        ? (inv as any).args
+        : JSON.stringify((inv as any).args);
+    }
     if (inv.state === 'result') {
       ev.done = true;
       if (typeof inv.result === 'string' && !ev.summary) {
@@ -118,6 +134,28 @@ const TOOL_META: Record<string, { label: string; Icon: React.ElementType; color?
   memory_search: { label: 'memory', Icon: Brain },
 };
 
+/**
+ * Icon cho tool KHÔNG có trong TOOL_META.
+ *
+ * TOOL_META và catalog phủ phần lớn toolset thật, nhưng `mcp__*` và mọi
+ * tool client-side mới thêm vẫn rơi xuống đây. Trước đây tất cả những tool đó
+ * nhận CÙNG một icon `Wrench`, nên phần lớn chip trong một lượt có gương mặt
+ * giống hệt nhau. Suy ra icon từ TIỀN TỐ tên tool: mắt nhận ra nhóm việc
+ * (đọc file / chạy lệnh / gọi MCP) trước khi kịp đọc nhãn.
+ */
+const TOOL_ICON_BY_PREFIX: ReadonlyArray<[string, React.ElementType]> = [
+  ['mcp__', Plug],
+  ['fs_', FileText],
+  ['code_', FileCode],
+  ['bg_', Activity],
+  ['git_', GitBranch],
+  ['plan_', ListTodo],
+  ['web_', Globe],
+  ['memory', Brain],
+  ['lesson', Bookmark],
+  ['chat_', Search],
+];
+
 function formatToolDetail(text: string) {
   if (!text) return null;
   // If text contains JSON string, extract relevant field
@@ -143,18 +181,24 @@ function formatToolDetail(text: string) {
   return text;
 }
 
-function ToolChip({ ev }: { ev: ToolEvent }) {
+/** Chip là ĐƯỜNG MỘT, mọi thứ bên ngoài nó (khoảng cách, viền) do cha quyết. */
+function ToolChip({ ev, className }: { ev: ToolEvent; className?: string }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const meta = TOOL_META[ev.name];
   // Mô tả tooltip lấy từ catalog (khớp cả tên di sản như read/bash qua alias),
   // nhãn fallback cũng theo catalog để chip lạ vẫn đọc được tiếng Việt.
   const catalogEntry = resolveToolEntry(ev.name);
-  const { Icon } = meta ?? { Icon: Wrench };
+  // Icon tra sẵn ở module scope: `react-hooks/static-components` chặn việc gọi
+  // hàm trả về component bên trong thân render, vì mỗi lần chip render lại sẽ
+  // là một type component mới → remount cây con. Ở đây chỉ tra bảng Module tĩnh.
+  const Icon = meta?.Icon ?? TOOL_ICON_BY_PREFIX.find(([p]) => ev.name.startsWith(p))?.[1] ?? Wrench;
   const label = meta?.label ?? catalogEntry?.shortLabel ?? ev.name;
 
   const displayParam = formatToolDetail(ev.args);
   const hasOutput = Boolean(ev.summary && ev.summary.trim());
+  const failed = Boolean(ev.isError);
+  const running = !ev.done;
 
   const onCopy = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -168,99 +212,59 @@ function ToolChip({ ev }: { ev: ToolEvent }) {
   }, [ev.summary]);
 
   return (
-    <div
-      className={`my-1 rounded-none border font-mono text-xs ${
-        ev.isError
-          ? 'border-status-error/40 bg-[#e8704f]/10'
-          : ev.done
-            ? 'border-border-hairline bg-panel-bg'
-            : 'border-accent-steel bg-panel-bg'
-      }`}
-    >
+    <div className={`font-mono text-meta ${className ?? ''}`}>
       <button
         type="button"
         onClick={() => hasOutput && setExpanded(!expanded)}
         disabled={!hasOutput}
         aria-expanded={hasOutput ? expanded : undefined}
         title={catalogEntry?.description}
-        className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left ${
-          hasOutput ? 'cursor-pointer hover:bg-white/[0.04]' : 'cursor-default'
+        className={`flex w-full items-center gap-2 py-1 text-left transition-colors ${
+          running
+            ? 'bg-raised text-secondary shadow-bevel-out'
+            : failed
+              ? 'text-danger hover:bg-danger/5'
+              : 'text-tertiary hover:text-secondary'
         }`}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-accent-steel font-bold text-[11px]">$</span>
-          <div className="flex items-center gap-1 font-semibold text-text-primary">
-            <Icon size={12} className="text-accent-steel" />
-            <span>{label}</span>
-          </div>
-
-          {displayParam && (
-            <span className="truncate text-text-muted text-[11px] max-w-[280px] sm:max-w-[420px]">
-              {displayParam}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-shrink-0 text-[11px]">
-          {ev.done ? (
-            ev.isError ? (
-              <span className="flex items-center gap-1 text-status-error">
-                <XCircle size={12} />
-                <span>error</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-status-success">
-                <Check size={12} />
-                <span>done</span>
-              </span>
-            )
+        {/* Ô icon cố định bề rộng: cả cột icon thẳng hàng, mắt quét dọc
+            không bị vỡ vì mỗi chip một độ dài nhãn khác nhau. */}
+        <span className="flex w-5 shrink-0 items-center justify-center">
+          {running ? (
+            <Loader2 size={11} className="animate-spin text-accent" />
+          ) : failed ? (
+            <XCircle size={11} className="text-danger" />
           ) : (
-            <span className="flex items-center gap-1 text-status-warning">
-              <Loader2 size={12} className="animate-spin text-accent-steel" />
-              <span>running</span>
-            </span>
+            <Icon size={11} className="text-disabled" />
           )}
+        </span>
 
-          {hasOutput && (
-            <span className="ml-1 text-text-muted">
-              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </span>
-          )}
-        </div>
+        <span className="min-w-0 truncate">
+          {label}
+          {displayParam ? <span className="text-disabled"> · {displayParam}</span> : null}
+        </span>
+
+        {hasOutput && (
+          <span className="ml-auto shrink-0 pl-2 text-disabled" aria-hidden>
+            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </span>
+        )}
       </button>
 
       {expanded && hasOutput && (
-        <div className="border-t border-border-hairline bg-surface-raised px-3 py-2 text-[11.5px] leading-relaxed">
-          <div className="flex items-center justify-between pb-1.5 text-[10px] text-text-muted">
-            <span>OUTPUT</span>
+        <div className="mt-1 bg-sunken p-2 shadow-bevel-in">
+          <div className="flex items-center justify-end pb-1.5">
             <button
               type="button"
               onClick={onCopy}
-              className="flex items-center gap-1 hover:text-text-primary"
+              className="flex items-center gap-1 text-disabled transition-colors hover:text-secondary"
             >
-              {copied ? <Check size={10} className="text-status-success" /> : <Copy size={10} />}
-              <span>{copied ? 'copied' : 'copy'}</span>
+              {copied ? <Check size={10} className="text-success" /> : <Copy size={10} />}
+              <span>{copied ? 'Đã sao chép' : 'Sao chép kết quả'}</span>
             </button>
           </div>
-          <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-text-primary">
-            {ev.summary.split('\n').map((line, idx) => {
-              const isAdded = line.startsWith('+');
-              const isRemoved = line.startsWith('-');
-              return (
-                <div
-                  key={idx}
-                  className={
-                    isAdded
-                      ? 'diff-line-added px-1'
-                      : isRemoved
-                        ? 'diff-line-removed px-1'
-                        : ''
-                  }
-                >
-                  {line}
-                </div>
-              );
-            })}
+          <pre className="custom-scrollbar max-h-60 overflow-y-auto whitespace-pre-wrap border border-subtle p-2 text-secondary">
+            {ev.summary}
           </pre>
         </div>
       )}
@@ -286,8 +290,14 @@ export const ToolTrace = memo(function ToolTrace({
       ))}
       {events.length > 0 && (
         <div className="my-2 flex flex-col" role="list" aria-label="Tool executions">
-          {events.map((ev) => (
-            <ToolChip key={ev.id} ev={ev} />
+          {events.map((ev, i) => (
+            <ToolChip
+              key={ev.id}
+              ev={ev}
+              // Chỉ tách khối đang mở (nhiều dòng) ra khỏi dòng trên — chip một
+              // dòng dán liền nhau, không lên thang so le.
+              className={i > 0 && ev.summary?.trim() ? 'mt-2' : undefined}
+            />
           ))}
         </div>
       )}

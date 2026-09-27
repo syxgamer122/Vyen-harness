@@ -590,7 +590,13 @@ export class SecuritySastScanner {
     // "eval(...)", "rm -rf /"... và bị quét như code thật (báo động giả CRITICAL).
     let inBlockComment = false;
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+      // JSX bọc comment trong `{/* ... */}`, nên `trimmed` mở đầu bằng `{/*`
+      // chứ không phải `/*` — hai nhánh bên dưới không nhận ra, và prose trong
+      // comment bị quét như code thật. Thống nhất về block comment thường để dùng
+      // chung logic, kể cả khi comment nằm giữa dòng: `<div>{/* c */} eval(x)`
+      // sau bước này không còn mở đầu bằng `/*` nên vẫn bị quét — đúng, vì `eval`
+      // đó là code thật.
+      const line = lines[i].replace(/\{\s*\/\*/g, '/*').replace(/\*\/\s*\}/g, '*/');
       const trimmed = line.trim();
 
       if (inBlockComment) {
