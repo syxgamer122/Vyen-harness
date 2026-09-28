@@ -11,9 +11,10 @@
  *   VYEN_BRIDGE_TOKEN, rồi gắn fragment `#bt=<token>` vào URL mở browser.
  * - Renderer tách fragment ra sessionStorage (không nằm trong URL/history)
  *   và gắn header `x-vyen-bridge-token` cho mọi call bridge.
- * - Server không có env token (npm run dev) sinh ephemeral in-memory VÀ ghi
- *   best-effort ra file `<userDataDir>/vyen-bridge-token` (mode 0600) để
- *   launcher reconnect đọc lại được.
+ * - Token được ghi best-effort ra file `<userDataDir>/vyen-bridge-token`
+ *   (mode 0600) ở CẢ HAI nhánh: có env (launcher spawn) lẫn tự sinh (dev).
+ *   Nhờ vậy launcher mở lại app khi server còn sống đọc được đúng token của
+ *   phiên đó, thay vì một token cũ đã hết hiệu lực.
  *
  * THREAT MODEL (ghi nhận chủ ý — defense-in-depth, không phải biên giới tuyệt đối):
  * - CHẶN được: curl/script local "mù" (không biết token), trang localhost cổng
@@ -21,7 +22,8 @@
  *   CSRF/recon từ trang web lạ (cross-site đã bị isLocalRequest chặn, giờ còn
  *   thiếu token), brute-force (256-bit + rate-limit ở route).
  * - KHÔNG chặn được: tiến trình khác cùng user — nó đọc được command line/env
- *   của tiến trình server hoặc thẳng file token trong userDataDir.
+ *   của tiến trình server hoặc thẳng file token trong userDataDir. Đây là
+ *   giới hạn đã thừa nhận, không phải hồi quy do ghi file.
  */
 
 import fs from 'node:fs';
@@ -77,11 +79,24 @@ function writeTokenFileBestEffort(token: string): void {
 export function ensureBridgeToken(): string {
   if (activeToken) return activeToken;
 
-  // Launcher truyền token qua env — dùng nguyên vẹn, không ghi ra file
-  // (env là kênh riêng launcher→con, file chỉ dành cho luồng fallback).
+  // Launcher truyền token qua env — dùng nguyên vẹn, VẪN ghi ra file.
+  //
+  // Trước đây nhánh env không ghi file, chỉ nhánh tự sinh mới ghi. Hệ quả:
+  // launcher spawn server (token qua env) rồi đóng app; mở lại thì server
+  // còn sống nên launcher vào nhánh reconnect, đọc token trong userDataDir —
+  // nhưng đó là token của phiên khác → verify fail → bridge trả 401 và
+  // fs/shell/git bị khoá dù app "chạy được". Ghi file ở cả hai nhánh để
+  // token trên đĩa luôn khớp token của server đang chạy.
+  //
+  // Rủi ro đánh đổi: token phiên nằm trên đĩa. Threat model dòng 18-24 đã
+  // nói rõ KHÔNG chặn được tiến trình cùng user — nó đọc được file này, và
+  // trước đó cũng đọc được command line/env của tiến trình server. Nên ghi
+  // file không mở rộng biên giới đã thừa nhận; chỉ sửa trạng thái "reconnect
+  // không dùng được" thành "dùng được".
   const fromEnv = process.env.VYEN_BRIDGE_TOKEN?.trim();
   if (fromEnv) {
     activeToken = fromEnv;
+    writeTokenFileBestEffort(activeToken);
     return activeToken;
   }
 

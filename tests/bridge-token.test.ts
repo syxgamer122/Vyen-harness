@@ -59,15 +59,23 @@ afterEach(() => {
 });
 
 describe('ensureBridgeToken — nguồn token', () => {
-  it('env VYEN_BRIDGE_TOKEN thắng: dùng nguyên vẹn và KHÔNG ghi file', () => {
+  it('env VYEN_BRIDGE_TOKEN thắng: dùng nguyên vẹn VÀ ghi file cùng nội dung', () => {
     // Đảo điều kiện: nếu bỏ nhánh env (luôn sinh mới), token trả về sẽ khác
     // giá trị env → test này đỏ.
+    //
+    // Ghi file ở nhánh env là BẮT BUỘC, không phải tuỳ chọn: launcher spawn
+    // server với token qua env rồi đóng app; mở lại thì server còn sống nên
+    // launcher đọc token trong userDataDir để mở cửa sổ mới. Trước đây nhánh
+    // env không ghi file, nên file còn token của phiên cũ → verify fail →
+    // bridge 401 và fs/shell/git bị khoá dù app vẫn mở được. Đây chính là
+    // lý do test dưới đây phải đỏ khi ai đó "tối ưu" bỏ lệnh ghi file.
     const envToken = 'envtoken'.repeat(4) + 'x'.repeat(11); // 43 ký tự
     process.env.VYEN_BRIDGE_TOKEN = envToken;
 
     const token = ensureBridgeToken();
     expect(token).toBe(envToken);
-    expect(existsSync(tokenFilePath())).toBe(false);
+    expect(existsSync(tokenFilePath())).toBe(true);
+    expect(readFileSync(tokenFilePath(), 'utf8')).toBe(envToken);
     expect(getActiveBridgeToken()).toBe(envToken);
   });
 
