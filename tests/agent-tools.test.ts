@@ -3,7 +3,6 @@ import { __clearSearchCache } from '@/lib/web-backend';
 import { __clearAllToolCallBudgets } from '@/lib/tool-call-budget';
 import {
   buildAgentTools,
-  MAX_TOOL_CALLS_PER_TURN,
   summarizeToolArgs,
   summarizeToolResult,
   validateMemoryProposal,
@@ -118,17 +117,14 @@ describe('agent tools', () => {
   });
 });
 
-describe('loop-guard — chặn gọi trùng và vượt trần', () => {
-  it('gọi trùng cùng args → note, KHÔNG fetch lần hai', async () => {
-    const fetchSpy = vi.fn(async () => htmlResponse(SEARCH_FIXTURE));
-    vi.stubGlobal('fetch', fetchSpy);
+describe('loop-guard — chỉ còn doom-loop, gọi lại hợp lệ không bị chặn', () => {
+  it('gọi trùng cùng args vẫn chạy thật (không còn dedupe)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => htmlResponse(SEARCH_FIXTURE)));
     const t = buildAgentTools();
     await t.web_search.execute!({ query: 'giá vàng' }, {} as any);
     const second = await t.web_search.execute!({ query: 'giá vàng' }, {} as any);
-    // Shape ổn định (results rỗng) + note bảo model dùng lại kết quả trước.
-    expect((second as any).results).toEqual([]);
-    expect(String((second as any).note)).toContain('gọi công cụ này rồi');
-    expect(fetchSpy).toHaveBeenCalledTimes(1); // engine lite chỉ chạy 1 lần
+    expect((second as any).note).toBeUndefined();
+    expect((second as any).results.length).toBeGreaterThan(0);
   });
 
   it('args khác nhau vẫn được gọi bình thường', async () => {
@@ -140,19 +136,15 @@ describe('loop-guard — chặn gọi trùng và vượt trần', () => {
     expect((b as any).note).toBeUndefined();
   });
 
-  it(`vượt ${MAX_TOOL_CALLS_PER_TURN} call trong một lượt → note tổng hợp`, async () => {
+  it('lặp LIÊN TIẾP cùng args tới ngưỡng → steering buộc đổi hướng', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ rates: { VND: 26000 } })));
     const t = buildAgentTools();
-    let last: unknown;
-    for (let i = 0; i <= MAX_TOOL_CALLS_PER_TURN; i++) {
-      last = await t.exchange_rates.execute!({}, {} as any);
-      if (i < MAX_TOOL_CALLS_PER_TURN) {
-        // Các call trong trần: dedupe chặn từ call thứ 2 (cùng args) — vẫn tính
-        // là "đã gọi" nên không cần assert gì thêm ở đây.
-        continue;
-      }
-    }
-    expect(String((last as any).note)).toContain('giới hạn số lần gọi');
+    const one = await t.exchange_rates.execute!({}, {} as any);
+    const two = await t.exchange_rates.execute!({}, {} as any);
+    expect((one as any).note).toBeUndefined();
+    expect((two as any).note).toBeUndefined();
+    const third = await t.exchange_rates.execute!({}, {} as any);
+    expect(String((third as any).note)).toContain('LIÊN TIẾP');
   });
 });
 

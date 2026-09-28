@@ -69,28 +69,45 @@ export function escapeWindowsBatchArg(arg: string): string {
 }
 
 /**
+ * Các gốc `node_modules` toàn cục theo thứ tự ưu tiên, tính từ thư mục của
+ * `process.execPath` (không dựa vào PATH kế thừa):
+ *   1. `<nodeDir>/node_modules` — installer chính thức trên Windows, nvm-windows,
+ *      gói .pkg macOS.
+ *   2. `<nodeDir>/../lib/node_modules` — Debian/Ubuntu (`/usr/bin` -> `/usr/lib`),
+ *      nvm trên Linux/macOS, Homebrew.
+ */
+function nodeGlobalModuleRoots(nodeDir: string): string[] {
+  return [
+    path.join(nodeDir, 'node_modules'),
+    path.join(nodeDir, '..', 'lib', 'node_modules'),
+  ];
+}
+
+/**
  * Phân giải trực tiếp file .js thực thi cho các công cụ Node-based (npm, npx, corepack).
  * Khi chạy trên Windows, thay vì chạy qua file wrapper .cmd (dễ bị second-order evaluation do cmd.exe %*),
  * ta gọi trực tiếp Node executable với file .js CLI:
  *   safeSpawn(process.execPath, [npmCliPath, ...args], { shell: false })
  * Triệt tiêu 100% bề mặt tấn công batch script của Windows.
  */
+
 export function resolveNodeCliAbsolute(bin: string): { execPath: string; argsPrefix: string[] } | null {
   const nodeDir = path.dirname(process.execPath);
   const base = path.basename(bin).toLowerCase().replace(/\.(cmd|bat|exe)$/, '');
 
-  if (base === 'npm') {
-    const candidate = path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npm-cli.js');
-    if (fs.existsSync(candidate)) {
-      return { execPath: process.execPath, argsPrefix: [candidate] };
-    }
-  } else if (base === 'npx') {
-    const candidate = path.join(nodeDir, 'node_modules', 'npm', 'bin', 'npx-cli.js');
-    if (fs.existsSync(candidate)) {
-      return { execPath: process.execPath, argsPrefix: [candidate] };
-    }
-  } else if (base === 'corepack') {
-    const candidate = path.join(nodeDir, 'node_modules', 'corepack', 'dist', 'corepack.js');
+  const relative = base === 'npm'
+    ? ['npm', 'bin', 'npm-cli.js']
+    : base === 'npx'
+      ? ['npm', 'bin', 'npx-cli.js']
+      : base === 'corepack'
+        ? ['corepack', 'dist', 'corepack.js']
+        : null;
+  if (!relative) {
+    return null;
+  }
+
+  for (const root of nodeGlobalModuleRoots(nodeDir)) {
+    const candidate = path.join(root, ...relative);
     if (fs.existsSync(candidate)) {
       return { execPath: process.execPath, argsPrefix: [candidate] };
     }

@@ -31,8 +31,6 @@ import {
   type EmulatedLoopOptions,
   type EmulatedLoopResult,
 } from '@/lib/emulated-agent';
-import { consumeSubagentSpawns, SUBAGENT_SPAWNS_PER_BUCKET } from '@/lib/subagent-budget';
-import { BUDGET_TTL_MS } from '@/lib/tool-call-budget';
 import type { AgentToolSet } from '@/lib/agent-tools';
 
 /* ------------------------------------------------------------------ */
@@ -397,25 +395,12 @@ export interface DelegateExecuteDeps {
    * model chọn 'brief'; caller truyền closure, không truyền chuỗi dựng sẵn.
    */
   getParentBrief?: () => string | undefined;
-  /**
-   * Id hội thoại — chìa khóa ngân sách spawn (lib/subagent-budget.ts).
-   * Thiếu thì delegate chạy không bị đếm, giữ hành vi cũ.
-   */
-  conversationId?: string;
 }
 
 /** Nhãn lane trong annotation khi chạy batch — UI dùng để tách thẻ theo task. */
 export interface SubagentTaskMeta {
   taskIndex?: number;
   taskTotal?: number;
-}
-
-function spawnBudgetErrorText(): string {
-  return (
-    `Đã hết ngân sách subagent cho hội thoại này (${SUBAGENT_SPAWNS_PER_BUCKET} lần trong ` +
-    `${Math.round(BUDGET_TTL_MS / 60_000)} phút). Hãy tự làm phần việc còn lại trực tiếp, ` +
-    'hoặc chờ người dùng rồi mới delegate tiếp.'
-  );
 }
 
 /** Trần ký tự của result preview trong annotation — card UI đọc field này. */
@@ -464,10 +449,6 @@ export async function executeDelegate(
         error: 'instructions quá ngắn — viết brief đầy đủ (tối thiểu 10 ký tự) cho subagent.',
       });
     }
-    const grant = consumeSubagentSpawns(deps.conversationId, 1);
-    if (grant.granted < 1) {
-      return JSON.stringify({ status: 'error', error: spawnBudgetErrorText() });
-    }
     const subResult = await runSubagent({
       instructions,
       maxTurns: typeof args.max_turns === 'number' ? args.max_turns : undefined,
@@ -507,21 +488,15 @@ export async function executeDelegate(
     });
   }
 
-  /* Ngân sách spawn consume MỘT lần cho cả lô TRƯỚC khi spawn — cấp một phần
-     nếu bucket sắp cạn; task vượt phần cấp nhận error entry, giữ đúng vị trí
-     trong mảng kết quả. */
-  const grant = consumeSubagentSpawns(deps.conversationId, tasks.length);
-  const runnable = grant.granted >= tasks.length ? tasks : tasks.slice(0, grant.granted);
-
   // Gắn nhãn lane vào mọi annotation để UI không trộn trạng thái các task.
   const withTaskMeta = (index: number): SubagentOptions['onProgress'] | undefined =>
     deps.onProgress
       ? (phase, detail) =>
-          deps.onProgress?.(phase, { ...detail, taskIndex: index, taskTotal: runnable.length })
+          deps.onProgress?.(phase, { ...detail, taskIndex: index, taskTotal: tasks.length })
       : undefined;
 
   const outcomes = await runPool<DelegateTaskInput, SubagentResult>({
-    items: runnable,
+    items: tasks,
     limit: SUBAGENT_PARALLEL_CONCURRENCY,
     signal: deps.abortSignal,
     worker: (task, index) =>
@@ -561,20 +536,5 @@ export async function executeDelegate(
           error: o.error,
         },
   );
-  /* Task vượt phần ngân sách cấp: error entry ở đúng vị trí — mảng kết quả
-     luôn dài bằng số task gốc, không làm mất kết quả của task đã chạy. */
-  for (let i = runnable.length; i < tasks.length; i++) {
-    results.push({
-      result: '',
-      turnsUsed: 0,
-      toolCalls: 0,
-      status: 'error',
-      runId: '',
-      mode,
-      startedAt: 0,
-      durationMs: 0,
-      error: spawnBudgetErrorText(),
-    });
-  }
   return JSON.stringify(results);
 }

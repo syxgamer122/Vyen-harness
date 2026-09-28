@@ -1,19 +1,24 @@
 /**
- * Ngân sách gọi tool sống XUYÊN các request của cùng một hội thoại.
+ * Trạng thái loop-guard theo HỘI THOẠI cho các tool server (web/memory/…).
  *
- * Vấn đề đã sửa: guarded() trong agent-tools.ts giữ bộ đếm và log dedupe
- * trong closure của buildAgentTools — mỗi request tạo bộ tool mới nên bộ đếm
- * reset về 0. Với agent coding, mỗi lần client thực thi fs_* xong là useChat
- * resubmit → request mới → trần "8 call mỗi lượt" thực chất là "8 call mỗi
- * request" (tối đa 8 resubmit × 8 = 64), và dedupe không chặn được vòng lặp
- * fs_list → fs_list lặp lại qua các resubmit.
+ * Vấn đề đã sửa: guarded() giữ bộ đếm/log trong closure của buildAgentTools —
+ * mỗi request tạo bộ tool mới nên trạng thái reset về 0. Với agent coding, mỗi
+ * lần client thực thi fs_* xong là useChat resubmit → request mới, nên detector
+ * phải sống XUYÊN request mới bắt được vòng lặp thật.
  *
- * Giải pháp: bucket theo conversationId, TTL tự dọn. Bộ nhớ tiến trình là đủ
- * — mất bucket khi restart chỉ có nghĩa là lượt đó được cấp ngân sách mới,
- * không phải lỗi bảo mật.
+ * Giải pháp: bucket theo conversationId, TTL tự dọn. Bộ nhớ tiến trình là đủ —
+ * mất bucket khi restart chỉ nghĩa là lượt đó bắt đầu lại lịch sử loop, không
+ * phải lỗi bảo mật.
+ *
+ * File này giữ: (1) trạng thái doom-loop (recentSignatures) và
+ * (2) host provenance (knownHosts). Trần tổng số call/lượt cùng dedupe "gọi
+ * trùng thì từ chối" và trần bước client (CLIENT_MAX_STEPS=48) đã bị XÓA —
+ * chúng là quota kiểu web-chat, chặn oan lần gọi lại hợp lệ của agent; vòng
+ * lặp bị chặn bởi doom-loop detector ở CẢ HAI tầng (server tools qua guarded
+ * và client tools qua wrapper executeClientToolCall).
  */
 
-import { MAX_TOOL_CALLS_PER_TURN, DOOM_LOOP_THRESHOLD } from '@/lib/tool-limits';
+import { DOOM_LOOP_THRESHOLD } from '@/lib/tool-limits';
 
 /** Bucket hết hạn sau khoảng này kể từ lần chạm cuối. */
 export const BUDGET_TTL_MS = 10 * 60_000;
@@ -23,21 +28,17 @@ const MAX_BUCKETS = 500;
 
 /**
  * Số chữ ký call gần nhất giữ lại để phát hiện vòng lặp. Đủ lớn để bắt
- * chuỗi lặp A→B→A→B mà dedupe call-trùng không thấy (mỗi call trùng chỉ
- * xuất hiện 1-2 lần trong window), đủ nhỏ để không phình bucket.
+ * chuỗi lặp A→B→A→B mà một bộ đếm call-trùng đơn thuần không thấy, đủ nhỏ để
+ * không phình bucket.
  */
 const DOOM_LOOP_WINDOW = 12;
 
 export interface ToolCallBudget {
-  /** Tổng số call đã dùng, cộng dồn qua mọi request của hội thoại. */
-  totalCalls: number;
-  /** key `${tool}:${args}` → số lần đã gọi. */
-  callCounts: Map<string, number>;
   /** Host đã có nguồn gốc hợp lệ, tích lũy qua các lượt (provenance). */
   knownHosts: Set<string>;
   /**
    * Chữ ký N lần gọi gần nhất (cũ → mới). Dùng cho doom-loop detector:
-   * đếm số lần lặp LIÊN TIẾP ở đuôi, khác với callCounts vốn đếm tổng.
+   * đếm số lần lặp LIÊN TIẾP ở đuôi.
    */
   recentSignatures: string[];
   touchedAt: number;
@@ -57,13 +58,12 @@ function sweep(now: number): void {
 
 /**
  * Lấy (hoặc tạo) bucket của hội thoại. `conversationId` rỗng/thiếu → trả
- * bucket dùng-một-lần, tức hành vi cũ theo từng request (không hồi quy khi
- * client không gửi id).
+ * bucket dùng-một-lần (không giữ trạng thái giữa các request).
  */
 export function getToolCallBudget(conversationId?: string | null): ToolCallBudget {
   const now = Date.now();
   if (!conversationId) {
-    return { totalCalls: 0, callCounts: new Map(), knownHosts: new Set(), recentSignatures: [], touchedAt: now };
+    return { knownHosts: new Set(), recentSignatures: [], touchedAt: now };
   }
   sweep(now);
   const existing = buckets.get(conversationId);
@@ -71,13 +71,7 @@ export function getToolCallBudget(conversationId?: string | null): ToolCallBudge
     existing.touchedAt = now;
     return existing;
   }
-  const fresh: ToolCallBudget = {
-    totalCalls: 0,
-    callCounts: new Map(),
-    knownHosts: new Set(),
-    recentSignatures: [],
-    touchedAt: now,
-  };
+  const fresh: ToolCallBudget = { knownHosts: new Set(), recentSignatures: [], touchedAt: now };
   buckets.set(conversationId, fresh);
   return fresh;
 }
@@ -98,9 +92,9 @@ export interface DoomLoopResult {
  * trigger — detector giữ ở đúng mép ngưỡng để lần sau vẫn báo, cho tới khi
  * model thực sự đổi hướng (call khác sẽ push signature mới, reset chuỗi).
  *
- * Chữ ký = `stableKey(name, args)` từ agent-tools.ts. Dedupe thuần (callCounts)
- * đã chặn call trùng THỨ HAI; doom-loop xử lý ca lặp liên tục từ thứ ba trở
- * lên bằng steering message mạnh hơn.
+ * Chữ ký = `stableKey(name, args)` từ agent-tools.ts. Đây là loop-guard DUY
+ * NHẤT còn lại sau khi bỏ dedupe: cùng một call lặp LIÊN TIẾP tới ngưỡng thì
+ * trả steering message mạnh buộc model đổi hướng.
  */
 export function checkDoomLoop(budget: ToolCallBudget, signature: string): DoomLoopResult {
   const recent = budget.recentSignatures;
@@ -122,16 +116,13 @@ export function checkDoomLoop(budget: ToolCallBudget, signature: string): DoomLo
 }
 
 /**
- * Đặt lại ngân sách khi người dùng gửi tin nhắn MỚI (không phải resubmit của
- * tool). Một lượt hội thoại mới xứng đáng có đủ trần call; nếu không, hội
- * thoại dài sẽ cạn ngân sách vĩnh viễn.
+ * Đặt lại lịch sử loop khi người dùng gửi tin nhắn MỚI (không phải resubmit
+ * của tool). Một lượt hội thoại mới không nên bị oan từ chuỗi lặp của lượt cũ.
  */
 export function resetToolCallBudget(conversationId?: string | null): void {
   if (!conversationId) return;
   const bucket = buckets.get(conversationId);
   if (!bucket) return;
-  bucket.totalCalls = 0;
-  bucket.callCounts.clear();
   bucket.recentSignatures.length = 0;
   bucket.touchedAt = Date.now();
   // knownHosts CỐ Ý giữ lại: URL người dùng dán ở lượt trước vẫn là nguồn
@@ -142,5 +133,3 @@ export function resetToolCallBudget(conversationId?: string | null): void {
 export function __clearAllToolCallBudgets(): void {
   buckets.clear();
 }
-
-export { MAX_TOOL_CALLS_PER_TURN };

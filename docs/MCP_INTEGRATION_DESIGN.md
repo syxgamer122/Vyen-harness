@@ -62,8 +62,8 @@
 **Tool definition** (`lib/agent-tools.ts`):
 - Vercel AI SDK `tool()` helper với Zod schemas
 - Tools: web_search, web_fetch, weather, exchange_rates, memory_search
-- Guard layers: dedupe/loop-guard, provenance tracking, injection guard
-- Budget: MAX_TOOL_CALLS_PER_TURN, TOOL_RESULT_MAX_CHARS
+- Guard layers: doom-loop guard, provenance tracking, injection guard
+- Budget: TOOL_RESULT_MAX_CHARS (trần ký tự mỗi kết quả tool)
 
 **Emulated tools** (`lib/emulated-agent.ts`):
 - Cho models KHÔNG hỗ trợ native function calling

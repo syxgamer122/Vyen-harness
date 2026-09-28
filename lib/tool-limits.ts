@@ -4,7 +4,6 @@
  * Trước đây các trần này nằm rải rác và không dẫn xuất từ nhau:
  *   - route.ts        maxSteps: 8        (server, native)
  *   - chat-interface  maxSteps: 48       (client, resubmit fs_*)
- *   - agent-tools     MAX_TOOL_CALLS_PER_TURN: 32
  *   - emulated-agent  10 rounds × 3 calls, result 6.000 ký tự
  *   - context-budget  TOOL_RESULT_ESTIMATE_CHARS: 24.000
  *   - fs-access       MAX_READ_CHARS: 24.000
@@ -72,28 +71,33 @@ export function serializeToolResult(
 /* ------------------------------------------------------------------ */
 
 /**
- * Trần số lần gọi tool SERVER trong một lượt chat (tính xuyên các resubmit
- * của client tool — xem tool-call-budget.ts). Tác vụ agent thật (tìm web +
- * đọc file + sửa + xác nhận) dễ vượt 8 call; dedupe call-trùng và note hướng
- * dẫn tổng hợp vẫn giữ nguyên nên tăng trần không mở đường vòng lặp vô hạn.
- */
-export const MAX_TOOL_CALLS_PER_TURN = 32;
-
-/**
  * Số step tối đa của một request /api/chat phía server (native function
  * calling). Mỗi step = một vòng model↔tool.
  */
 export const SERVER_MAX_STEPS = 8;
 
 /**
- * Số lần useChat tự resubmit sau khi client thực thi fs_*. Phải LỚN HƠN
- * SERVER_MAX_STEPS vì mỗi resubmit là một request server mới; đây là trần
- * của cả phiên agent coding phía trình duyệt. Mỗi call fs_* hoặc shell tốn 1
- * step — task nặng (refactor 10+ file: đọc, sửa, chạy shell, đọc lại xác
- * nhận) cần 30-50 call nên trần 48. Vẫn có dedupe call-trùng + budget server
- * chặn vòng lặp nên tăng trần không mở đường vòng lặp vô hạn.
+ * KHÔNG CÒN TRẦN BƯỚC CLIENT.
+ *
+ * Số lần useChat tự resubmit sau khi client thực thi tool — trước đây là trần
+ * 48 (CLIENT_MAX_STEPS). Trần cứng đó giết task agent dài: chạm 48 bước là
+ * useChat ngừng resubmit, onFinish không chốt gì (finishReason vẫn
+ * 'tool-calls'), stall detector 20s sau chỉ stop im lặng — agent "tắt ngóm"
+ * giữa task mà không một thông báo. Không coding agent nào (Claude Code,
+ * Codex CLI, Cline, Aider) tự đặt trần bước per-task kiểu này; họ chỉ dừng
+ * khi model không còn gọi tool hoặc người dùng bấm dừng.
+ *
+ * useChat (ai v4.3) cần maxSteps >= 2 để bật auto-resubmit, nên dùng
+ * MAX_SAFE_INTEGER làm "vô cực thực dụng". An toàn vì:
+ *  - doom-loop guard phía client (executeClientToolCall) chặn lặp y hệt;
+ *  - doom-loop guard phía server (guarded/checkDoomLoop) chặn web/memory;
+ *  - run-lifecycle: RUN_DEADLINE_MS 10 phút + stall detector 20s vẫn hiển
+ *    thị/dừng run chết thật (mất mạng, upstream treo);
+ *  - người dùng luôn bấm được Dừng.
+ * Chi phí token của vòng lặp dài là trách nhiệm của model + người dùng xem
+ * thấy, không phải việc harness tự chặn tay mình.
  */
-export const CLIENT_MAX_STEPS = 48;
+export const CLIENT_MAX_STEPS_UNBOUNDED = Number.MAX_SAFE_INTEGER;
 
 /** Đường emulated: số vòng model↔tool. Round cuối bị ép trả prose. */
 export const EMU_MAX_ROUNDS = 10;

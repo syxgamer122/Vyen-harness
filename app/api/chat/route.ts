@@ -104,6 +104,22 @@ const IDLE_TIMEOUT_MS = 90_000;
 const HEARTBEAT_MS = 10_000;
 const MAX_BODY_BYTES = 4.5 * 1024 * 1024;
 
+/* ------------------------------------------------------------------------- */
+/* Rate limit — chỉ còn bucket CHỐNG BRUTE-FORCE (request sai mã truy cập)    */
+/* ------------------------------------------------------------------------- */
+/* Vyen là harness agent coding local-first (BYOK), không còn là web chat:     */
+/* mỗi tool call client (fs_*, shell, git) resubmit một POST /api/chat, nên    */
+/* throttle request HỢP LỆ theo phút chính là tự chặn vòng lặp agent giữa     */
+/* task. Mọi coding agent (Claude Code, Codex CLI, Cline, Aider…) đều KHÔNG    */
+/* tự rate-limit vòng lặp của mình — chúng tôn trọng 429 của nhà cung cấp     */
+/* rồi backoff. Vì vậy bỏ hẳn trần request/phút cho request hợp lệ.            */
+/* Giữ ĐÚNG MỘT bucket: request SAI/THIẾU ACCESS_CODE bị đếm để chặn           */
+/* brute-force — lớp này không dính tới vòng lặp agent (mã đúng không tốn     */
+/* quota), cùng mô hình với /api/bridge.                                       */
+/** Trần request SAI mã/phút/IP — chống brute-force (bằng ngưỡng /api/bridge). */
+const CHAT_AUTH_RATE_LIMIT = 30;
+const CHAT_RATE_WINDOW_MS = 60_000;
+
 /* Port từ prime-agent (`isRetryableError`): lỗi TẠM THỜI của gateway thì thử
    lại ĐÚNG model đó một lần (kèm backoff ngắn) trước khi đốt model/key kế
    tiếp trong chuỗi failover — overload/rate-limit thường nhả sau vài trăm ms. */
@@ -961,25 +977,29 @@ export async function POST(req: Request) {
         ? rawCustomKey
         : undefined;
 
-    /* --- Tầng 2: Rate limit — PHẢI chạy trước verifyAccessAuth để mỗi lần
-       đoán sai ACCESS_CODE cũng tốn quota, không thể brute-force miễn phí. --- */
-    const clientIp = getClientIp(req as any);
-    const rateKey = `${customKey ? 'byok' : 'pool'}:${clientIp}`;
-    const rl = checkRateLimit(rateKey, customKey ? 60 : 20, 60_000);
-    if (!rl.ok) {
-      return jsonError(
-        requestId,
-        429,
-        'RATE_LIMITED',
-        `Bạn đang gửi tin nhắn quá nhanh. Vui lòng thử lại sau ${rl.retryAfterSec} giây.`,
-        undefined,
-        { 'Retry-After': String(rl.retryAfterSec) },
-      );
-    }
-
-    /* --- Tầng 3: Access code --- */
+    /* --- Tầng 2: Access code --- */
     const auth = verifyAccessAuth(req as any);
+
+    /* --- Tầng 3: Rate limit — CHỈ chặn brute-force mã truy cập ---
+       Request HỢP LỆ không bị đếm phút nào: mỗi tool call client (fs_*, shell,
+       git) resubmit một POST /api/chat, nên throttle theo phút chính là tự
+       chặn vòng lặp agent giữa task. Mã SAI vẫn bị đếm để chống brute-force. */
     if (!auth.ok) {
+      const rl = checkRateLimit(
+        `chat-auth:${getClientIp(req as any)}`,
+        CHAT_AUTH_RATE_LIMIT,
+        CHAT_RATE_WINDOW_MS,
+      );
+      if (!rl.ok) {
+        return jsonError(
+          requestId,
+          429,
+          'RATE_LIMITED',
+          `Bạn đang gửi tin nhắn quá nhanh. Vui lòng thử lại sau ${rl.retryAfterSec} giây.`,
+          undefined,
+          { 'Retry-After': String(rl.retryAfterSec) },
+        );
+      }
       console.warn(`[req:${requestId}][AUTH_UNAUTHORIZED] ${auth.error}`);
       return jsonError(requestId, auth.status ?? 401, 'UNAUTHORIZED', auth.error ?? 'Unauthorized');
     }
@@ -1057,7 +1077,7 @@ export async function POST(req: Request) {
        biết bằng: message cuối là 'user' và KHÔNG có assistant nào mang
        toolInvocations chờ xử lý ở cuối chuỗi. Resubmit sau khi client chạy
        fs_* luôn kết thúc bằng assistant + toolInvocations, nên không reset và
-       trần vẫn tính dồn đúng cho cả phiên agent. */
+       lịch sử loop giữ đúng chuỗi liên tiếp xuyên cả phiên agent. */
     {
       const last = parsed.data.messages[parsed.data.messages.length - 1];
       if (last?.role === 'user') resetToolCallBudget(conversationId);
@@ -2058,7 +2078,6 @@ export async function POST(req: Request) {
                         : { temperature: temperature ?? 0.7 }),
                       ...(modelConfig.maxOutputTokens ? { maxTokens: modelConfig.maxOutputTokens } : {}),
                       resolveClientTool: relaySubagentTool,
-                      conversationId,
                       onProgress: (phase, detail) => {
                         writeAnnotation({ subagent: { phase, ...detail } });
                       },
@@ -2130,7 +2149,6 @@ export async function POST(req: Request) {
                         /* context 'brief' của model mới kích hoạt build — lazy
                            nên đường thường không tốn chi phí trích xuất. */
                         getParentBrief: () => buildSubagentParentBrief(messages),
-                        conversationId,
                         onProgress: (phase, detail) => {
                           writeAnnotation({ subagent: { phase, ...detail } });
                         },
@@ -2199,7 +2217,6 @@ export async function POST(req: Request) {
                                 : {}),
                               resolveClientTool: relaySubagentTool,
                               getParentBrief: () => buildSubagentParentBrief(messages),
-                              conversationId,
                               onProgress: (phase, detail) => {
                                 writeAnnotation({ subagent: { phase, ...detail } });
                               },

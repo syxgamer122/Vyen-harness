@@ -54,7 +54,9 @@ Session/chat_recall, Scheduler, Headless CLI slash, Cost telemetry, ACP).
   model không đè được giá trị recipe cha gắn cứng) + tool `subrecipe__batch` (1-8 calls, validate tên +
   không trùng, kết quả giữ đúng thứ tự).
 - **Parallel cap 3** qua `runPool` (orchestrator/scheduler — semantics allSettled có sẵn, khớp
-  SUBAGENT_PARALLEL_CONCURRENCY). Ngân sách spawn dùng chung `subagent-budget`.
+  SUBAGENT_PARALLEL_CONCURRENCY). Ngân sách spawn dùng chung `subagent-budget` — **ĐÃ GỠ sau này**:
+  xóa hẳn module + trần 12 spawn/hội thoại (chỉ còn doom-loop guard), vì harness agent không tự
+  chặn vòng lặp của mình.
 - **Chặn đệ quy**: schema cấm inline chứa sub_recipes (superRefine); subagent là leaf worker — không
   `delegate`, không `subrecipe__*` trong bộ tool của nó.
 - **return_mode**: `summary` (default — subagent tự tóm tắt, cứng 2.000 ký tự + ghi chú) | `full`.

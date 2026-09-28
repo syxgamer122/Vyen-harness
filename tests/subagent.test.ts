@@ -22,11 +22,6 @@ import {
   type SubagentResult,
   type DelegateExecuteDeps,
 } from '@/lib/subagent';
-import {
-  consumeSubagentSpawns,
-  SUBAGENT_SPAWNS_PER_BUCKET,
-  resetSubagentBudgetForTests,
-} from '@/lib/subagent-budget';
 import { runEmulatedLoop } from '@/lib/emulated-agent';
 import { buildSubagentParentBrief } from '@/lib/context-compaction';
 import type { BudgetMessageLike } from '@/lib/context-budget';
@@ -454,98 +449,8 @@ describe('buildSubagentParentBrief', () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Ngân sách spawn theo conversation + result preview annotation         */
+/* result preview annotation                                            */
 /* ------------------------------------------------------------------ */
-
-describe('subagent budget — consumeSubagentSpawns', () => {
-  beforeEach(() => {
-    resetSubagentBudgetForTests();
-  });
-
-  it('cấp đủ cap rồi chặn; hội thoại khác độc lập', () => {
-    for (let i = 0; i < SUBAGENT_SPAWNS_PER_BUCKET; i++) {
-      expect(consumeSubagentSpawns('conv-a', 1).granted).toBe(1);
-    }
-    expect(consumeSubagentSpawns('conv-a', 1).granted).toBe(0);
-    expect(consumeSubagentSpawns('conv-b', 1).granted).toBe(1);
-  });
-
-  it('cấp một phần khi want lớn hơn số suất còn lại', () => {
-    consumeSubagentSpawns('conv-c', SUBAGENT_SPAWNS_PER_BUCKET - 2);
-    const grant = consumeSubagentSpawns('conv-c', 5);
-    expect(grant.granted).toBe(2);
-    expect(grant.remaining).toBe(0);
-  });
-
-  it('hết TTL thì bucket được cấp lại (giả lập đồng hồ)', () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-09-05T10:00:00Z'));
-      consumeSubagentSpawns('conv-ttl', SUBAGENT_SPAWNS_PER_BUCKET);
-      expect(consumeSubagentSpawns('conv-ttl', 1).granted).toBe(0);
-      vi.setSystemTime(new Date('2026-09-05T10:10:01Z')); // > BUDGET_TTL_MS
-      expect(consumeSubagentSpawns('conv-ttl', 1).granted).toBe(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('thiếu conversationId thì luôn cấp đủ, không bị cap', () => {
-    expect(consumeSubagentSpawns(undefined, 100).granted).toBe(100);
-    expect(consumeSubagentSpawns('', 100).granted).toBe(100);
-  });
-});
-
-describe('executeDelegate — ngân sách spawn', () => {
-  beforeEach(() => {
-    resetSubagentBudgetForTests();
-  });
-
-  it('đường đơn: hết ngân sách → error JSON, không spawn', async () => {
-    consumeSubagentSpawns('conv-x', SUBAGENT_SPAWNS_PER_BUCKET);
-    const out = JSON.parse(
-      await executeDelegate(
-        { instructions: 'task đủ dài để hợp lệ nè' },
-        makeDeps({ conversationId: 'conv-x' }),
-      ),
-    ) as { status: string; error?: string };
-    expect(out.status).toBe('error');
-    expect(out.error).toContain('ngân sách');
-    expect(runEmulatedLoop).not.toHaveBeenCalled();
-  });
-
-  it('batch sát cap: phần được cấp chạy, phần vượt error đúng vị trí', async () => {
-    mockLoopText('ok');
-    consumeSubagentSpawns('conv-y', SUBAGENT_SPAWNS_PER_BUCKET - 1); // còn 1 suất
-    const out = JSON.parse(
-      await executeDelegate(
-        {
-          tasks: [
-            { instructions: 'task một đủ dài để chạy được' },
-            { instructions: 'task hai cũng đủ dài vậy đó' },
-          ],
-        },
-        makeDeps({ conversationId: 'conv-y' }),
-      ),
-    ) as SubagentResult[];
-    expect(out).toHaveLength(2);
-    expect(out[0].status).toBe('done');
-    expect(out[0].result).toBe('ok');
-    expect(out[1].status).toBe('error');
-    expect(out[1].error).toContain('ngân sách');
-    expect(vi.mocked(runEmulatedLoop)).toHaveBeenCalledTimes(1);
-  });
-
-  it('không có conversationId thì không đếm — chạy tự do như cũ', async () => {
-    mockLoopText('ok');
-    for (let i = 0; i < 15; i++) {
-      const out = JSON.parse(
-        await executeDelegate({ instructions: `task lặp thứ ${i} đủ dài hợp lệ` }, makeDeps()),
-      ) as SubagentResult;
-      expect(out.status).toBe('done');
-    }
-  });
-});
 
 describe('done annotation — result preview', () => {
   it('gắn preview đúng trần SUBAGENT_RESULT_PREVIEW_CHARS', async () => {

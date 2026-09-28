@@ -57,7 +57,8 @@ import { ensureProviderSeed } from '@/lib/providers';
 import { type ThinkingLevel } from '@/lib/provider-url';
 import { estimatePromptTokens, shouldCompact, evaluateUsageTrigger, splitForCompaction } from '@/lib/context-budget';
 import { drainQueue, enqueueMessage, isQueueMode, type QueueMode } from '@/lib/message-queue';
-import { CLIENT_MAX_STEPS } from '@/lib/tool-limits';
+import { CLIENT_MAX_STEPS_UNBOUNDED } from '@/lib/tool-limits';
+import { checkClientDoomLoop, clientToolSignature } from '@/lib/client-doom-loop';
 import {
   resolveContextWindow,
   serializeForCompaction,
@@ -2765,6 +2766,23 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   const executeClientToolCall = useCallback(
     async (call: { toolCall: { toolName: string; args?: unknown } }): Promise<string> => {
       const toolName = call.toolCall.toolName;
+      /* Doom-loop guard phía CLIENT (đối xứng guarded() phía server): cùng một
+         (tool, args) lặp LIÊN TIẾP tới ngưỡng thì KHÔNG thực thi nữa — trả
+         note điều hướng, model tự đổi hướng. Đọc nhiều file khác nhau không
+         bao giờ dính (chữ ký gồm args, chỉ đếm chuỗi liên tiếp). */
+      const doom = checkClientDoomLoop(
+        chatKey,
+        clientToolSignature(toolName, call.toolCall.args),
+      );
+      if (doom.blocked) {
+        const steer = [
+          `Bạn đã gọi công cụ "${toolName}" với cùng tham số ${doom.counted} lần LIÊN TIẾP ` +
+          'mà không thu được gì mới. TUYỆT ĐỐI không lặp lại. Hãy: (1) đổi tham số hoặc dùng ' +
+          'công cụ khác, (2) nếu cần trạng thái mới thì chờ thay đổi thật rồi mới gọi lại, ' +
+          '(3) nếu vướng thì nói thẳng với người dùng bạn cần gì.',
+        ].join("");
+        return JSON.stringify({ note: steer });
+      }
       const result = await rawHandleClientToolCall(call);
       /* Chỉ đánh dấu khi tool thực sự CHẠY (không bị deny/policy chặn) —
          payload bị deny là thông điệp lỗi harness, không có dữ liệu ngoài. */
@@ -2939,8 +2957,12 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
     experimental_throttle: throttleMs,
     /* Client-executed tools (fs_*): onToolCall chạy trên máy user, trả kết quả
        tại chỗ; sau stream, maxSteps phía useChat tự resubmit để model đọc
-       kết quả — vòng lặp agent coding chạy xuyên nhiều request. */
-    maxSteps: CLIENT_MAX_STEPS,
+       kết quả — vòng lặp agent coding chạy xuyên nhiều request.
+       KHÔNG trần bước: task agent dài tự do chạy tới khi model ngừng gọi tool
+       hoặc người dùng bấm Dừng. Lặp vô hạn bị chặn ở tầng doom-loop client
+       (executeClientToolCall) + server (checkDoomLoop), và RUN_DEADLINE_MS
+       vẫn canh run chết thật. */
+    maxSteps: CLIENT_MAX_STEPS_UNBOUNDED,
     onToolCall: handleClientToolCall,
     onFinish: (message, { finishReason, usage }) => {
       /**

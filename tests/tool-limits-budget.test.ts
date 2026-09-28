@@ -19,7 +19,6 @@ import {
   checkDoomLoop,
 } from '@/lib/tool-call-budget';
 import {
-  MAX_TOOL_CALLS_PER_TURN,
   DOOM_LOOP_THRESHOLD,
   TOOL_RESULT_MAX_CHARS,
   serializeToolResult,
@@ -33,7 +32,7 @@ afterEach(() => {
 });
 
 describe('ngân sách gọi tool sống xuyên request', () => {
-  it('dedupe CHẶN gọi trùng ở request thứ hai của cùng hội thoại', async () => {
+  it('gọi trùng ở request sau VẪN chạy thật (không còn dedupe chặn)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -43,20 +42,20 @@ describe('ngân sách gọi tool sống xuyên request', () => {
       ),
     );
 
-    // Request 1 — bộ tool mới, gọi lần đầu: chạy thật.
     const first = await buildAgentTools({ conversationId: 'chat-1' }).web_search.execute!(
       { query: 'tin mới' },
       {} as never,
     );
     expect((first as any).results.length).toBeGreaterThan(0);
 
-    /* Request 2 = resubmit sau khi client chạy fs_* → buildAgentTools() được
-       gọi LẠI. Trước khi sửa, closure reset nên call trùng chạy lại từ đầu. */
+    /* Request 2 = resubmit sau khi client chạy fs_* → buildAgentTools() gọi LẠI.
+       Trước đây bị dedupe từ chối; nay phải chạy thật, không kèm note chặn. */
     const second = await buildAgentTools({ conversationId: 'chat-1' }).web_search.execute!(
       { query: 'tin mới' },
       {} as never,
     );
-    expect((second as any).note).toMatch(/đã gọi công cụ này rồi/i);
+    expect((second as any).note).toBeUndefined();
+    expect((second as any).results.length).toBeGreaterThan(0);
   });
 
   it('hội thoại KHÁC nhau không ảnh hưởng ngân sách của nhau', async () => {
@@ -76,42 +75,24 @@ describe('ngân sách gọi tool sống xuyên request', () => {
     expect((other as any).results.length).toBeGreaterThan(0);
   });
 
-  it('trần tổng call tính DỒN qua các request, không reset mỗi request', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })));
-    for (let i = 0; i < MAX_TOOL_CALLS_PER_TURN; i++) {
-      await buildAgentTools({ conversationId: 'burn' }).weather.execute!(
-        { location: `nơi-${i}` },
-        {} as never,
-      );
-    }
-    const overflow = await buildAgentTools({ conversationId: 'burn' }).weather.execute!(
-      { location: 'nơi-cuối' },
-      {} as never,
-    );
-    expect((overflow as any).note).toMatch(/giới hạn số lần gọi/i);
-  });
-
-  it('lượt người dùng MỚI reset trần nhưng GIỮ provenance host', () => {
+  it('lượt người dùng MỚI dọn lịch sử doom-loop nhưng GIỮ provenance host', () => {
     const bucket = getToolCallBudget('c1');
-    bucket.totalCalls = 7;
-    bucket.callCounts.set('web_search:{}', 1);
+    bucket.recentSignatures.push('web_search:{}');
     bucket.knownHosts.add('example.com');
 
     resetToolCallBudget('c1');
 
     const after = getToolCallBudget('c1');
-    expect(after.totalCalls).toBe(0);
-    expect(after.callCounts.size).toBe(0);
     // URL người dùng dán ở lượt trước vẫn hợp lệ cho web_fetch lượt sau.
     expect(after.knownHosts.has('example.com')).toBe(true);
-    // Lịch sử doom-loop cũng được dọn — lượt mới không bị oan từ lượt cũ.
+    // Lịch sử doom-loop được dọn — lượt mới không bị oan từ lượt cũ.
     expect(after.recentSignatures.length).toBe(0);
   });
 
-  it('không có conversationId → bucket dùng-một-lần (hành vi cũ, không rò rỉ)', () => {
+  it('không có conversationId → bucket dùng-một-lần (không rò rỉ trạng thái)', () => {
     const a = getToolCallBudget(undefined);
-    a.totalCalls = 5;
-    expect(getToolCallBudget(undefined).totalCalls).toBe(0);
+    a.knownHosts.add('leak.example');
+    expect(getToolCallBudget(undefined).knownHosts.size).toBe(0);
   });
 });
 
@@ -236,10 +217,9 @@ describe('trần kết quả tool', () => {
 });
 
 /**
- * Doom-loop detector (port doom_loop.rs của evot) — bắt chuỗi lặp LIÊN TIẾP
- * của cùng một call mà dedupe thuần không chặn được. Dedupe chặn call trùng
- * THỨ HAI bằng note nhẹ; doom-loop can thiệp từ lần thứ ba trở lên bằng
- * steering message mạnh hơn buộc model đổi hướng.
+ * Doom-loop detector (port doom_loop.rs của evot) — loop-guard DUY NHẤT còn
+ * lại cho tool server: cùng một call lặp LIÊN TIẾP tới ngưỡng thì trả steering
+ * message buộc model đổi hướng. Dedupe và trần call/lượt đã được gỡ.
  */
 describe('doom-loop detector', () => {
   it('call đầu tiên → không trigger, signature được ghi', () => {
@@ -323,13 +303,11 @@ describe('doom-loop qua guarded() — integration', () => {
 
     const tools = () => buildAgentTools({ conversationId: 'dl-int' });
 
-    // Lần 1: chạy thật
+    // Lần 1-2: chạy thật (chưa tới ngưỡng doom-loop)
     const first = await tools().web_search.execute!({ query: 'doom-test' }, {} as never);
     expect((first as any).results.length).toBeGreaterThan(0);
-
-    // Lần 2: dedupe note (nhẹ)
     const second = await tools().web_search.execute!({ query: 'doom-test' }, {} as never);
-    expect((second as any).note).toMatch(/đã gọi công cụ này rồi/i);
+    expect((second as any).note).toBeUndefined();
 
     // Lần 3+: doom-loop steering (mạnh)
     for (let i = 0; i < 3; i++) {
@@ -358,10 +336,8 @@ describe('doom-loop qua guarded() — integration', () => {
     // Call khác xen vào
     await tools().web_search.execute!({ query: 'q2' }, {} as never);
 
-    // q1 lại xuất hiện — counted reset về 1, không trigger
+    // q1 lại xuất hiện — counted reset về 1, chạy thật, KHÔNG phải doom-loop
     const after = await tools().web_search.execute!({ query: 'q1' }, {} as never);
-    // Vẫn bị dedupe (seen > 0) nhưng KHÔNG phải doom-loop
-    expect((after as any).note).toMatch(/đã gọi công cụ này rồi/i);
-    expect((after as any).note).not.toMatch(/LIÊN TIẾP/i);
+    expect((after as any).note).toBeUndefined();
   });
 });

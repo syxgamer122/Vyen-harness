@@ -26,7 +26,7 @@ import { fetchRates, fetchWeather } from '@/lib/live-tools';
 import { WEB_LIMITS } from '@/lib/web-context';
 import { judgeInjection } from '@/lib/injection-guard';
 import { getToolCallBudget, checkDoomLoop } from '@/lib/tool-call-budget';
-import { MAX_TOOL_CALLS_PER_TURN, TOOL_RESULT_MAX_CHARS } from '@/lib/tool-limits';
+import { TOOL_RESULT_MAX_CHARS } from '@/lib/tool-limits';
 import { redactSecretsDeep } from '@/lib/secret-registry';
 import { isMcpToolKey } from '@/lib/mcp/tool-mapper';
 import { TOOL_CATALOG } from '@/lib/tool-catalog';
@@ -70,9 +70,6 @@ export interface AgentToolsOptions {
    */
   conversationId?: string | null;
 }
-
-/** Trần số lần gọi tool MỌI LOẠI trong một lượt chat. */
-export { MAX_TOOL_CALLS_PER_TURN };
 
 /* ------------------------------------------------------------------ */
 /* Tìm ghi nhớ (thuần, test được không cần Dexie)                      */
@@ -267,7 +264,6 @@ export function buildAgentTools(
      thì trần và dedupe reset sạch, đúng kịch bản vòng lặp fs_list vô hạn đã
      gặp. Không có conversationId → bucket dùng-một-lần (hành vi cũ). */
   const budget = getToolCallBudget(opts.conversationId);
-  const callCounts = budget.callCounts;
   const knownHosts = budget.knownHosts;
   for (const h of opts.allowedHosts ?? []) {
     const host = hostOf(h);
@@ -287,20 +283,14 @@ export function buildAgentTools(
     run: () => Promise<Record<string, unknown>>,
     errorFallback: Record<string, unknown> = {},
   ): Promise<Record<string, unknown>> {
-    budget.totalCalls += 1;
     budget.touchedAt = Date.now();
-    if (budget.totalCalls > MAX_TOOL_CALLS_PER_TURN) {
-      return {
-        ...errorFallback,
-        note:
-          'Đã đạt giới hạn số lần gọi công cụ của lượt này. Hãy tổng hợp câu trả lời từ dữ liệu đã có.',
-      };
-    }
     const key = stableKey(name, args);
-    /* Doom-loop TRƯỚC dedupe: dedupe chỉ chặn call trùng THỨ HAI bằng note
-       nhẹ; nếu model vẫn ngoan cố lặp lần 3-4-5 (điển hình khi gateway yếu),
-       cần tín hiệu MẠNH hơn — steering message bắt đổi hướng. Detector đếm
-       chuỗi LẶP LIÊN TIẾP ở đuôi, khác với callCounts đếm tổng. */
+    /* Loop-guard DUY NHẤT còn lại: doom-loop — cùng một (tool, args) lặp
+       LIÊN TIẾP tới ngưỡng thì trả steering message buộc model đổi hướng.
+       Đã gỡ dedupe "gọi trùng thì từ chối" và trần tổng call/lượt: cả hai là
+       quota kiểu web-chat, chặn oan lần gọi lại HỢP LỆ (vd search lại sau khi
+       ngữ cảnh đổi). Số bước vẫn bị chặn ở tầng useChat/SERVER_MAX_STEPS nên
+       không mở đường vòng lặp vô hạn. */
     const doom = checkDoomLoop(budget, key);
     if (doom.triggered) {
       return {
@@ -310,15 +300,6 @@ export function buildAgentTools(
           'mà không thu được gì mới. TUYỆT ĐỐI không lặp lại. Hãy: (1) thử một công cụ ' +
           'khác, (2) đổi tham số, hoặc (3) nếu đang vướng thì nói thẳng với người dùng ' +
           'bạn vướng ở đâu và cần họ hỗ trợ gì.',
-      };
-    }
-    const seen = callCounts.get(key) ?? 0;
-    callCounts.set(key, seen + 1);
-    if (seen > 0) {
-      return {
-        ...errorFallback,
-        note:
-          'Bạn đã gọi công cụ này rồi với cùng tham số và đã có kết quả. Dùng lại kết quả đó, đừng gọi lại.',
       };
     }
     try {

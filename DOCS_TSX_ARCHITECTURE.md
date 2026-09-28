@@ -397,7 +397,7 @@ RootLayout (app/layout.tsx)
 
 ### Hiện Trạng Đã Hoàn Thành — [181/181 Test Files PASS · 2,569/2,569 Tests PASS]
 
-> **Đồng bộ 2026-09-26**: mốc kiểm chứng hiện tại đạt đúng **181 file `tests/*.test.ts`** và **2,550 tests PASS** (đã đóng toàn bộ residual P0/P0.5 sau đợt S3/S3b và hoàn tất toàn diện PR 1, PR 2, PR 3, PR 4, PR 5, Phase 4, Phase 5).
+> **Đồng bộ 2026-09-26**: mốc kiểm chứng hiện tại đạt đúng **183 file `tests/*.test.ts`** và **2,550 tests PASS** (đã đóng toàn bộ residual P0/P0.5 sau đợt S3/S3b và hoàn tất toàn diện PR 1, PR 2, PR 3, PR 4, PR 5, Phase 4, Phase 5).
 > Toàn bộ đặc tả kiến trúc — **63 file `.tsx`** (tổng cộng **14,379 dòng code** loại trừ trailing newline / **14,442 dòng** tính cả trailing newline),
 > schema Dexie v19, danh sách API route — đã đối chiếu lại và khớp tuyệt đối 100% với codebase.
 > Vòng 2 (2026-09-24, HEAD `3febca9`): Egress Guard đã nối dây thật (A5) + CSP (A8) — chi tiết §5.0.

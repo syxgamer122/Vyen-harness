@@ -12,7 +12,6 @@ import { tool, type LanguageModel, type ToolSet } from 'ai';
 import { z } from 'zod';
 import { runPool } from '@/lib/orchestrator/scheduler';
 import { runSubagent, type SubagentOptions, type SubagentResult } from '@/lib/subagent';
-import { consumeSubagentSpawns, SUBAGENT_SPAWNS_PER_BUCKET } from '@/lib/subagent-budget';
 import type { AgentToolSet } from '@/lib/agent-tools';
 import { prepareRecipeRun } from './run';
 import {
@@ -38,12 +37,7 @@ export interface SubRecipeExecDeps {
   temperature?: number;
   maxTokens?: number;
   resolveClientTool?: SubagentOptions['resolveClientTool'];
-  conversationId?: string;
   onProgress?: SubagentOptions['onProgress'];
-}
-
-function spawnBudgetError(): string {
-  return `Đã hết ngân sách subagent (${SUBAGENT_SPAWNS_PER_BUCKET} lần) — tự làm phần việc còn lại trực tiếp.`;
 }
 
 /** Áp tool policy của SUB-recipe lên bản sao client tool names. */
@@ -114,8 +108,6 @@ export function buildSubRecipeServerTools(
       description: buildSubRecipeToolDescription(sub),
       parameters: buildSubRecipeParameters(sub.recipe.parameters, sub.fixedValues),
       execute: async (args: unknown) => {
-        const grant = consumeSubagentSpawns(deps.conversationId, 1);
-        if (grant.granted < 1) return JSON.stringify({ status: 'error', error: spawnBudgetError() });
         const result = await runOneSubRecipe(sub, (args ?? {}) as Record<string, unknown>, deps);
         return JSON.stringify(result);
       },
@@ -142,11 +134,8 @@ export function buildSubRecipeServerTools(
       const plan = planSubRecipeBatch(calls, subs);
       if (!plan.ok) return JSON.stringify({ status: 'error', error: plan.error });
 
-      const grant = consumeSubagentSpawns(deps.conversationId, plan.entries.length);
-      const runnable = grant.granted >= plan.entries.length ? plan.entries : plan.entries.slice(0, grant.granted);
-
       const outcomes = await runPool({
-        items: runnable,
+        items: plan.entries,
         limit: SUBRECIPE_PARALLEL_CONCURRENCY,
         signal: deps.abortSignal,
         worker: (entry, index) =>
@@ -158,7 +147,7 @@ export function buildSubRecipeServerTools(
                     ...detail,
                     task: `subrecipe:${entry.sub.name}`,
                     taskIndex: index,
-                    taskTotal: runnable.length,
+                    taskTotal: plan.entries.length,
                   })
               : undefined,
           }),
@@ -179,19 +168,6 @@ export function buildSubRecipeServerTools(
               error: o.error,
             },
       );
-      for (let i = runnable.length; i < plan.entries.length; i++) {
-        results.push({
-          result: '',
-          turnsUsed: 0,
-          toolCalls: 0,
-          status: 'error',
-          runId: '',
-          mode: 'worker',
-          startedAt: 0,
-          durationMs: 0,
-          error: spawnBudgetError(),
-        });
-      }
       return JSON.stringify(results);
     },
   });
