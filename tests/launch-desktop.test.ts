@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -784,6 +784,84 @@ describe('launch-desktop.cjs cross-platform server launcher', () => {
     // Không được chứa cờ --app-id vì Chromium sẽ cố tìm Chrome App extension thay vì mở URL
     const hasAppId = args.some((a: string) => a.startsWith('--app-id'));
     expect(hasAppId).toBe(false);
+  });
+});
+
+/**
+ * Ngân sách chờ server khởi động.
+ *
+ * `next dev` của Next 16 lazy compile: không route nào được build sẵn, toàn bộ
+ * chi phí dồn vào request đầu tiên. Đo thực tế trên máy dev: server ready sau
+ * ~1.7s nhưng request đầu 41-78s khi cache lạnh. Mốc 60s cũ khiến launcher báo
+ * "Timeout chờ Next.js server khởi động" dù server sắp lên. Các test dưới khoá
+ * lại hành vi này — trước đây chưa có test nào chạm ngưỡng thật.
+ */
+describe('launch-desktop.cjs ngân sách chờ server (cold start Next 16)', () => {
+  const OLD_ENV = process.env.VYEN_STARTUP_TIMEOUT_MS;
+
+  afterEach(() => {
+    if (OLD_ENV === undefined) delete process.env.VYEN_STARTUP_TIMEOUT_MS;
+    else process.env.VYEN_STARTUP_TIMEOUT_MS = OLD_ENV;
+  });
+
+  it('mặc định chờ 180s, đủ cho cold start đo được 41-78s', () => {
+    delete process.env.VYEN_STARTUP_TIMEOUT_MS;
+
+    // Đảo điều kiện: nếu đưa về 60s, expect dưới đỏ.
+    expect(launcher.startupTimeoutFromEnv()).toBe(180_000);
+    expect(launcher.DEFAULT_STARTUP_TIMEOUT_MS).toBe(180_000);
+  });
+
+  it('VYEN_STARTUP_TIMEOUT_MS nâng/giảm được ngân sách, env rác thì rơi về mặc định', () => {
+    process.env.VYEN_STARTUP_TIMEOUT_MS = '300000';
+    expect(launcher.startupTimeoutFromEnv()).toBe(300_000);
+
+    // Máy nhanh hơn nhiều thì người dùng tự hạ được
+    process.env.VYEN_STARTUP_TIMEOUT_MS = '30000';
+    expect(launcher.startupTimeoutFromEnv()).toBe(30_000);
+
+    // Rác → mặc định, không NaN (NaN sẽ khiến deadline vô hạn)
+    for (const bad of ['', 'abc', '-5', '0', '12.5']) {
+      process.env.VYEN_STARTUP_TIMEOUT_MS = bad;
+      expect(launcher.startupTimeoutFromEnv()).toBe(launcher.DEFAULT_STARTUP_TIMEOUT_MS);
+    }
+  });
+
+  it('timeoutMs truyền tường minh vẫn thắng env và mặc định', async () => {
+    // Cổng 3457 cố định + customPort: né được nhánh R2 reconnect, nên launcher
+    // buộc phải spawn thật rồi tới deadline. Cổng lấy động (listen(0)) sẽ hỏng
+    // khi máy đang chạy sẵn một Vyen server ở 3000 — R2 thấy nó và trả về URL.
+    //
+    // Env đặt cố ý cao hơn nhiều: nếu launcher ưu tiên env, test sẽ treo tới
+    // 300s (vượt cả testTimeout của vitest) thay vì kết thúc sau 150ms.
+    process.env.VYEN_STARTUP_TIMEOUT_MS = '300000';
+    const mockSpawn = () => ({ pid: 42424, on: () => {} }) as any;
+    const started = Date.now();
+    await expect(
+      launcher.startServerIfNeeded([3457], {
+        customPort: 3457,
+        spawnFn: mockSpawn,
+        timeoutMs: 150,
+        probeTimeoutMs: 40,
+        pollIntervalMs: 20,
+      })
+    ).rejects.toThrow('Timeout');
+
+    // 150ms deadline: phải kết thúc nhanh, không phải chờ 180s mặc định
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it('thông báo timeout chỉ đích danh nguyên nhân và cách xử lý', async () => {
+    const mockSpawn = () => ({ pid: 42425, on: () => {} }) as any;
+    await expect(
+      launcher.startServerIfNeeded([3457], {
+        customPort: 3457,
+        spawnFn: mockSpawn,
+        timeoutMs: 150,
+        probeTimeoutMs: 40,
+        pollIntervalMs: 20,
+      })
+    ).rejects.toThrow(/biên dịch lần đầu|VYEN_STARTUP_TIMEOUT_MS/);
   });
 });
 

@@ -48,6 +48,19 @@ const nextConfig = {
      Cho phép cả hai tên máy cục bộ để shell không mất chunk JS. */
   allowedDevOrigins: ['127.0.0.1', 'localhost', '*.monkeycode-ai.live'],
 
+  /* Dự án nằm trong Downloads trên filesystem mà Next cảnh báo "Slow
+     filesystem" (~400-550ms). Với mặc định 'auto', Turbopack sau khi snapshot
+     cache ra đĩa sẽ 'evict' bản trong RAM rồi phải đọc lại từ đĩa mỗi lần —
+     đọc lại trên đĩa chậm thì tệ hơn nhiều so với giữ trong RAM.
+     `false` = không evict, cache nằm trong RAM suốt đời process.
+
+     Chỉ có tác dụng ở `next dev` khi FileSystem Cache bật (mặc định từ 16.1+).
+     Đánh đổi: giữ cache trong RAM tốn RAM hơn — `.next/dev` của repo này
+     lớn ~442MB, nên nếu máy thiếu RAM thì bỏ mục này lại. */
+  experimental: {
+    turbopackMemoryEviction: false,
+  },
+
   /* A8-CSP: áp cho mọi route — header tĩnh, không cần async vì không dùng
      nonce (khối chống flash theme ở app/layout.tsx dùng 'unsafe-inline'). */
   headers() {

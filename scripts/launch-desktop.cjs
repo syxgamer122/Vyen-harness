@@ -662,6 +662,24 @@ function checkHasProductionBuild() {
   return fs.existsSync(buildIdPath) && fs.existsSync(serverDir);
 }
 
+/** Ngân sách chờ (ms) cho server sẵn sàng. Env cho phép máy chậm nâng lên. */
+const DEFAULT_STARTUP_TIMEOUT_MS = 180_000;
+
+function startupTimeoutFromEnv() {
+  const raw = process.env.VYEN_STARTUP_TIMEOUT_MS;
+  if (!raw) return DEFAULT_STARTUP_TIMEOUT_MS;
+  // `Number` chứ không `parseInt`: parseInt('12.5') = 12 lặng lẽ, biến deadline
+  // thành 12ms và launcher fail tức thì. Chỉ nhận số nguyên dương.
+  const parsed = Number(raw.trim());
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    console.warn(
+      `[vyen-launcher] VYEN_STARTUP_TIMEOUT_MS="${raw}" không hợp lệ — dùng mặc định ${Math.round(DEFAULT_STARTUP_TIMEOUT_MS / 1000)}s.`
+    );
+    return DEFAULT_STARTUP_TIMEOUT_MS;
+  }
+  return parsed;
+}
+
 function spawnServerProcess(runSubcmd, env, options = {}) {
   const targetPort = options.port || customPort;
   const targetWorkspace =
@@ -773,7 +791,15 @@ async function startServerIfNeeded(candidatePorts = PORTS, options = {}) {
   const optCustomWorkspace = options.customWorkspace !== undefined ? options.customWorkspace : customWorkspace;
   const optForceDev = options.forceDev !== undefined ? options.forceDev : forceDev;
   const optSpawnFn = options.spawnFn || spawnServerProcess;
-  const optTimeoutMs = options.timeoutMs || 60_000;
+  // `next dev` của Next 16 lazy compile: không route nào được build sẵn, nên
+  // request đầu tiên phải chờ Turbopack dựng route (đo thực tế trên máy dev:
+  // 41-78s khi cache lạnh, vài chục ms khi cache ấm — server thì luôn ready
+  // sau ~1.7s). 60s là quá ngắn cho cold start trên filesystem chậm nên
+  // launcher báo timeout dù server sắp lên; 180s có dư để cover đo được.
+  const optTimeoutMs = options.timeoutMs || startupTimeoutFromEnv();
+  // Probe đơn lẻ giữ nguyên ngắn: nó chỉ là "server còn sống không", và deadline
+  // tổng mới là lúc hết hy vọng. Trả về nhanh còn giữ được nhịp poll 1s nên
+  // việc một request phải chờ compile không làm lãng phí cửa sổ 2.5s.
   const optProbeTimeoutMs = options.probeTimeoutMs || 2500;
   const optPollIntervalMs = options.pollIntervalMs || 1000;
 
@@ -864,10 +890,12 @@ async function startServerIfNeeded(candidatePorts = PORTS, options = {}) {
   });
 
   const deadline = Date.now() + optTimeoutMs;
+  const waitStartedAt = Date.now();
   // Chỉ thăm dò cổng mà Next.js được chỉ định khởi động (tránh trễ do cổng chiếm dụng và tránh nhầm lẫn instance)
   const probePorts = [selectedPort];
   try {
     let firstTick = true;
+    let lastReportedSec = -1;
     while (Date.now() < deadline) {
       if (childExited) {
         cleanupChild();
@@ -882,10 +910,25 @@ async function startServerIfNeeded(candidatePorts = PORTS, options = {}) {
         console.log(`[vyen-launcher] Server đã sẵn sàng tại ${url}!`);
         return url;
       }
+      // Cold start hợp lệ có thể mất hàng chục giây (compile lần đầu). Không có
+      // dòng này thì người dùng chỉ thấy launcher treo im, không phân biệt được
+      // với treo thật — giữ nhịp 15s để không spam log.
+      const waitedSec = Math.floor((Date.now() - waitStartedAt) / 1000);
+      if (waitedSec - lastReportedSec >= 15) {
+        lastReportedSec = waitedSec;
+        console.log(
+          `[vyen-launcher] Đang chờ Next.js biên dịch lần đầu... ${waitedSec}s/${Math.round(optTimeoutMs / 1000)}s`
+        );
+      }
     }
 
     cleanupChild();
-    throw new Error('Timeout chờ Next.js server khởi động.');
+    throw new Error(
+      `Timeout chờ Next.js server khởi động (${Math.round(optTimeoutMs / 1000)}s). ` +
+        'Máy có thể đang biên dịch lần đầu chậm (filesystem chậm). ' +
+        'Cách nhanh nhất: nâng ngân sách bằng VYEN_STARTUP_TIMEOUT_MS=<ms>. ' +
+        'Còn nếu muốn cache ấm sẵn: `npm run build` (lưu ý launcher sẽ chuyển sang chạy `next start` — mất Fast Refresh).'
+    );
   } catch (err) {
     cleanupChild();
     throw err;
@@ -1015,6 +1058,8 @@ if (require.main === module) {
 
 module.exports = {
   DEFAULT_PORTS,
+  DEFAULT_STARTUP_TIMEOUT_MS,
+  startupTimeoutFromEnv,
   resolveNextBin,
   resolveNpmCli,
   checkHasProductionBuild,
