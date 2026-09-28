@@ -23,6 +23,7 @@ let customPort = process.env.PORT ? parseInt(process.env.PORT, 10) : null;
 let customWorkspace = process.env.VYEN_WORKSPACE_ROOT || null;
 let customWindowSize = '1360,880';
 let forceDev = false;
+let forceProd = false;
 let noOpen = false;
 
 for (let i = 0; i < rawArgs.length; i++) {
@@ -39,6 +40,9 @@ Tùy chọn:
   --workspace, -w <path>       Thư mục làm việc (Workspace root)
   --window-size <width,height> Kích thước cửa sổ (mặc định: 1360,880)
   --dev                        Bắt buộc chạy server ở chế độ dev (next dev)
+  --prod, --start              Bắt buộc chạy production build (next start).
+                               Cần 'npm run build' trước; lạnh ~1-2s thay vì 7-80s
+                               của 'next dev' (vốn compile lần đầu), nhưng mất Fast Refresh.
   --no-open                    Chỉ khởi động server, không mở cửa sổ browser
   --help, -h                   Hiển thị hướng dẫn này
 `);
@@ -65,6 +69,8 @@ Tùy chọn:
     customWindowSize = a.slice('--window-size='.length);
   } else if (a === '--dev') {
     forceDev = true;
+  } else if (a === '--prod' || a === '--start') {
+    forceProd = true;
   } else if (a === '--no-open') {
     noOpen = true;
   }
@@ -790,6 +796,7 @@ async function startServerIfNeeded(candidatePorts = PORTS, options = {}) {
 
   const optCustomWorkspace = options.customWorkspace !== undefined ? options.customWorkspace : customWorkspace;
   const optForceDev = options.forceDev !== undefined ? options.forceDev : forceDev;
+  const optForceProd = options.forceProd !== undefined ? options.forceProd : forceProd;
   const optSpawnFn = options.spawnFn || spawnServerProcess;
   // `next dev` của Next 16 lazy compile: không route nào được build sẵn, nên
   // request đầu tiên phải chờ Turbopack dựng route (đo thực tế trên máy dev:
@@ -850,7 +857,17 @@ async function startServerIfNeeded(candidatePorts = PORTS, options = {}) {
   }
 
   const hasBuild = checkHasProductionBuild();
-  const runSubcmd = (!optForceDev && hasBuild) ? 'start' : 'dev';
+  // `--prod` khi chưa có build: `next start` sẽ chết ngay với lỗi khó hiểu
+  // ("Could not find a production build"), nên báo trước và chỉ rõ cách sửa.
+  if (optForceProd && !hasBuild) {
+    cleanupChild();
+    throw new Error(
+      'Yêu cầu --prod nhưng chưa có production build trong .next.\n' +
+        'Chạy `npm run build` một lần trước, rồi mở lại app.\n' +
+        '(Bỏ --prod để chạy `next dev` bình thường.)'
+    );
+  }
+  const runSubcmd = optForceProd || (!optForceDev && hasBuild) ? 'start' : 'dev';
 
   console.log(`[vyen-launcher] Chưa có server, đang khởi động Next.js (${runSubcmd}) trên cổng ${selectedPort}...`);
 

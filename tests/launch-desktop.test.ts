@@ -865,6 +865,90 @@ describe('launch-desktop.cjs ngân sách chờ server (cold start Next 16)', () 
   });
 });
 
+/**
+ * Cờ `--prod`: ép chạy `next start` (production build).
+ *
+ * Launcher mặc định chọn `start` khi có `.next/BUILD_ID`, `dev` khi không.
+ * `--dev` đã có sẵn để ép ngược lại; thiếu `--prod` nên không có cách nói
+ * "dùng production build" mà không phải nhớ chạy `npm run build` trước.
+ */
+describe('launch-desktop.cjs cờ --prod', () => {
+  // Không spy `checkHasProductionBuild`: launcher gọi hàm nội bộ nên spy trên
+  // export không bắt được. Thay vào đó chọn tổ hợp (forceProd, có build thật
+  // trong .next) — đây là điều kiện launcher thật sự dùng.
+  const hasBuild = launcher.checkHasProductionBuild();
+
+  it.skipIf(hasBuild)('--prod khi chưa có build thì báo cách sửa, không spawn', async () => {
+    // Nhánh này phải chặn TRƯỚC khi gọi spawnFn: `next start` không có build
+    // sẽ chết ngay với lỗi khó hiểu ("Could not find a production build").
+    let spawned = false;
+
+    await expect(
+      launcher.startServerIfNeeded([3457], {
+        customPort: 3457,
+        forceProd: true,
+        spawnFn: () => {
+          spawned = true;
+          return { pid: 51515, on: () => {} } as any;
+        },
+        timeoutMs: 150,
+        probeTimeoutMs: 40,
+        pollIntervalMs: 20,
+      })
+    ).rejects.toThrow(/npm run build/);
+
+    // Đảo điều kiện: nếu launcher spawn dù thiếu build, expect dưới đỏ.
+    expect(spawned).toBe(false);
+  });
+
+  it.skipIf(!hasBuild)('--prod khi CÓ build thì spawn lệnh "start" (không phải "dev")', async () => {
+    let subcmd: string | null = null;
+
+    try {
+      const promise = launcher.startServerIfNeeded([3457], {
+        customPort: 3457,
+        forceProd: true,
+        spawnFn: (cmd: string) => {
+          subcmd = cmd;
+          return { pid: 52525, on: () => {} } as any;
+        },
+        timeoutMs: 150,
+        probeTimeoutMs: 40,
+        pollIntervalMs: 20,
+      });
+      await expect(promise).rejects.toThrow();
+
+      // Đảo điều kiện: nếu rơi về 'dev', expect dưới đỏ.
+      expect(subcmd).toBe('start');
+    } finally {
+      launcher.cleanupChild();
+    }
+  });
+
+  it.skipIf(!hasBuild)('--dev vẫn thắng khi có build (giữ hành vi Fast Refresh)', async () => {
+    let subcmd: string | null = null;
+
+    try {
+      const promise = launcher.startServerIfNeeded([3457], {
+        customPort: 3457,
+        forceDev: true,
+        spawnFn: (cmd: string) => {
+          subcmd = cmd;
+          return { pid: 53535, on: () => {} } as any;
+        },
+        timeoutMs: 150,
+        probeTimeoutMs: 40,
+        pollIntervalMs: 20,
+      });
+      await expect(promise).rejects.toThrow();
+
+      expect(subcmd).toBe('dev');
+    } finally {
+      launcher.cleanupChild();
+    }
+  });
+});
+
 describe('launch-desktop.cjs bridge token — khóa /api/bridge theo phiên server', () => {
   /** Lấy một cổng trống (bind rồi release) cho các test spawn giả lập. */
   async function getFreePort(): Promise<number> {
