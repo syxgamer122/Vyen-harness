@@ -42,17 +42,29 @@ describe('globals.css — không còn @import render-blocking', () => {
   });
 });
 
-describe('layout.tsx — đúng một nguồn Pixelify Sans', () => {
+describe('layout.tsx — không còn font Pixelify, chỉ next/font tự host', () => {
   const layout = read('../app/layout.tsx');
 
-  it('chỉ <link> là nguồn tải Pixelify (không tải kép qua CSS)', () => {
-    expect((layout.match(/Pixelify/g) ?? []).length).toBe(1);
-    expect(layout).toMatch(/<link[^>]*Pixelify\+Sans[^>]*rel="stylesheet"/);
+  /*
+   * Trước đây test này canh "đúng MỘT nguồn tải Pixelify qua <link>". Pixelify
+   * đã bị gỡ khỏi hệ thiết kế (thay bằng Patrick Hand qua `next/font`, tự
+   * host ở build) nên giờ KHÔNG còn <link> font nào trong <head> — mọi họ
+   * font đều đi qua `next/font/google`, tức không có request nào ra
+   * fonts.googleapis.com lúc chạy.
+   *
+   * Bất biến còn giữ nguyên: KHÔNG được thêm lại <link> font thủ công, vì
+   * đó là một chuỗi request render-blocking nối đuôi sau CSS chính — đúng
+   * thứ `globals.css` đã dâng @import vì lý do này.
+   */
+  it('không còn <link> tải font thủ công (mọi họ đi qua next/font)', () => {
+    expect(layout).not.toMatch(/Pixelify/);
+    expect(layout).not.toMatch(/fonts\.googleapis\.com\/css2/);
+    expect(layout).not.toMatch(/rel="stylesheet"[^>]*font/i);
   });
 
-  it('có preconnect cho cả fonts.googleapis.com và fonts.gstatic.com', () => {
-    expect(layout).toMatch(/<link[^>]*rel="preconnect"[^>]*https:\/\/fonts\.googleapis\.com/);
-    expect(layout).toMatch(/<link[^>]*rel="preconnect"[^>]*https:\/\/fonts\.gstatic\.com[^>]*crossOrigin/);
+  it('không có @import nào trong globals.css (không render-blocking)', () => {
+    const css = read('../app/globals.css');
+    expect(css).not.toMatch(/^[ \t]*@import/m);
   });
 });
 

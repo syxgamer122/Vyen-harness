@@ -18,32 +18,34 @@ const token = (name: string) => `rgb(var(${name}) / <alpha-value>)`
  * Chỉ dùng cho token KHÔNG nằm trong hệ thống channel RGB.
  */
 const hex = {
-  sunken: '#07090d',
-  base: '#0b0e13',
-  surface: '#12161d',
-  raised: '#1a1f27',
-  overlay: '#20262f',
+  sunken: '#f2f2ef',
+  base: '#fafaf8',
+  surface: '#ffffff',
+  raised: '#eeeeeb',
+  overlay: '#ffffff',
 
-  primary: '#e8eaed',
-  secondary: '#a7b0bb',
-  tertiary: '#7c8794',
-  disabled: '#5c6673',
+  primary: '#18181b',
+  secondary: '#52525b',
+  tertiary: '#6b6b73',
+  disabled: '#a1a1aa',
 
-  subtle: '#1c222a',
-  default: '#3a4552',
-  strong: '#5a6675',
+  subtle: '#dcdcd8',
+  default: '#2a2a2e',
+  strong: '#18181b',
 
-  accent: '#7cb7ea',
-  'accent-dim': '#3f6a94',
-  success: '#5bbd7f',
-  warning: '#e0a04a',
-  danger: '#ef6f5c',
-  info: '#63b3d6',
-  reasoning: '#a78bd4',
+  accent: '#2a7360',
+  'accent-dim': '#8fc7b8',
+  'accent-mint': '#98d8c8',
+  'on-fill': '#ffffff',
+  success: '#2a7347',
+  warning: '#9a6206',
+  danger: '#b3261e',
+  info: '#0369a1',
+  reasoning: '#6d4aa8',
 
-  'diff-add': '#6cc98d',
-  'diff-del': '#f08578',
-  'diff-ctx': '#8d97a3',
+  'diff-add': '#1f7a3d',
+  'diff-del': '#b3261e',
+  'diff-ctx': '#6b6b73',
 } as const
 
 /**
@@ -60,24 +62,19 @@ const hex = {
 const legacyAlias = {
   /* Trạng thái cũ → bảng accent/status mới. */
   'cyan-glow': hex.accent,
-  'emerald-safe': hex.success,
   'amber-warn': hex.warning,
   'rose-danger': hex.danger,
-  'violet-reasoning': hex.reasoning,
 
-  /* Mặt phẳng cũ → thang 5 tầng mới. */
-  canvas: hex.sunken,
-  'surface-elevated': hex.overlay,
-  'surface-subtle': hex.surface,
-  'surface-glass': 'rgba(32, 38, 47, 0.82)',
-
-  /* Ranh giới cũ → 3 bậc viền mới. */
-  'border-control': hex.default,
-
-  /* Bóng cũ — hai key này KHÔNG còn sinh CSS nào, giữ để class cũ không
-     vỡ cú pháp trong lúc component chuyển sang `bevel-out`/`bevel-in`. */
-  'ambient-glow': 'none',
-  'reasoning-glow': 'none',
+  /*
+   * ĐÃ XOÁ trong đợt sửa viền (2026-09-27) — 8 key dưới đây đã rỗng hoàn toàn,
+   * tức không component nào còn gọi tới:
+   *   emerald-safe, violet-reasoning — lượt gọi cuối ở `stream-bubble.tsx`
+   *   canvas, surface-elevated, surface-subtle, surface-glass, border-control
+   *   ambient-glow, reasoning-glow — key bóng `'none'`, không sinh CSS nào
+   *
+   * Chúng chỉ là những cách viết khác của token đã có sẵn ở `hex`, nên xoá đi
+   * không đổi màu gì được vẽ ra. Giữ lại là đẻ thêm cách gọi cho cùng một màu.
+   */
 
   /*
    * THANG ZINC LẬT BẬC — alias cho 5 chỗ dùng sót lại.
@@ -146,6 +143,13 @@ const config: Config = {
         /* NHẤN & TRẠNG THÁI — một bảng màu cho toàn ứng dụng. */
         accent: hex.accent,
         'accent-dim': hex['accent-dim'],
+        /*
+         * MINT NHẠT — token NỀN, không phải token chữ. Tách riêng khỏi `accent`
+         * vì `accent` còn dùng làm màu chữ (link, con trỏ, viền focus) và mint
+         * nhạt trên giấy trắng chỉ đạt ~1.6:1 — không đọc được.
+         */
+        'accent-mint': hex['accent-mint'],
+        'on-fill': hex['on-fill'],
         success: hex.success,
         warning: hex.warning,
         danger: hex.danger,
@@ -179,51 +183,69 @@ const config: Config = {
         ...legacyAlias,
       },
       borderRadius: {
-        none: '0px',
-        sm: '3px',
-        DEFAULT: '5px',
-        md: '5px',
-        full: '9999px',
         /*
-         * Cố ý KHÔNG định nghĩa `lg`/`xl`/`2xl`/`3xl`. Mọi bo góc đều là
-         * 0px trong ứng dụng này; nếu ai đó gọi `rounded-lg` thì class đó không
-         * được sinh ra — thà không có bo góc nào còn hơn là bo góc ngoài ý muốn.
-         * (Trước đây khối override `[class*="rounded-lg"]` trong globals.css làm
-         * cho cấu hình này bị vô hiệu hoàn toàn; khối đó đã bị xoá.)
+         * BO GÓC BẤT ĐỐI XỨNG — dấu hiệu nhận dạng của phong cách nét vẽ tay.
+         *
+         * Người vẽ tay không bao giờ kéo cung tròn đều tứ phương; mỗi góc lệch
+         * một chút. Ở đây mỗi bậc là một "organic pill" 4 góc, trong đó 2 góc
+         * bo lớn (255px-class) và 2 góc bo nhỏ (15px-class) xen kẽ nhau —
+         * nhìn bề ngoài vẫn là hình bầu dục nhưng mép không bao giờ đều.
+         *
+         *   sm    6px  — chip nhỏ, badge, ô inline
+         *   md   10px  — control: nút, input, menu item
+         *   lg   14px  — nút icon gần như viên thuốc, ô tìm kiếm
+         *   xl   20px  — khối nội dung: thẻ settings, panel
+         *   2xl  28px  — khối lớn: bubble, khung modal
+         *   3xl  36px  — vỏ composer
+         *   ink        — BẤT ĐỐI XỨNG đậm: bubble truyện tranh, nút nhấn mạnh
+         *   wobble     — BẤT ĐỐI XỨNG nhẹ: ô nhập, chip
          */
+        none: '0px',
+        sm: '6px',
+        DEFAULT: '10px',
+        md: '10px',
+        lg: '14px',
+        xl: '20px',
+        '2xl': '28px',
+        '3xl': '36px',
+        /*
+         * Dạng `A B C D / E F G H` là tám giá trị bán kính theo thứ tự
+         * góc trên-phải → phải → dưới-phải → dưới-trái → trái → trên-trái
+         * → trên (theo quy ước CSS). Hai góc "bo to" xen kẽ hai góc "bo nhỏ"
+         * tạo ra mép nguệch ngoạc.
+         */
+        ink: '255px 15px 225px 15px / 15px 225px 15px 255px',
+        wobble: '18px 6px 16px 6px / 6px 16px 6px 18px',
+        full: '9999px',
       },
       boxShadow: {
         /*
-         * Ứng dụng KHÔNG dùng bóng đổ. Mọi key mặc định của Tailwind bị khoá
-         * về `none` để không class `shadow-*` nào lọt vào mang theo bóng mềm —
-         * ngoại trừ HAI key dưới đây.
+         * Bóng đổ THÔ, LỆCH CỨNG — không blur, không mờ dần.
+         *
+         * Đây là đổi hệ thống so với bóng mềm trước đây: bóng mềm đọc "chiều
+         * sâu" theo kiểu vật lý, còn bóng lệch cứng đọc "vẽ tay" — cùng một
+         * đường viền mực và một vệt mực đọn lệch ra, đúng cách người vẽ tạo
+         * cảm giả nổi. Trên nền tối bóng mềm phải dùng alpha tăng dần mới đọc
+         * ra (nền gần đen nuốt bóng); trên giấy trắng nét lệch cứng tự nó đã
+         * đọc ra ngay mà không cần blur.
+         *
+         * `lift-md` / `lift-lg` có lớp thứ hai rất nhạt (`/0.10`, `/0.14`) để
+         * khối lớn không bị cắt khúc ở góc. Lớp `0 … 0` được bỏ hẳn: nó
+         * không vẽ ra gì mà chỉ làm test so số lớp khó đọc.
+         *
+         * Giá trị phải khớp BYTE với `.lift-sm` / `.lift-md` / `.lift-lg` trong
+         * globals.css — sửa một bên thì phải sửa cả bên kia.
+         *
+         * `inner` vẫn là `none`: ô nhập chìm dùng `.well` (inset), không dùng
+         * `shadow-inner` của Tailwind.
          */
         none: 'none',
         DEFAULT: 'none',
-        sm: 'none',
-        md: 'none',
-        lg: 'none',
-        xl: 'none',
-        '2xl': 'none',
+        'lift-sm': '2px 2px 0 rgb(0 0 0 / 0.9)',
+        'lift-md': '3px 3px 0 rgb(0 0 0 / 0.9), 7px 7px 0 rgb(0 0 0 / 0.10)',
+        'lift-lg':
+          '4px 4px 0 rgb(0 0 0 / 0.9), 10px 10px 0 rgb(0 0 0 / 0.14)',
         inner: 'none',
-
-        /*
-         * BEVEL — chiều sâu hai tông theo kiểu GUI Minecraft/Windows 95: cạnh
-         * trên & trái sáng hơn, cạnh dưới & phải tối hơn. Đây là CÁCH DUY NHẤT
-         * để tạo tầng bậc trong giao diện phẳng này, nên nó là hai `boxShadow`
-         * duy nhất không phải `none`.
-         *
-         * Dùng `box-shadow` chứ không phải `border-color`: một cạnh viền 1px chỉ
-         * mang được một màu, còn bevel cần hai để đọc ra hướng ánh sáng. Cả bốn
-         * cạnh đều `inset` nên không đổi kích thước bố cục.
-         *
-         * Giá trị phải khớp byte với `.bevel-out` / `.bevel-in` trong
-         * globals.css — sửa một bên thì phải sửa cả bên kia.
-         */
-        'bevel-out':
-          'inset 0 1px 0 rgb(255 255 255 / 0.07), inset 1px 0 0 rgb(255 255 255 / 0.04), inset 0 -1px 0 rgb(0 0 0 / 0.45), inset -1px 0 0 rgb(0 0 0 / 0.30)',
-        'bevel-in':
-          'inset 0 1px 0 rgb(0 0 0 / 0.45), inset 1px 0 0 rgb(0 0 0 / 0.30), inset 0 -1px 0 rgb(255 255 255 / 0.06), inset -1px 0 0 rgb(255 255 255 / 0.04)',
       },
       fontSize: {
         /*
@@ -257,21 +279,47 @@ const config: Config = {
       },
       fontFamily: {
         /*
-         * `next/font` chỉ tạo biến `--font-sans`; nếu không map vào đây thì
-         * `font-sans` của Tailwind vẫn là font hệ thống và Inter (đã tải kèm
-         * subset tiếng Việt) không bao giờ được dùng.
+         * BA HỌ, BA VIỆC.
+         *
+         * `next/font` chỉ tạo biến `--font-hand` / `--font-sans` / `--font-mono`;
+         * nếu không map vào đây thì class của Tailwind sẽ rơi về font hệ thống và
+         * font đã tải kèm subset tiếng Việt không bao giờ được dùng.
+         *
+         *   hand — Patrick Hand: nét vẽ. Nhãn, nút, tiêu đề, wordmark.
+         *          CHỈ có weight 400 (xác minh trong font-data.json của
+         *          next/font) — nên phân cấp đậm/nhạt trong UI KHÔNG đến từ
+         *          `font-bold` mà đến từ CỠ CHỮ và mực đậm/nhạt.
+         *   sans — Inter: prose dài của assistant. Chữ vẽ tay cho văn bản kỹ
+         *          thuật dài làm người dùng mỏi mắt; phần đọc lâu nhất phải dễ
+         *          đọc nhất.
+         *   mono — JetBrains Mono: MỌI thứ do máy sinh ra. Code, token, id,
+         *          đường dẫn, hash, timestamp, số đếm, nhãn trường.
          */
+        hand: ['var(--font-hand)', 'Patrick Hand', 'Quicksand', 'Comic Sans MS', 'cursive'],
         sans: ['var(--font-sans)', 'Geist', 'Inter', ...defaultTheme.fontFamily.sans],
         mono: [['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'], { fontFeatureSettings: '"calt" 1, "zero" 1' }],
-        /*
-         * Font pixel là đạo diện NGUYÊN CẢO — dành cho wordmark (.font-pixel).
-         * KHÔNG áp cho tiêu đề trong câu trả lời của model.
-         */
-        pixel: ['var(--font-pixel)', 'Pixelify Sans', 'Minecraft', 'monospace'],
       },
       maxWidth: {
-        /** Chiều rộng cột hội thoại — dùng chung cho message list & composer. */
+        /**
+         * Chiều rộng cột hội thoại — dùng chung cho message list & composer.
+         *
+         * TRƯỚC ĐÂY cột hội thoại là `48rem` nhưng composer là `max-w-4xl`
+         * (56rem) viết riêng trong JSX, nên ô nhập lấn ra 64px mỗi bên so với
+         * nội dung đang đọc — đo được @1360px là composer 896px vs thread 768px.
+         * Nay CẢ HAI gọi chung `thread` nên không còn cách nào lệch nhau: muốn
+         * đổi thì đổi đúng một số này.
+         */
         thread: '48rem',
+        /**
+         * Cột phụ bên phải (Plan / Context / Workspace checkpoints) khi màn
+         * hình đủ rộng. Chỉ dùng ở ≥1400px — dưới ngưỡng đó các khối này quay
+         * về nằm giữa cột hội thoại như trước (xem `chat-interface.tsx`).
+         */
+        rail: '20rem',
+      },
+      screens: {
+        /* Mốc bật cột phụ: 256 (sidebar) + 768 (thread) + 320 (rail) + gutter. */
+        rail: '1432px',
       },
       keyframes: {
         'fade-in': {

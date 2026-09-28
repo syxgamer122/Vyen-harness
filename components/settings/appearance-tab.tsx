@@ -89,7 +89,7 @@ export function AppearanceTab() {
             type="checkbox"
             checked={settings.sendOnEnter}
             onChange={(e) => updateSettings({ sendOnEnter: e.target.checked })}
-            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full accent-accent"
           />
         </label>
 
@@ -146,7 +146,7 @@ export function AppearanceTab() {
             type="checkbox"
             checked={settings.autoCompact}
             onChange={(e) => updateSettings({ autoCompact: e.target.checked })}
-            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full accent-accent"
           />
         </label>
 
@@ -163,7 +163,7 @@ export function AppearanceTab() {
             type="checkbox"
             checked={settings.perf?.animations ?? true}
             onChange={(e) => updatePerf({ animations: e.target.checked })}
-            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+            className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full accent-accent"
           />
         </label>
 

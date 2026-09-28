@@ -100,7 +100,7 @@ export function TelemetryTab() {
         <div className="flex items-center gap-2">
           <Activity size={16} className="text-accent" />
           <span className="text-read font-semibold text-primary">OpenTelemetry Waterfall</span>
-          <span className="rounded-none border border-subtle bg-raised px-1.5 py-0.5 font-mono text-micro tabular-nums text-tertiary">
+          <span className="rounded-full border border-subtle bg-raised px-2 py-0.5 font-mono text-micro tabular-nums text-tertiary">
             {spans.length} / 500 spans
           </span>
         </div>
@@ -122,7 +122,7 @@ export function TelemetryTab() {
       </div>
 
       {traces.length === 0 ? (
-        <div className="rounded-none border border-dashed border-default bg-surface p-8 text-center text-tertiary">
+        <div className="rounded-xl border border-dashed border-default bg-surface p-10 text-center text-tertiary">
           <Activity size={24} className="mx-auto mb-2 text-tertiary" />
           <p>Chưa có dữ liệu đo đạc.</p>
           <p className="mt-1 text-meta">
@@ -143,7 +143,7 @@ export function TelemetryTab() {
                   setSelectedSpanId(null);
                 }}
                 aria-pressed={selectedTraceId === t.traceId}
-                className={`flex-shrink-0 rounded-none border px-2 py-1 text-left text-meta transition-colors ${
+                className={`flex-shrink-0 rounded-lg border px-2.5 py-1.5 text-left text-meta transition-colors ${
                   selectedTraceId === t.traceId
                     ? 'border-strong bg-raised font-medium text-primary'
                     : 'border-subtle bg-surface text-tertiary hover:border-default hover:text-primary'
@@ -158,7 +158,7 @@ export function TelemetryTab() {
           </div>
 
           {/* Waterfall Chart */}
-          <div className="space-y-2 rounded-none border border-subtle bg-surface p-3">
+          <div className="lift-sm space-y-2 rounded-lg border border-subtle bg-surface p-3.5">
             <div className="flex justify-between border-b border-subtle pb-1 text-micro text-tertiary">
               <span>0ms</span>
               <span className="tabular-nums">Timeline: {traceTotalDuration}ms</span>
@@ -180,7 +180,7 @@ export function TelemetryTab() {
                   <div
                     key={span.id}
                     onClick={() => setSelectedSpanId(span.id)}
-                    className={`cursor-pointer rounded-none px-2 py-1 transition-colors ${
+                    className={`cursor-pointer rounded-lg px-2.5 py-1 transition-colors ${
                       isSelected ? 'border border-strong bg-raised' : 'hover:bg-raised'
                     }`}
                   >
@@ -200,7 +200,7 @@ export function TelemetryTab() {
                     </div>
 
                     {/* Horizontal Bar */}
-                    <div className="relative h-2 w-full overflow-hidden rounded-none bg-raised">
+                    <div className="relative h-2 w-full overflow-hidden rounded-lg bg-raised">
                       <div
                         className={`absolute bottom-0 top-0 ${barColor}`}
                         style={{
@@ -217,7 +217,7 @@ export function TelemetryTab() {
 
           {/* Span Details Drawer */}
           {selectedSpan && (
-            <div className="space-y-2 rounded-none border border-subtle bg-surface p-3">
+            <div className="lift-sm space-y-2 rounded-lg border border-subtle bg-surface p-3.5">
               <div className="flex items-center justify-between border-b border-subtle pb-1.5">
                 <span className="text-meta font-semibold text-primary">{selectedSpan.name}</span>
                 <span className="font-mono text-micro text-tertiary">ID: {selectedSpan.id}</span>
@@ -239,7 +239,7 @@ export function TelemetryTab() {
               {Object.keys(selectedSpan.attributes).length > 0 && (
                 <div className="border-t border-subtle pt-1">
                   <div className="mb-1 text-micro text-tertiary">Thuộc tính (Attributes):</div>
-                  <pre className="max-h-24 overflow-y-auto rounded-none border border-subtle bg-sunken p-1.5 font-mono text-micro text-primary">
+                  <pre className="max-h-24 overflow-y-auto rounded-full border border-subtle bg-sunken px-2 py-0.5 font-mono text-micro text-primary">
                     {JSON.stringify(selectedSpan.attributes, null, 2)}
                   </pre>
                 </div>

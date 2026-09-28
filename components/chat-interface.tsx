@@ -12,6 +12,7 @@ import { useChatOrchestration } from '@/react/use-chat-orchestration';
 
 import { StatusLine } from '@/components/chat/status-line';
 import { MessageList } from '@/components/chat/message-list';
+import { SessionRail } from '@/components/chat/session-rail';
 import { Composer } from '@/components/composer';
 import { AgentHud } from '@/components/hud/agent-hud';
 import { DiffConfirm } from '@/components/diff-confirm';
@@ -154,7 +155,13 @@ export default function ChatInterface() {
         </div>
       )}
 
-      <div className="relative flex-1 min-h-0 flex flex-col">
+      {/*
+       * Hàng nội dung: cột hội thoại + cột phụ. `flex-1 min-w-0` ở cột hội
+       * thoại là bắt buộc — không có nó thì `max-w-thread` của message list
+       * sẽ đẩy hàng rộng ra và đẩy cột phụ ra khỏi màn hình.
+       */}
+      <div className="flex flex-1 min-h-0">
+        <div className="relative flex min-w-0 flex-1 flex-col">
         <MessageList
           chatId={orch.chatKey}
           messages={orch.messages}
@@ -187,12 +194,11 @@ export default function ChatInterface() {
             orch.lastMessageId && orch.handleRegenerate(orch.lastMessageId)}
           onContinueGenerating={orch.continueGenerating}
         />
-      </div>
 
       <aside aria-label="Trạng thái phiên làm việc" className="w-full flex-none">
         {orch.workspaceReconnectRequired && !orch.dismissedReconnect && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="flex items-center justify-between gap-3 rounded-none border border-subtle bg-raised px-3.5 py-2 text-xs">
+            <div className="flex items-center justify-between gap-3 lift-sm rounded-lg border border-subtle bg-raised px-4 py-2.5 text-xs">
               <span className="text-tertiary truncate">
                 Phiên này từng dùng workspace <strong className="text-primary font-mono font-medium">{orch.workspace?.name}</strong>. Bạn có muốn kết nối lại để agent truy cập file?
               </span>
@@ -200,7 +206,7 @@ export default function ChatInterface() {
                 <button
                   type="button"
                   onClick={orch.reconnectWorkspace}
-                  className="bg-accent hover:bg-accent/80 text-base px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer"
+                  className="bg-accent hover:bg-accent/80 text-on-fill px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer"
                 >
                   Kết nối lại
                 </button>
@@ -216,15 +222,23 @@ export default function ChatInterface() {
           </div>
         )}
 
-        <WorkspaceCheckpointBar chatId={orch.currentChatId} busy={orch.isLoading} onNotice={orch.showNotice} />
+        {/*
+         * `rail:hidden` — ở ≥1400px hai khối này chuyển sang cột phụ bên
+         * phải (SessionRail). Giữ nguyên ở dưới ngưỡng: đó là chỗ duy nhất
+         * chúng xuất hiện khi màn hình hẹp, và `rail:hidden` chỉ khiến chúng
+         * biến mất ở màn rộng chứ không đụng tới hành vi màn hẹp.
+         */}
+        <div className="rail:hidden">
+          <WorkspaceCheckpointBar chatId={orch.currentChatId} busy={orch.isLoading} onNotice={orch.showNotice} />
 
-        {orch.plan && !orch.planHidden && (
-          <PlanPanel plan={orch.plan} onHide={() => orch.setPlanHidden(true)} canApprove={orch.agentMode === 'plan' && !orch.isLoading} onApprove={orch.handleApprovePlan} />
-        )}
+          {orch.plan && !orch.planHidden && (
+            <PlanPanel plan={orch.plan} onHide={() => orch.setPlanHidden(true)} canApprove={orch.agentMode === 'plan' && !orch.isLoading} onApprove={orch.handleApprovePlan} />
+          )}
+        </div>
 
         {orch.hintsChip && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="rounded-none border border-subtle bg-raised font-mono text-[11.5px] text-tertiary">
+            <div className="lift-sm rounded-lg border border-subtle bg-raised font-mono text-[11.5px] text-tertiary">
               <button
                 type="button"
                 onClick={() => orch.setShowHints((v) => !v)}
@@ -246,7 +260,7 @@ export default function ChatInterface() {
 
         {orch.activeRecallPack && orch.activeRecallPack.items.length > 0 && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="flex items-center justify-between gap-2 rounded-none border border-subtle bg-raised px-3 py-1.5 text-xs text-primary">
+            <div className="flex items-center justify-between gap-2 lift-sm rounded-lg border border-subtle bg-raised px-3.5 py-2 text-xs text-primary">
               <button
                 type="button"
                 onClick={() => orch.setShowRecalledDetail((v) => !v)}
@@ -258,7 +272,7 @@ export default function ChatInterface() {
               <button
                 type="button"
                 onClick={() => orch.setActiveRecallPack(null)}
-                className="rounded-none p-0.5 text-tertiary hover:text-primary"
+                className="rounded-lg p-1 text-tertiary hover:text-primary"
                 aria-label="Đóng thông báo ghi nhớ"
               >
                 <X size={13} />
@@ -266,7 +280,7 @@ export default function ChatInterface() {
             </div>
 
             {orch.showRecalledDetail && (
-              <div className="mt-1.5 rounded-none border border-subtle bg-panel-bg p-2.5 text-xs">
+              <div className="mt-1.5 lift-sm rounded-lg border border-subtle bg-panel-bg p-3 text-xs">
                 <div className="mb-1.5 text-[11px] font-semibold text-primary">
                   Ghi chú đã nạp vào ngữ cảnh ({orch.activeRecallPack.budget.usedTokens}/{orch.activeRecallPack.budget.limitTokens} tokens):
                 </div>
@@ -340,6 +354,24 @@ export default function ChatInterface() {
 
       {/* Agent Telemetry HUD */}
       <AgentHud className="mx-auto w-full max-w-thread" />
+        </div>
+
+        {/*
+         * Cột phụ bên phải — anh em của cột hội thoại, KHÔNG phải con của nó.
+         * Bản thân nó tự quyết định có hiện không (cần ≥1400px VÀ có gì để
+         * đặt vào), nên không cần điều kiện bao quanh ở đây.
+         */}
+        <SessionRail
+          currentChatId={orch.currentChatId}
+          isLoading={orch.isLoading}
+          onNotice={orch.showNotice}
+          plan={orch.plan}
+          planHidden={orch.planHidden}
+          onHidePlan={() => orch.setPlanHidden(true)}
+          canApprove={orch.agentMode === 'plan' && !orch.isLoading}
+          onApprovePlan={orch.handleApprovePlan}
+        />
+      </div>
 
       {/* Phê duyệt an toàn */}
       <DiffConfirm state={diffState} onClose={closeDiffModal} />

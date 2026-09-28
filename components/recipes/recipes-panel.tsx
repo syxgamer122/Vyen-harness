@@ -128,7 +128,7 @@ function ParamField({
           type="checkbox"
           checked={value === 'true'}
           onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
-          className="h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+          className="h-4 w-4 flex-shrink-0 rounded-full accent-accent"
         />
         <span className="text-ui text-primary">
           <span className="font-mono font-medium">{def.key}</span>
@@ -366,11 +366,11 @@ export function RecipesPanel({
       role="dialog"
       aria-modal="true"
       aria-labelledby="recipes-panel-title"
-      className={`fixed inset-0 ${Z_CLASS.navigation} flex justify-end bg-black/60`}
+      className={`fixed inset-0 ${Z_CLASS.navigation} flex justify-end bg-sunken/70`}
       onClick={onClose}
     >
       <aside
-        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden rounded-none border border-subtle bg-overlay font-mono"
+        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden lift-md rounded-xl border border-subtle bg-overlay font-mono"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2 border-b border-subtle bg-raised px-4 py-3">

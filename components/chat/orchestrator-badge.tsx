@@ -79,7 +79,7 @@ export const OrchestratorBadge = memo(function OrchestratorBadge({
   /* Cùng hệ chip với tool-trace (DESIGN.md): góc vuông, hairline #495059,
      nền panel, một theme dark duy nhất. Không glow/shimmer — nhãn tĩnh. */
   const chipClass =
-    'flex max-w-full items-center gap-1.5 rounded-none border border-subtle bg-panel-bg px-2.5 py-1 font-mono text-[11px] transition-colors duration-100 text-text-muted';
+    'flex max-w-full items-center gap-1.5 rounded-full border border-subtle bg-panel-bg px-3 py-1 font-mono text-[11px] transition-colors duration-100 text-text-muted';
   const inner = (
     <>
       <span className="flex-shrink-0 font-semibold text-text-primary">Kết quả Orchestrator</span>
@@ -113,7 +113,7 @@ export const OrchestratorBadge = memo(function OrchestratorBadge({
       )}
 
       {expanded && (
-        <div className="mt-1.5 rounded-none border border-subtle bg-raised px-2.5 py-1.5 font-mono text-[11px] text-text-muted">
+        <div className="mt-1.5 rounded-full border border-subtle bg-raised px-3 py-1 font-mono text-[11px] text-text-muted">
           {goal && (
             <p className="whitespace-pre-wrap break-words" title={goal}>
               <span className="font-medium text-text-primary">Mục tiêu:</span> {goal}

@@ -36,14 +36,14 @@ export function BranchSwitcher({
     <div
       role="group"
       aria-label="Điều hướng giữa các nhánh"
-      className="inline-flex items-center gap-0.5 rounded-none border border-default bg-raised px-1 py-0.5"
+      className="inline-flex items-center gap-0.5 rounded-lg border border-default bg-raised px-1 py-0.5"
     >
       <button
         type="button"
         data-no-swipe="true"
         disabled={disabled || !canGoPrevious}
         onClick={onPrevious}
-        className={`rounded-none p-0.5 text-tertiary transition-colors hover:bg-overlay hover:text-accent disabled:pointer-events-none disabled:opacity-20 ${hitArea}`}
+        className={`rounded-md p-1 text-tertiary transition-colors hover:bg-overlay hover:text-accent disabled:pointer-events-none disabled:opacity-20 ${hitArea}`}
         aria-label="Nhánh trước"
         title="Nhánh trước · Alt + ←"
       >
@@ -62,7 +62,7 @@ export function BranchSwitcher({
         data-no-swipe="true"
         disabled={disabled || !canGoNext}
         onClick={onNext}
-        className={`rounded-none p-0.5 text-tertiary transition-colors hover:bg-overlay hover:text-accent disabled:pointer-events-none disabled:opacity-20 ${hitArea}`}
+        className={`rounded-md p-1 text-tertiary transition-colors hover:bg-overlay hover:text-accent disabled:pointer-events-none disabled:opacity-20 ${hitArea}`}
         aria-label="Nhánh sau"
         title="Nhánh sau · Alt + →"
       >

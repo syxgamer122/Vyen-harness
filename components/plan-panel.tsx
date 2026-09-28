@@ -84,12 +84,18 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
       role="region"
       aria-label={`Kế hoạch: ${plan.title}`}
     >
-      <div className="rounded-none border border-subtle bg-panel-bg text-xs">
-        <div className="flex items-center gap-2 px-3 py-2">
+      <div className="lift-md rounded-xl border border-subtle bg-panel-bg text-xs">
+        {/*
+         * Badge + bộ đếm nằm NGOÀI nút toggle, ở hàng flex-wrap riêng.
+         * Trước đây chúng nằm trong nút cùng tiêu đề: ở cột phụ 320px, ba
+         * phần `flex-shrink-0` cùng tranh chỗ với tiêu đề `truncate` nên tiêu
+         * đề bị cắt còn 2 ký tự. Ra ngoài thì tiêu đề chiếm hết hàng trên.
+         */}
+        <div className="flex flex-wrap items-center gap-2 px-3 pb-1 pt-2">
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            className="flex min-w-0 flex-1 basis-full items-center gap-2 text-left sm:basis-auto"
             aria-expanded={expanded}
           >
             {expanded ? (
@@ -107,16 +113,16 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
               <span className="text-accent-steel mr-1">$</span>
               {plan.title}
             </span>
-            <EvidenceBadge level={planEvidence} className="ml-1" />
-            <span className="ml-auto flex-shrink-0 text-[11px] tabular-nums text-accent-steel">
-              {prog.done}/{prog.total} · {prog.percentComplete}%
-            </span>
           </button>
+          <EvidenceBadge level={planEvidence} />
+          <span className="flex-none text-[11px] tabular-nums text-accent-steel">
+            {prog.done}/{prog.total} · {prog.percentComplete}%
+          </span>
           {canApprove && onApprove && (
             <button
               type="button"
               onClick={onApprove}
-              className="rounded-none border border-success/40/60 px-2 py-1 text-[11px] font-semibold text-status-success transition-colors hover:bg-success/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[accent]"
+              className="rounded-full border border-success/60 px-2.5 py-1 text-[11px] font-semibold text-status-success transition-colors hover:bg-success/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[accent]"
               title="Chuyển sang ACT mode và bắt đầu thực thi kế hoạch này"
             >
               Duyệt &amp; thực hiện
@@ -125,7 +131,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
           <button
             type="button"
             onClick={onHide}
-            className="rounded-none p-1 text-text-muted hover:bg-panel-soft hover:text-text-primary"
+            className="ml-auto rounded-lg p-1.5 text-text-muted hover:bg-panel-soft hover:text-text-primary"
             aria-label="Ẩn kế hoạch"
           >
             <X className="h-3.5 w-3.5" />
@@ -150,7 +156,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
                   <li
                     key={st.id}
                     className={`flex items-start gap-2 rounded px-1.5 py-0.5 transition-colors ${
-                      st.isActive ? "bg-accent/10 border border-accent/40/30" : ""
+                      st.isActive ? "bg-accent/10 border border-accent/40" : ""
                     }`}
                   >
                     <Icon className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 ${meta.className}`} aria-hidden />

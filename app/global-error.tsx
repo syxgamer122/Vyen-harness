@@ -24,18 +24,18 @@ export default function GlobalError({
      * global-error thay THẾ root layout, nên nó phải tự mang `<html>`/`<body>`,
      * style riêng và theme riêng (không kế thừa gì từ app/layout.tsx).
      */
-    <html lang="vi" className="dark">
+    <html lang="vi">
       {/*
         Màu nền đặt thêm inline, không chỉ dựa vào class: trước first-paint
-        stylesheet chưa kịp về, mà không có màu nền nào thì chữ sáng trên nền
+        stylesheet chưa kịp về, mà không có màu nền nào thì chữ đậm trên nền
         trắng của trình duyệt là không đọc được. Hai giá trị ở đây cố ý
         hardcode, không lấy từ token.
       */}
       <body
-        className="flex h-dvh flex-col items-center justify-center rounded-none bg-sunken p-4 font-sans text-primary"
-        style={{ backgroundColor: '#07090d', color: '#e8eaed' }}
+        className="flex h-dvh flex-col items-center justify-center rounded-xl bg-sunken p-4 font-sans text-primary"
+        style={{ backgroundColor: '#f2f2ef', color: '#18181b' }}
       >
-        <div className="w-full max-w-md rounded-none border border-default bg-surface p-6 text-center shadow-bevel-out">
+        <div className="w-full max-w-md lift-lg rounded-ink border-2 border-default bg-surface p-6 text-center shadow-lift-lg">
           <h1 className="mb-1 text-base font-semibold text-primary">
             Sự cố ứng dụng ngoài dự kiến
           </h1>
@@ -58,7 +58,7 @@ export default function GlobalError({
             <button
               type="button"
               onClick={() => reset()}
-              className="rounded-none border border-default bg-accent/20 px-4 py-2 text-xs font-semibold text-accent transition-all hover:bg-accent/30"
+              className="rounded-lg border border-default bg-accent/20 px-4 py-2 text-xs font-semibold text-accent transition-all hover:bg-accent/30"
             >
               Khôi phục phiên
             </button>
@@ -72,7 +72,7 @@ export default function GlobalError({
               onClick={() => {
                 if (typeof window !== 'undefined') window.location.reload();
               }}
-              className="rounded-none border border-default bg-raised px-4 py-2 text-xs font-medium text-secondary transition-all hover:bg-overlay hover:text-primary"
+              className="rounded-lg border border-default bg-raised px-4 py-2 text-xs font-medium text-secondary transition-all hover:bg-overlay hover:text-primary"
             >
               Tải lại ứng dụng
             </button>

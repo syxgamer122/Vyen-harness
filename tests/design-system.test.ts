@@ -16,18 +16,21 @@ describe('DESIGN.md — Vyen design-system contract', () => {
    * Bảng màu chuẩn — DESIGN.md §2. Mọi giá trị ở đây PHẢI khớp `hex` trong
    * tailwind.config.ts; test 'bảng màu trong test khớp tailwind.config.ts'
    * kiểm tra điều đó theo cả hai chiều.
+   *
+   * Nền GIẤY TRẮNG (light-only). Bề mặt gần như toàn trắng — chiều sâu đến từ
+   * VIỀN MỰC và bóng lệch cứng, không phải từ độ sáng của nền.
    */
   const PALETTE_TOKENS = new Set([
     /* Bề mặt — 5 tầng */
-    '#07090d', '#0b0e13', '#12161d', '#1a1f27', '#20262f',
+    '#f2f2ef', '#fafaf8', '#ffffff', '#eeeeeb', '#ffffff',
     /* Chữ — 4 tầng */
-    '#e8eaed', '#a7b0bb', '#7c8794', '#5c6673',
-    /* Viền — 3 tầng */
-    '#1c222a', '#3a4552', '#5a6675',
+    '#18181b', '#52525b', '#6b6b73', '#a1a1aa',
+    /* Viền — 3 tầng, đều là mực ở ba bậc đậm nhạt */
+    '#dcdcd8', '#2a2a2e', '#18181b',
     /* Nhấn & trạng thái */
-    '#7cb7ea', '#3f6a94', '#5bbd7f', '#e0a04a', '#ef6f5c', '#63b3d6', '#a78bd4',
+    '#2a7360', '#8fc7b8', '#98d8c8', '#ffffff', '#2a7347', '#9a6206', '#b3261e', '#0369a1', '#6d4aa8',
     /* Diff */
-    '#6cc98d', '#f08578', '#8d97a3',
+    '#1f7a3d', '#b3261e', '#6b6b73',
   ]);
 
   /**
@@ -108,6 +111,52 @@ describe('DESIGN.md — Vyen design-system contract', () => {
   const TEXT_OPACITY =
     /\btext-(?:text-muted|text-primary|primary|secondary|tertiary|disabled|accent|success|warning|danger|info|reasoning)\/\d{1,3}\b/g;
 
+  /**
+   * Class VIỀN mà preflight bơm màu hộ phụ mà không cần hỏi.
+   *
+   * Tailwind preflight đặt `border: 0 solid #e5e7eb` cho MỌI phần tử. Nên khi
+   * ai đó viết `border` (chỉ đặt độ rộng) mà quên class màu, class đó sinh ra
+   * **không có `border-color`** — và phần tử kế thừa luôn `#e5e7eb` từ preflight.
+   * Trên nền tối đó là 13.4:1, sáng hơn cả `text-primary` (`#e8eaed`): một viền
+   * trắng sáng ơ lên bố cục, nặng hơn nhiều so với chữ nó bao quanh.
+   *
+   * Vì sao lỗi này SỐNG SÓT qua mọi assertion phía trên: `#e5e7eb` do Tailwind
+   * chèn lúc build, không bao giờ xuất hiện trong source. Test chỉ soi source thì
+   * không có gì để đỏ. Đây là lý do phải soi CẶP class, chứ không soi màu.
+   */
+  const BORDER_SIDE = 'trblxy';
+  /** Đặt ĐỘ RỘNG: `border`, `border-t`, `border-2`, `border-l-4`… */
+  const BORDER_WIDTH = new RegExp(`^border(?:-[${BORDER_SIDE}])?(?:-\\d+)?$`);
+  /** Đặt MÀU: `border-subtle`, `border-transparent`, `border-danger/40`… */
+  const BORDER_COLOR = new RegExp(`^border-(?![${BORDER_SIDE}](?:-\\d+)?$)(?!\\d+$).+$`);
+  /**
+   * `border-0` / `border-b-0` đặt độ rộng **0** — không vẽ gì ra, nên không cần
+   * màu. Thiếu màu ở đó là vô hại, và bắt nó sẽ dạy người đọc rằng assertion
+   * này bắt cả những thứ vô hại (rồi họ sẽ tắt nó).
+   */
+  const isBorderWidth = (token: string) =>
+    BORDER_WIDTH.test(token) && !new RegExp(`^border(?:-[${BORDER_SIDE}])?-0$`).test(token);
+  /** Đặt MÀU cho `divide-*` — `divide-subtle`, `divide-subtle/70`. */
+  const DIVIDE_COLOR = /^divide-(?![xy](?:-\d+)?$)(?!reverse$)[a-z][\w-]*(?:\/[\d.]+)?$/;
+
+  /**
+   * Hai modifier opacity trên MỘT class. Tailwind chỉ parse được một `/alpha`
+   * nên `border-success/40/60` không sinh CSS nào — viền đơn giản BIẾN MẤT mà
+   * không có dấu vết. Nhìn code thì thấy còn `border-`, nên tưởng đang có viền.
+   */
+  const DOUBLE_OPACITY =
+    /\b(?:bg|text|border|ring|divide|fill|stroke|decoration|outline|placeholder)-[a-z][\w-]*\/\d{1,3}\/\d{1,3}\b/g;
+
+  /**
+   * Class CHẾT — còn được gọi trong JSX nhưng không còn sinh CSS. Nguy hiểm vì
+   * người đọc tưởng còn tác dụng, và "sửa" nó bằng cách tinh chỉnh class đứng
+   * cạnh sẽ trượt: mọi thứ trông đúng trừ đúng khối không vẽ gì.
+   * Nguồn xác nhận: DESIGN.md §5.5 (khung góc) + `boxShadow` trong
+   * tailwind.config.ts (hai key `'none'`).
+   */
+  const DEAD_CLASSES =
+    /\b(?:pi-corner-[a-z-]+|pi-frame|vyen-frame|vyen-corner-[a-z-]+|shadow-reasoning-glow|shadow-ambient-glow|glass-panel|custom-scrollbar)\b/g;
+
   function collectStyleFiles(dir: string, out: string[] = []): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
@@ -116,6 +165,30 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     }
     return out;
   }
+
+  /**
+   * Cắt comment TRƯỚC khi soi. Comment giải thích lịch sử hay nhắc tên class đã
+   * chết ("khối này từng dùng `.glass-panel`") — đó là TÀI LIỆU, không phải code
+   * gọi class. Không cắt thì assertion báo đúng những dòng nên giữ lại.
+   */
+  const stripComments = (code: string) =>
+    /* Thay bằng newline thay vì xoá hẳn: xoá hẳn làm số dòng trong thông điệp
+     * đỏ lệch với số dòng thật, và người đọc phải tự dò lại mới thấy. */
+    code.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '));
+
+  /** Mọi file component + app, không kể `node_modules`. */
+  const componentFiles = () =>
+    ['../components', '../app']
+      .map((rel) => collectStyleFiles(path.resolve(__dirname, rel)))
+      .flat()
+      .filter((file) => /\.(tsx?|ts)$/.test(file))
+      .map((file) => path.relative(root, file).replace(/\\/g, '/'));
+
+  /** File + số dòng, để thông điệp đỏ chỉ đúng chỗ. */
+  const lineOf = (code: string, index: number) => code.slice(0, index).split('\n').length;
+
+  /** Đọc theo đường dẫn quy về GỐC REPO (khác `readRel`, quy về `tests/`). */
+  const readFromRoot = (rel: string) => read(path.resolve(root, rel));
 
   /* ------------------------------------------------------------------ */
   /* globals.css — con trỏ, prose, bevel                                */
@@ -156,47 +229,118 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     expect(css).toContain('.claude-prose.streaming-caret .claude-md-root > :last-child:is(p, h1, h2, h3, li)');
   });
 
-  /**
-   * Khối này là lý do test này tồn tại. Trước đây `.vyen-bevel*` có ĐÚNG 0
-   * lượt dùng trong khi DESIGN.md gọi nó là "nguyên tắc quan trọng nhất", và
-   * hiệu ứng được dán tay ở 7 chỗ bằng khối rgba viết tay. Không có assertion
-   * nào nhìn thấy điều đó.
+  /*
+   * HỢP ĐỒNG CHIỀU SÂU (thay cho BEVEL).
+   *
+   * Lý do khối assertion này tồn tại không đổi so với bản BEVEL: trước đây
+   * `.vyen-bevel*` có ĐÚNG 0 lượt dùng trong khi DESIGN.md gọi nó là "nguyên
+   * tắc quan trọng nhất", và hiệu ứng được dán tay ở 7 chỗ bằng khối rgba viết
+   * tay — không có assertion nào nhìn thấy điều đó. Nay app dùng BÓNG MỀM, và
+   * bóng mềm dễ bị lạm dụng hơn nhiều (ai cũng `shadow-*-` một cái), nên bất
+   * biến "chỉ 4 nguồn được sinh bóng" phải được canh.
    */
-  it('bevel tồn tại: đúng MỘT định nghĩa inset 0 1px 0 trong .bevel-out và .bevel-in', () => {
-    const css = read(globalsCssPath);
-    const out = css.match(/\.bevel-out\s*\{([^}]*)\}/);
-    const inn = css.match(/\.bevel-in\s*\{([^}]*)\}/);
-    expect(out, 'globals.css thiếu .bevel-out').toBeTruthy();
-    expect(inn, 'globals.css thiếu .bevel-in').toBeTruthy();
-    /* Mỗi rule có đúng 1 cạnh trên `inset 0 1px 0`. */
-    expect(out![1].match(/inset 0 1px 0/g) ?? []).toHaveLength(1);
-    expect(inn![1].match(/inset 0 1px 0/g) ?? []).toHaveLength(1);
-    /* Bốn cạnh, tất cả inset — không cạnh nào đổi kích thước bố cục. */
-    expect(out![1].match(/inset/g) ?? []).toHaveLength(4);
-    expect(inn![1].match(/inset/g) ?? []).toHaveLength(4);
-    /* Không được dán tay thêm bản sao ở nơi khác. */
-    expect(css.match(/inset 0 1px 0/g) ?? []).toHaveLength(2);
-  });
+  const DEPTH_SOURCES = ['lift-sm', 'lift-md', 'lift-lg', 'well'] as const;
 
-  it('recipe trong globals.css @apply class bevel, không viết tay khối rgba', () => {
+  it('chiều sâu: đúng 4 nguồn sinh bóng, không có nguồn thứ năm', () => {
     const css = read(globalsCssPath);
-    /* .surface-panel/.btn-secondary/.settings-card nổi; .field & .btn-primary chìm. */
-    for (const selector of ['.surface-panel', '.btn-secondary', '.settings-card', '.field', '.field-sm', '.btn-primary']) {
-      const block = css.match(new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`));
-      expect(block, `globals.css thiếu recipe ${selector}`).toBeTruthy();
-      expect(block![1], `${selector} phải @apply một class bevel`).toMatch(/@apply\s+bevel-(?:in|out)\b/);
+    for (const name of DEPTH_SOURCES) {
+      const rule = css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`));
+      expect(rule, `globals.css thiếu .${name}`).toBeTruthy();
+      expect(rule![1], `.${name} phải khai báo box-shadow`).toMatch(/box-shadow\s*:/);
     }
+
     /*
-     * Nguyên nhân gốc của lỗi "7 khối rgba dán tay": cấu hình chỉ có 2 class
-     * này được phép sinh bóng. Bất kỳ `box-shadow` nào khác — kể cả khai báo
-     * bằng class riêng — đều là bypass. Xem `rounded-lg` bên dưới: cùng một
-     * kiểu lách, cùng hậu quả là tài liệu nói 0px trong khi code là 8px.
-     *
-     * KHÔNG assert toàn cục `box-shadow` ở đây: `inset` của chính `.bevel-out`
-     * / `.bevel-in` hợp lệ, và assertion trên đã kiểm đúng chúng.
+     * KHÔNG dán tay thêm ở nơi khác. `box-shadow:` xuất hiện đúng 4 lần — mỗi
+     * lần là một nguồn. Thêm lần thứ 5 nghĩa là đã có class bóng ngoài hợp
+     * đồng, và tailwind.config.ts sẽ lệch với CSS mà không ai thấy.
      */
     const declared = [...css.matchAll(/^\s*box-shadow\s*:/gm)].length;
-    expect(declared, 'chỉ .bevel-out và .bevel-in được khai báo box-shadow').toBe(2);
+    expect(
+      declared,
+      `chỉ ${DEPTH_SOURCES.length} nguồn (${DEPTH_SOURCES.join(', ')}) được khai báo box-shadow`,
+    ).toBe(DEPTH_SOURCES.length);
+  });
+
+  it('bóng mềm phải là NGOÀI vùng cho lift-*, và INSIDE cho .well', () => {
+    const css = read(globalsCssPath);
+    for (const name of ['lift-sm', 'lift-md', 'lift-lg']) {
+      const body = css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))![1];
+      expect(body, `.${name} thiếu box-shadow`).toMatch(/box-shadow\s*:/);
+      /*
+       * Không `inset`: một bộ "nâng" luôn có một cạnh sáng và một cạnh tối, nên
+       * nó vẽ cách mà không phải sáng/tối nửa ai ra tri tuyệt đối. Ngược lại,
+       * một khối "nổi" mà không có viền sáng ngoài sẽ không tách được khỏi nền.
+       */
+      expect(body, `.${name} không được dùng inset — bóng sáng phải đổ bóng đổ`).not.toMatch(/inset/);
+    }
+    /* Ô nhập thì ngược lại: bóng nằm TRONG để đọc ra "khoét vào". */
+    const well = css.match(/\.well\s*\{([^}]*)\}/)![1];
+    expect(well, '.well phải là bóng inset').toMatch(/box-shadow\s*:[^;]*inset/);
+  });
+
+  it('recipe trong globals.css @apply một class chiều sâu hợp lệ', () => {
+    const css = read(globalsCssPath);
+    /*
+     * `.surface-panel`/`.settings-card` nổi (lift-md); `.field` & `.field-sm`
+     * chìm (well); `.btn-primary`/`.btn-secondary` nổi nhẹ (lift-sm).
+     */
+    const expected: Array<[string, string]> = [
+      ['.surface-panel', 'lift-md'],
+      ['.settings-card', 'lift-md'],
+      ['.btn-primary', 'lift-sm'],
+      ['.btn-secondary', 'lift-sm'],
+      ['.field', 'well'],
+      ['.field-sm', 'well'],
+    ];
+    for (const [selector, depth] of expected) {
+      const block = css.match(new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`));
+      expect(block, `globals.css thiếu recipe ${selector}`).toBeTruthy();
+      expect(block![1], `${selector} phải @apply ${depth}`).toMatch(
+        new RegExp(`@apply[^;]*\\b${depth}\\b`),
+      );
+    }
+  });
+
+  it('giá trị lift-* trong config khớp BYTE với globals.css', () => {
+    const config = read(tailwindConfigPath);
+    /*
+     * Cắt comment trước khi soi: khối `.lift-*` trong globals.css có đoạn
+     * comment giải thích vì sao alpha tăng dần trên nền tối. Comment là tài
+     * liệu, không phải khai báo — cùng lý do mà assertion `rounded-lg` bên
+     * dưới cũng cắt comment trước khi kiểm.
+     */
+    const css = read(globalsCssPath).replace(/\/\*[\s\S]*?\*\//g, '');
+
+    /*
+     * So từng LAYER, không so chuỗi thô: hai bên viết xuống dòng khác nhau,
+     * một bên có dấu phẩy một bên không. Phải cắt tên thuộc tính `box-shadow:`
+     * ra trước — nếu không, vế CSS segment đầu tiên là
+     * `"box-shadow: 0 1px 2px …"` không bắt đầu bằng `inset` nên bị lọc mất.
+     */
+    const layers = (value: string) =>
+      value
+        .split(',')
+        .map((x) => x.replace(/\s+/g, ' ').trim().replace(/;$/, '').trim())
+        .filter(Boolean);
+
+    /* Số lớp mong đợi: 1 ở lift-sm (nét lệch đơn), 2 ở lift-md/lift-lg (gần + xa). */
+    const expectedLayers: Record<string, number> = { 'lift-sm': 1, 'lift-md': 2, 'lift-lg': 2 };
+
+    for (const name of ['lift-sm', 'lift-md', 'lift-lg']) {
+      const cfgRaw = config.match(new RegExp(`'${name}':\\s*'([^']*)'`))?.[1];
+      expect(cfgRaw, `tailwind.config.ts thiếu boxShadow['${name}']`).toBeTruthy();
+
+      const body = css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+      const cssRaw = body.match(/box-shadow\s*:\s*([\s\S]*)/)?.[1] ?? '';
+      expect(cssRaw.trim(), `globals.css thiếu khai báo box-shadow cho .${name}`).not.toBe('');
+
+      const a = layers(cfgRaw!);
+      const b = layers(cssRaw);
+      expect(a, `${name} lệch giữa config và globals.css`).toEqual(b);
+      expect(a, `${name} phải có ${expectedLayers[name]} lớp bóng`).toHaveLength(
+        expectedLayers[name],
+      );
+    }
   });
 
   /* ------------------------------------------------------------------ */
@@ -217,95 +361,88 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     return code.slice(from, to);
   }
 
-  it('borderRadius giữ quy tắc vuông: có none/sm/md/full, KHÔNG có lg/xl/2xl/3xl', () => {
+  it('borderRadius là thang THẬT theo vai trò, không còn chốt vuông', () => {
     const block = configBlock('borderRadius: {', 'boxShadow: {');
     const keys = [...block.matchAll(/^\s*'?([\w-]+)'?:\s*/gm)].map((m) => m[1]);
 
-    expect(keys).toContain('none');
-    expect(keys).toContain('sm');
-    expect(keys).toContain('md');
-    expect(keys).toContain('full');
-
     /*
-     * PHẦN QUAN TRỌNG: `lg`/`xl`/`2xl`/`3xl` phải KHÔNG tồn tại.
-     * Gọi `rounded-lg` khi đó sinh ra KHÔNG CÓ class nào — thà không bo góc
-     * còn hơn bo sai. Nếu ai đó định nghĩa lại chúng, 47 chỗ đang gọi
-     * `rounded-lg`/`xl`/`2xl` sẽ bật bo tròn ngay lập tức.
+     * Đủ 11 bậc. Một bậc thiếu nghĩa là code gọi tên đó không sinh class nào.
+     * `ink` và `wobble` là hai bậc BẤT ĐỐI XỨNG — dấu hiệu nhận dạng của phong
+     * cách nét vẽ tay, nên chúng bắt buộc phải tồn tại cùng thang px.
      */
-    for (const banned of ['lg', 'xl', '2xl', '3xl']) {
-      expect(keys, `borderRadius.${banned} không được định nghĩa — sẽ làm rounded-${banned} có tác dụng`).not.toContain(banned);
+    for (const key of ['none', 'sm', 'DEFAULT', 'md', 'lg', 'xl', '2xl', '3xl', 'ink', 'wobble', 'full']) {
+      expect(keys, `borderRadius.${key} phải tồn tại`).toContain(key);
     }
 
-    expect(block).toMatch(/none:\s*'0px'/);
-    expect(block).toMatch(/sm:\s*'3px'/);
-    expect(block).toMatch(/md:\s*'5px'/);
-    expect(block).toMatch(/DEFAULT:\s*'5px'/);
-    expect(block).toMatch(/full:\s*'9999px'/);
+    /*
+     * THANG PX PHẢI TĂNG DẦN. Nếu ai đó sửa `xl` thành 4px thì giao diện co
+     * lại mà không test nào đỏ.
+     *
+     * `ink`/`wobble` KHÔNG so theo thang này: chúng là dạng 8 giá trị
+     * (`A B C D / E F G H`), nên bậc lớn nhất của chúng là 255px — lớn hơn
+     * `full` là chuyện bình thường và không phải lỗi.
+     */
+    const px = (key: string) => {
+      const v = block.match(new RegExp(`^\\s*'?${key}'?:\\s*'([\\d.]+)px'`, 'm'))?.[1];
+      expect(v, `borderRadius.${key} phải là số px`).toBeTruthy();
+      return Number(v);
+    };
+    const order = ['none', 'sm', 'md', 'lg', 'xl', '2xl', '3xl'];
+    for (let i = 1; i < order.length; i++) {
+      expect(
+        px(order[i]),
+        `borderRadius.${order[i]} phải lớn hơn ${order[i - 1]}`,
+      ).toBeGreaterThan(px(order[i - 1]));
+    }
+    expect(px('full'), 'rounded-full phải lớn hơn bậc lớn nhất').toBeGreaterThan(px('3xl'));
+    expect(px('none'), 'rounded-none = 0px').toBe(0);
+
+    /*
+     * BẤT ĐỐI XỨNG phải THẬT bất đối xứng — dạng `A B C D / E F G H` với hai
+     * góc bo to xen kẽ hai góc bo nhỏ. Nếu ai đó dán lại một bán kính đều
+     * (bo tròn mềm) thì nét vẽ tay biến mất mà test này vẫn xanh, vì nó chỉ
+     * kiểm key tồn tại chứ không kiểm HÌNH DẠNG.
+     */
+    for (const key of ['ink', 'wobble']) {
+      const v = block.match(new RegExp(`^\\s*'?${key}'?:\\s*'([^']+)'`, 'm'))?.[1];
+      expect(v, `borderRadius.${key} phải khai báo`).toBeTruthy();
+      const [h, vAxis] = v!
+        .split('/')
+        .map((x) => x.trim().split(/\s+/).map((n) => Number(n.replace('px', ''))));
+      expect(h, `${key} phải có 4 bán kính ngang`).toHaveLength(4);
+      expect(vAxis, `${key} phải có 4 bán kính dọc`).toHaveLength(4);
+      /* Có ít nhất MỘT cặp khác nhau — đó mới là "bất đối xứng". */
+      const distinct = new Set([...h, ...vAxis]);
+      expect(distinct.size, `${key} mọi bán kính bằng nhau → bo tròn đều, mất nét vẽ tay`).toBeGreaterThan(1);
+      expect(
+        h[0],
+        `${key} phải có ít nhất một góc bo lớn (255px-class) xen kẽ góc bo nhỏ`,
+      ).toBeGreaterThan(h[1]!);
+    }
   });
 
-  it('boxShadow: bevel-out và bevel-in là hai key DUY NHẤT không phải none', () => {
+  it('boxShadow: chỉ lift-sm/md/lg được sinh bóng, key mặc định KHÔNG bật lại', () => {
     const block = configBlock('boxShadow: {', 'fontSize: {');
     const keys = [...block.matchAll(/^\s*'?([\w-]+)'?:\s*/gm)].map((m) => m[1]).filter((k) => k !== 'boxShadow');
 
-    const nonNone = keys.filter((k) => {
-      const value = block.match(new RegExp(`^\\s*'?${k}'?:\\s*(.*)$`, 'm'))?.[1] ?? '';
-      return !value.startsWith("'none'") && value !== '';
-    });
-    expect(nonNone.sort()).toEqual(['bevel-in', 'bevel-out']);
-
     /*
-     * Ý định gốc của assertion cũ (`shadow-sm/md/lg/xl/2xl/inner` = 'none')
-     * vẫn phải được giữ — ứng dụng cấm bóng mềm. Khẳng định tường minh để một
-     * lần đổi tên key không làm rơi mất ý nghĩa.
+     * Chỉ ba key `lift-*` được phép sinh bóng. Tên `sm`/`md`/`lg`/`xl`/`2xl`
+     * bị GỠ HẲN khỏi cấu hình (không còn key, nên `shadow-sm` không sinh CSS) —
+     * nếu ai đó thêm lại, giao diện sẽ bị bóng mềm lạc lõng ở khắp nơi mà
+     * không test nào bắt.
      */
-    for (const soft of ['none', 'DEFAULT', 'sm', 'md', 'lg', 'xl', '2xl', 'inner']) {
-      const value = block.match(new RegExp(`^\\s*'?${soft}'?:\\s*(.*)$`, 'm'))?.[1] ?? '';
-      expect(value.trim().startsWith("'none'"), `boxShadow.${soft} phải là 'none'`).toBe(true);
+    for (const banned of ['sm', 'md', 'lg', 'xl', '2xl']) {
+      expect(keys, `boxShadow.${banned} không được định nghĩa — bóng mềm lọt vào app`).not.toContain(banned);
     }
-  });
-
-  it('giá trị bevel trong config khớp với .bevel-out/.bevel-in trong globals.css', () => {
-    const config = read(tailwindConfigPath);
-    /*
-     * Cắt comment trước khi soi: `.glass-panel` có một đoạn comment nhắc tên
-     * `.bevel-out` để giải thích vì sao nó cố tình KHÔNG khai báo box-shadow.
-     * Comment là tài liệu, không phải khai báo — cùng lý do mà assertion
-     * `rounded-lg` phía dưới cũng cắt comment trước khi kiểm.
-     */
-    const css = read(globalsCssPath).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(keys.sort()).toEqual(['DEFAULT', 'inner', 'lift-lg', 'lift-md', 'lift-sm', 'none']);
 
     /*
-     * So từng LAYER một, không so chuỗi thô: hai bên viết xuống dòng khác nhau,
-     * một bên có dấu phẩy một bên không. Nhưng phải cắt tên thuộc tính
-     * `box-shadow:` ra trước — nếu không, ở vế CSS segment đầu tiên là
-     * `"box-shadow: inset 0 1px 0 …"`, không bắt đầu bằng `inset` nên bị lọc
-     * mất, và hợp đồng "đủ 4 cạnh" bị kiểm bằng 3.
-     *
-     * THỨ TỰ là thông tin: `inset 0 1px 0` (cạnh trên) phải là layer đầu.
+     * Và các key còn lại phải là 'none' — ô nhập chìm dùng `.well`, không dùng
+     * `shadow-inner` của Tailwind (nó là inset một chiều, không khớp `.well`).
      */
-    const layers = (value: string) =>
-      value
-        .split(',')
-        .map((x) => x.replace(/\s+/g, ' ').trim().replace(/;$/, '').trim())
-        .filter(Boolean);
-
-    for (const name of ['bevel-out', 'bevel-in']) {
-      const cfgRaw = config.match(new RegExp(`'${name}':\\s*'([^']*)'`))?.[1];
-      expect(cfgRaw, `tailwind.config.ts thiếu boxShadow['${name}']`).toBeTruthy();
-
-      const body = css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
-      const cssRaw = body.match(/box-shadow\s*:\s*([\s\S]*)/)?.[1] ?? '';
-      expect(cssRaw.trim(), `globals.css thiếu khai báo box-shadow cho .${name}`).not.toBe('');
-
-      const a = layers(cfgRaw!);
-      const b = layers(cssRaw);
-      expect(a, `${name} lệch giữa config và globals.css`).toEqual(b);
-      expect(a, `${name} phải có đúng BỐN cạnh`).toHaveLength(4);
-      /* Cả bốn đều inset — không cạnh nào đổi kích thước bố cục. */
-      expect(
-        a.filter((x) => x.startsWith('inset')),
-        `${name} có cạnh không inset`,
-      ).toHaveLength(4);
+    for (const flat of ['none', 'DEFAULT', 'inner']) {
+      const value = block.match(new RegExp(`^\\s*'?${flat}'?:\\s*(.*)$`, 'm'))?.[1] ?? '';
+      expect(value.trim().startsWith("'none'"), `boxShadow.${flat} phải là 'none'`).toBe(true);
     }
   });
 
@@ -316,7 +453,15 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     const configHexes = new Set(
       [...block.matchAll(/^\s*'?([\w-]+)'?:\s*'(#[0-9a-fA-F]{6})'/gm)].map((m) => m[2].toLowerCase()),
     );
-    expect(configHexes.size, 'không đọc được mảng `hex` trong tailwind.config.ts').toBe(22);
+    /*
+     * Đếm theo GIÁ TRỊ hex đã khử trùng, không theo số key.
+     *
+     * Bảng sáng cố ý dùng lại một vài màu cho nhiều vai trò — `#ffffff` cho
+     * cả `surface`/`overlay`/`on-fill`, `#18181b` cho cả `primary`/`strong` —
+     * vì trên giấy trắng, "nền" và "chữ trên nền tô đậm" là hai câu hỏi khác
+     * nhau về CÙNG một màu. 24 key → 19 giá trị phân biệt.
+     */
+    expect(configHexes.size, 'không đọc được mảng `hex` trong tailwind.config.ts').toBe(19);
 
     /* Mỗi hex trong PALETTE_TOKENS phải tồn tại thật trong config. */
     for (const h of PALETTE_TOKENS) {
@@ -432,6 +577,236 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     }
   });
 
+  it('không dùng HAI modifier opacity trên một class — class đó không sinh CSS nào', () => {
+    /*
+     * `border-success/40/60` nghe có vẻ hợp lý nhưng Tailwind chỉ parse được MỘT
+     * `/alpha`; class không khớp mẫu nên KHÔNG sinh dòng CSS nào. Hậu quả không
+     * phải "màu sai" mà là viền biến mất — code vẫn còn `border-` nên người
+     * đọc tưởng đang có viền. Đã có 5 chỗ mắc lỗi này (DESIGN.md §6.1).
+     */
+    for (const rel of TOKENIZED_COMPONENTS) {
+      const hits = [...new Set(readRel(rel).match(DOUBLE_OPACITY) ?? [])];
+      expect(
+        hits,
+        `${rel} có class hai modifier opacity (không sinh CSS): ${hits.join(', ')}`,
+      ).toEqual([]);
+    }
+  });
+
+  /*
+   * VIỀN KHÔNG MÀU — lỗ hổng nghiêm trọng nhất của hợp đồng này.
+   *
+   * Bối cảnh: preflight của Tailwind đặt `border: 0 solid #e5e7eb` cho mọi phần
+   * tử. `border` (độ rộng) và `border-<màu>` là hai utility ĐỘC LẬP; viết một
+   * cái không kèm cái kia thì phần tử kế thừa `#e5e7eb` từ preflight. Trên nền
+   * tối, `#e5e7eb` đạt 13.4:1 — SÁNG HƠN CẢ `text-primary` (`#e8eaed`). Một viền
+   * trắng sáng ơ lên bố cục làm nổi khối mạnh hơn cả chữ nó bao quanh, và đó là
+   * hệ quả của một class trông hoàn toàn bình thường khi đọc code.
+   *
+   * Vì sao mọi assertion phía trên bỏ lọt: chúng soi MÀU trong source, mà
+   * `#e5e7eb` do Tailwind chèn lúc build — không bao giờ xuất hiện trong file nguồn.
+   * Không có gì để đỏ. Đây là lý do phải kiểm CẶP class thay vì kiểm màu.
+   */
+  it('recipe @apply đặt độ rộng viền thì phải @apply kèm màu', () => {
+    const css = stripComments(read(globalsCssPath));
+    /* Cặp ngoặc phẳng: đủ cho mọi recipe trong `@layer components`. */
+    const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+    expect(blocks.length, 'không đọc được khối rule nào trong globals.css — regex chắc hỏng').toBeGreaterThan(0);
+
+    const offenders: string[] = [];
+    let checked = 0;
+    for (const block of blocks) {
+      const selector = block[1]!.trim().split('\n').pop()!.trim();
+      for (const statement of block[2]!.split(';')) {
+        if (!/@apply\b/.test(statement)) continue;
+        const tokens = statement.replace(/@apply\s*/, '').split(/\s+/).filter(Boolean);
+        const widths = tokens.filter(isBorderWidth);
+        if (widths.length === 0) continue;
+        checked++;
+        if (!tokens.some((t) => BORDER_COLOR.test(t))) {
+          offenders.push(`${selector}: @apply … ${widths.join(' ')} (thiếu border-<màu>)`);
+        }
+      }
+    }
+    expect(checked, 'không tìm được lệnh @apply nào đặt viền — regex chắc hỏng').toBeGreaterThan(0);
+    expect(
+      offenders,
+      `recipe viền không màu (kế thừa #e5e7eb từ preflight):\n  ${offenders.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('class đặt độ rộng viền phải có class màu CÙNG variant trong cùng className', () => {
+    /*
+     * Nửa JSX của lỗi trên. Cùng luật: `border` ở trạng thái nghỉ cần
+     * `border-subtle` ở trạng thái nghỉ; `hover:border` cần `hover:border-<màu>`.
+     * So sánh THEO VARIANT chứ không theo "có màu nào đó trong chuỗi" — nếu
+     * không, `hover:border` sẽ được tha bằng một `border-subtle` tĩnh ở đúng chỗ
+     * mà nó cần đổi màu.
+     */
+    const files = componentFiles();
+    expect(files.length, 'không quét được file nào trong components/ + app/').toBeGreaterThan(20);
+
+    const offenders: string[] = [];
+    let scanned = 0;
+    for (const rel of files) {
+      const code = stripComments(readFromRoot(rel));
+
+      /*
+       * `${helper(x)}` trả về class, nhưng scanner không thấy qua lời gọi hàm:
+       * nếu không nội dung dung, `border … ${decisionTone(d)}` bị báo nhầm dù
+       * hàm đó trả về `border-danger/40` ở cả ba nhánh. Nội dung dung TẤT CẢ
+       * lệnh `return '…'` của hàm cục bộ vào đây, rồi lấy chuỗi của hàm được
+       * gọi. Hàm định nghĩa ở file khác hoặc class ghép từ biến vẫn không
+       * theo được — đó là giới hạn thật, đã ghi ở comment cuối assertion.
+       */
+      const helperBodies = new Map<string, string>();
+      for (const fn of code.matchAll(
+        /function\s+(\w+)\s*\([^)]*\)(?::[^{]+)?\s*\{([\s\S]*?)\n\}/g,
+      )) {
+        helperBodies.set(
+          fn[1]!,
+          [...fn[2]!.matchAll(/return\s+'([^']*)'/g)].map((r) => r[1]!).join(' '),
+        );
+      }
+      /*
+       * Nội suy hàm cục bộ: `${decisionTone(x)}` → chuỗi class mà hàm đó trả.
+       *
+       * CHỈ nội suy khi className thật sự GỌI hàm đó. Trước đây quét mọi `${fn(`
+       * trong toàn bộ className, nên `decisionTone` ở `audit-viewer-dialog.tsx`
+       * bị chèn vào một `className` hoàn toàn không liên quan
+       * (`<tbody className="divide-y divide-subtle/70">`) — làm assertion báo
+       * nhầm 2 file, và khiến thông điệu đỏ in ra class rỗng.
+       */
+      const expandHelpers = (text: string) =>
+        text.replace(/\$\{\s*(\w+)\s*\(/g, (_, name: string) => {
+          const body = helperBodies.get(name);
+          /* Chỉ nội suy hàm mà className này thật sự gọi tới. */
+          if (body === undefined || !text.includes(name)) return ' ';
+          return ' ' + body + ' ';
+        });
+
+      /* className="…" | className='…' | className={`…`} */
+      const re = /className\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([\s\S]*?)`\})/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(code))) {
+        scanned++;
+        /*
+         * Vế trong `${…}` KHÔNG phải class tĩnh, nhưng các NHÁNH CHUỖI bên trong
+         * nó thì có (`${tone(x) ? 'border-danger' : 'border-subtle'}`). Bỏ hẳn
+         * `${…}` sẽ báo nhầm hàng loạt; giữ hết thì đếm nhầm chữ trong câu.
+         * Nên chỉ giữ lại literal, bỏ biểu thức.
+         */
+        const rawClass = m[1] ?? m[2] ?? m[3] ?? '';
+        const staticText = expandHelpers(rawClass).replace(
+          /\$\{([\s\S]*?)\}/g,
+          (_, expr: string) =>
+            ' ' +
+            (expr.match(/'[^']*'|"[^"]*"|`[^`]*`/g) ?? [])
+              .map((lit) => lit.slice(1, -1))
+              .join(' ') +
+            ' ',
+        );
+        const tokens = staticText.split(/\s+/).filter(Boolean);
+
+        /* Gom theo variant: phần trước dấu `:` cuối cùng. */
+        const byVariant = new Map<string, string[]>();
+        for (const token of tokens) {
+          const cut = token.lastIndexOf(':');
+          const variant = cut === -1 ? '' : token.slice(0, cut);
+          const rest = cut === -1 ? token : token.slice(cut + 1);
+          byVariant.set(variant, [...(byVariant.get(variant) ?? []), rest]);
+        }
+
+        for (const [variant, group] of byVariant) {
+          const widths = group.filter(isBorderWidth);
+          /*
+           * `divide-y` cũng dính lỗi này: nó đặt `border-top-width` trên con mà
+           * MÀU lấy từ chính `border-color` mà preflight bơm — nên `divide-y`
+           * trần cũng ra đường kẻ `#e5e7eb`. Phải có `divide-<màu>` cùng variant.
+           *
+           * Phải TÍNH `divides` TRƯỚC khi `continue`: `isBorderWidth` chỉ khớp
+           * `^border`, không bao giờ khớp `divide*`. Nếu để `continue` chạy khi
+           * không có `border*` nào thì một className chỉ có `divide-y` bị bỏ qua
+           * trọn — và nhánh kiểm bên dưới thành mã chết, im lặng. Đã xác minh bằng
+           * probe: `divide-y` trần không đỏ, `border` trần thì đỏ.
+           */
+          const divides = group.filter((t) => /^divide-[xy](?:-\d+)?$/.test(t));
+          if (widths.length === 0 && divides.length === 0) continue;
+
+          /*
+           * Repo có dùng `divide-y`, nên không bỏ qua được nhánh này.
+           */
+          if (divides.length > 0 && !group.some((t) => DIVIDE_COLOR.test(t))) {
+            const prefix = variant ? `${variant}:` : '';
+            offenders.push(
+              `${rel}:${lineOf(code, m.index)} — ${prefix}${divides.join(' ')} không có ${prefix}divide-<màu>`,
+            );
+          }
+
+          if (group.some((t) => BORDER_COLOR.test(t))) continue;
+
+          /*
+           * Ngoại lệ hợp lệ: màu đặt bằng inline `style` thì không cần class màu.
+           * Ô meter 5px trong thinking-menu là ví dụ — nó gán `borderColor` cho
+           * TỪNG ô theo mức suy luận, động hơn bất kỳ class nào.
+           */
+          const tag = code.slice(code.lastIndexOf('<', m.index), m.index + 400);
+          if (/\bborder-?[Cc]olor\b/.test(tag)) continue;
+
+          /*
+           * `widths` rỗng nghĩa là className này chỉ đặt độ rộng qua `divide-*`
+           * — việc đó đã được kiểm ở nhánh trên. Không có `border` nào để báo.
+           * Thiếu điều kiện này thì `divide-y divide-subtle` (đã có màu) rơi
+           * xuống đây và bị báo nhầm với thông điệo rỗng.
+           */
+          if (widths.length === 0) continue;
+
+          const prefix = variant ? `${variant}:` : '';
+          offenders.push(
+            `${rel}:${lineOf(code, m.index)} — ${prefix}${widths.join(' ')} không có ${prefix}border-<màu>`,
+          );
+        }
+      }
+    }
+    expect(scanned, 'không tìm được className nào — regex chắc hỏng').toBeGreaterThan(100);
+    expect(
+      offenders,
+      `viền không màu (kế thừa #e5e7eb từ preflight):\n  ${offenders.join('\n  ')}`,
+    ).toEqual([]);
+
+    /*
+     * GIỚI HẠN ĐÃ BIẾT, ghi lại để người sau không tưởng assertion phủ hết:
+     *   - class dựng từ BIẾN (`const cls = 'border'; … ${cls}`) không theo được.
+     *   - helper ở file KHÁC không nội dung dung được — chỉ hàm cục bộ.
+     * Cả hai đều hiếm ở repo này (không có `cn()`, không có hằng chứa class), và
+     * thiếu cả hai thì test vẫn đỏ — nên hướng lỗi đi, không bỏ sót âm thầm.
+     */
+  });
+
+  it('class CHẾT đã bị gỡ khỏi hệ thống không được còn gọi trong components/ và app/', () => {
+    /*
+     * `pi-corner-*` / `pi-frame` / `vyen-frame` / `vyen-corner-*` mất tác dụng
+     * khi khối khung góc bị xoá khỏi globals.css (DESIGN.md §5.5);
+     * `shadow-reasoning-glow` / `shadow-ambient-glow` là key `'none'` trong
+     * tailwind.config.ts nên `shadow-…` sinh ra là `box-shadow: none`;
+     * `glass-panel` đã rời khỏi globals.css.
+     *
+     * Tất cả đều chết trong im lặng: class vẫn còn trong JSX, HTML render ra vẫn
+     * có `class="pi-corner-tl"`, chỉ là không có dòng CSS nào khớp. Người đọc
+     * thấy class thì tin là nó đang làm gì đó.
+     *
+     * Quét CẢ `components/` + `app/`, không chỉ hợp đồng — class chết hại
+     * nhiều nhất ở đúng những file chưa được migrate.
+     */
+    const offenders: string[] = [];
+    for (const rel of componentFiles()) {
+      const code = stripComments(readFromRoot(rel));
+      const hits = [...new Set(code.match(DEAD_CLASSES) ?? [])];
+      for (const hit of hits) offenders.push(`${rel} — gọi ${hit} (không còn sinh CSS)`);
+    }
+    expect(offenders, `class chết còn được gọi:\n  ${offenders.join('\n  ')}`).toEqual([]);
+  });
+
   it('không dùng trắng tinh cho chữ — token chữ tối nhất là #e8eaed', () => {
     for (const rel of TOKENIZED_COMPONENTS) {
       const code = readRel(rel);
@@ -476,15 +851,57 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     expect(css).toMatch(/\.rounded-full/);
   });
 
-  it('components/sidebar.tsx: mọi nút đều vuông góc, không bo tròn lửng lơ', () => {
+  /*
+   * Bo góc theo vai trò. Trước đây hai test này bắt buộc MỌI nút sidebar và
+   * backup-reminder phải là `rounded-none` — đúng với thời còn chốt vuông.
+   * Nay thang bo góc là thật, nên bất biến mới là: KHÔNG được bỏ trống.
+   *
+   * Một nút không khai báo bo góc (và không dùng recipe nào mang bo góc) sẽ
+   * thừa kế 0px từ preflight — tức rơi về đúng trạng thái vuông sắc mà đợt đổi
+   * này đang gỡ.
+   *
+   * Bo góc có hai đường: viết thẳng `rounded-*` trong JSX, hoặc đi qua RECIPE
+   * trong globals.css (`.icon-btn` → `rounded-lg`, `.btn-primary` → `rounded-lg`…).
+   * Danh sách `RADIUS_RECIPES` dưới đây là đường thứ hai; nó không phải lỗ hổng
+   * vì có assertion riêng bắt buộc mỗi recipe ấy thật sự khai bo góc.
+   */
+  const RADIUS_RECIPES = [
+    'icon-btn',
+    'menu-item',
+    'btn-primary',
+    'btn-secondary',
+    'surface-panel',
+    'settings-card',
+    'field',
+    'field-sm',
+  ];
+  const RADIUS_DIRECT = /className=[\s\S]*?rounded-(?:none|sm|md|lg|xl|2xl|3xl|ink|wobble|full)\b/;
+  /* Dấu nháy kép và backtick phải escape trong regex source. */
+  const CLASSNAME_BOUNDARY = '[\\s"\'`]';
+  const RADIUS_ANY = new RegExp(
+    `className=[\\s\\S]*?(?:rounded-(?:none|sm|md|lg|xl|2xl|3xl|ink|wobble|full)\\b|(?:^|${CLASSNAME_BOUNDARY})(?:${RADIUS_RECIPES.join('|')})\\b)`,
+  );
+
+  it('mọi recipe sinh bo góc trong globals.css đều khai báo bo góc thật', () => {
+    const css = read(globalsCssPath);
+    for (const recipe of RADIUS_RECIPES) {
+      const block = css.match(new RegExp(`\\.${recipe}\\s*\\{([^}]*)\\}`));
+      expect(block, `globals.css thiếu recipe .${recipe}`).toBeTruthy();
+      expect(
+        block![1],
+        `.${recipe} phải @apply một bậc bo góc — nếu không, mọi nút dùng nó sẽ rơi về 0px`,
+      ).toMatch(/@apply[^;]*rounded-(?:sm|md|lg|xl|2xl|3xl|ink|wobble|full)\b/);
+    }
+  });
+
+  it('components/sidebar.tsx: mọi nút khai báo bo góc tường minh', () => {
     const sidebarCode = read(sidebarPath);
     const buttonBlocks = sidebarCode.split('<button').slice(1);
     expect(buttonBlocks.length).toBeGreaterThan(5);
 
     for (const block of buttonBlocks) {
       const tagContent = block.split('</button>')[0];
-      expect(tagContent).toMatch(/className=[\s\S]*?rounded-none/);
-      expect(tagContent).not.toMatch(/className=[\s\S]*?rounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/);
+      expect(tagContent, 'nút thiếu class bo góc — sẽ rơi về 0px').toMatch(RADIUS_ANY);
     }
   });
 
@@ -494,20 +911,105 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     expect(sidebarCode).toContain('title="Thu gọn (Ctrl+\\)"');
   });
 
-  it('components/backup-reminder.tsx: mọi button đều vuông góc', () => {
+  it('components/backup-reminder.tsx: mọi button khai báo bo góc tường minh', () => {
     const code = read(backupReminderPath);
     const buttonBlocks = code.split('<button').slice(1);
     expect(buttonBlocks.length).toBeGreaterThanOrEqual(3);
 
     for (const block of buttonBlocks) {
-      expect(block.split('</button>')[0]).toMatch(/className=[\s\S]*?rounded-none/);
+      expect(block.split('</button>')[0], 'nút thiếu class bo góc').toMatch(RADIUS_ANY);
     }
   });
 
-  it('composer chạy full-bleed: không còn khung max-w-thread căn giữa', () => {
+  /*
+   * Composer phải dùNG CHUNG token `thread` với message list.
+   *
+   * Lịch sử: test này từng khẳng định NGƯỢC LẠI (`not.toMatch(/max-w-thread/)`)
+   * và bắt buộc `max-w-4xl` — tức là nó đang BẢO VỆ chính cái lệch đo được
+   * ở @1360px: composer 896px trong khi cột hội thoại 768px, tức ô nhập lấn
+   * 64px ra ngoài nội dung đang đọc mỗi bên.
+   *
+   * Nay hai bên gọi cùng một token nên test kiểm cái BẤT BIẾN thay vì kiểm
+   * một con số: composer không được tự khai báo bề rộng riêng (bất kỳ
+   * `max-w-4xl` hay `max-w-thread` viết tay nào ở JSX đều là lệch trở lại).
+   */
+  it('composer dùng CHUNG token thread với cột hội thoại, không tự khai báo bề rộng', () => {
     const code = readRel('../components/composer.tsx');
-    expect(code).not.toMatch(/max-w-thread/);
-    expect(code).toContain('w-full pb-[env(safe-area-inset-bottom)]');
+    expect(code, 'composer phải bám cột hội thoại').toContain('max-w-thread');
+    /* Không còn khung cứng 4xl — đó chính là nguồn gốc lệch 64px. */
+    expect(code, 'composer không được tự đặt max-w-4xl').not.toMatch(/max-w-4xl/);
+    /*
+     * Vỏ ngoài vẫn full-bleed: ô nhập cuộn theo chiều ngang, không phải khung.
+     * Assert theo REGEX chứ không theo chuỗi literal — vỏ nay có thêm gutter
+     * `px-5 md:px-8` và `pt-3`, nên thứ tự class không còn cố định.
+     */
+    expect(code, 'vỏ composer phải full-bleed').toMatch(
+      /w-full[^"']*pb-\[env\(safe-area-inset-bottom\)\]/,
+    );
+  });
+
+  /*
+   * GUTTER NGANG phải khớp giữa cột hội thoại và composer.
+   *
+   * Đây là lỗi bố cục thật đã tồn tại: message list cuộn ở `px-4 md:px-8` rồi
+   * mỗi hàng lại tự thêm `px-4 sm:px-6` BÊN TRONG, nên mép chữ lệch 56px về trái
+   * trong khi mép ô nhập chỉ lệch 16px — cùng một nội dung, hai mép không khớp.
+   * Nay cả hai cùng khai báo gutter ở vỏ ngoài và hàng không padding.
+   *
+   * Test kiểm bất biến (hai bên cùng một lớp gutter, hàng không tự padding)
+   * chứ không kiểm một con số, để đổi thiết kế không phải sửa test.
+   */
+  it('gutter ngang của cột hội thoại khớp gutter của ô nhập', () => {
+    const listCode = readRel('../components/chat/message-list.tsx');
+    const composerCode = readRel('../components/composer.tsx');
+
+    const gutter = /(?<![\w-])px-5(?![0-9a-z])/;
+    expect(listCode, 'message list phải khai gutter px-5').toMatch(gutter);
+    expect(composerCode, 'composer phải khai gutter px-5').toMatch(gutter);
+
+    /* Hàng tin nhắn KHÔNG được tự thêm padding ngang — nó sẽ cộng dồn lên
+       gutter của container và làm lệch mép chữ so với ô nhập. */
+    const itemCode = readRel('../components/chat/message-item.tsx');
+    const rowWrappers = [...itemCode.matchAll(/<div className="(group relative w-full py-\d+[^"]*)"/g)]
+      .map((m) => m[1]);
+    expect(rowWrappers.length, 'phải tìm được 2 hàng tin nhắn (user + assistant)').toBe(2);
+    for (const row of rowWrappers) {
+      expect(row, `hàng tin nhắn không được tự padding ngang: ${row}`).not.toMatch(/(?<![\w-])px-/);
+    }
+  });
+
+  /*
+   * Cột phụ bên phải chỉ được bật ở `rail:` — và token phải được khai ở cả
+   * `maxWidth` lẫn `screens`, vì bật `screen` mà quên token thì Tailwind sinh
+   * class `rail:max-w-rail` không có giá trị.
+   *
+   * Ngưỡng là phép TRỪ của ba bề rộng đã biết: sidebar 288 (`md:w-72`) + cột
+   * hội thoại 768 (`maxWidth.thread`) + rail 320 (`maxWidth.rail`), cộng gutter
+   * hai bên. Test này TÍNH ra con số đó từ chính config thay vì chép một số cứng
+   * — nếu ai đó đổi bề rộng sidebar mà quên nâng ngưỡng, assertion đỏ ngay
+   * thay vì cột phụ bị bóp méo ở một dải rộng.
+   */
+  it('mốc rail: khai đủ cả screen lẫn maxWidth, và ngưỡng đủ cho cả ba cột', () => {
+    const config = read(tailwindConfigPath);
+    expect(config, 'thiếu token maxWidth.rail').toMatch(/rail:\s*'20rem'/);
+
+    const threadRem = Number(config.match(/thread:\s*'(\d+(?:\.\d+)?)rem'/)?.[1]);
+    const railRem = Number(config.match(/rail:\s*'(\d+(?:\.\d+)?)rem'/)?.[1]);
+    expect(Number.isFinite(threadRem), 'không đọc được maxWidth.thread').toBe(true);
+    expect(Number.isFinite(railRem), 'không đọc được maxWidth.rail').toBe(true);
+
+    /* Bề rộng sidebar lấy từ class thật trong sidebar.tsx — không chép số. */
+    const sidebarRem = Number(read(sidebarPath).match(/md:w-(\d+)/)?.[1]) * 0.25;
+    expect(Number.isFinite(sidebarRem), 'không đọc được bề rộng sidebar (md:w-N)').toBe(true);
+
+    const GUTTER_REM = 2; /* px-8 = 2rem mỗi bên ở md */
+    const required = Math.ceil(sidebarRem + threadRem + railRem + GUTTER_REM * 2);
+    const screensRail = Number(config.match(/rail:\s*'(\d+)px'/)?.[1]);
+    expect(Number.isFinite(screensRail), 'thiếu mốc screens.rail').toBe(true);
+    expect(
+      screensRail,
+      `screens.rail phải ≥ ${required}px (sidebar ${sidebarRem} + thread ${threadRem} + rail ${railRem} + gutter ${GUTTER_REM * 2})rem`,
+    ).toBeGreaterThanOrEqual(required);
   });
 
   it('nút có nhãn trong composer nới vùng chạm lên mốc 44px của mobile', () => {

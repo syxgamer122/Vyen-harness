@@ -35,16 +35,28 @@ type PreviewState =
   | { status: 'ready'; text: string; adds: number; dels: number }
   | { status: 'unavailable'; note: string };
 
-export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props) {
+/**
+ * Snapshot mới nhất còn hoàn tác được (LIFO — xem getUndoTarget), hoặc null.
+ *
+ * Tách ra khỏi `WorkspaceCheckpointBar` vì cột phụ bên phải cần biết "có gì
+ * để đặt vào không" để quyết định bật rail — cùng một nguồn sự thật với chính
+ * thanh nó điều khiển, nên thanh và rail không thể lệch ý kiến về việc
+ * "đã có gì để hiện chưa".
+ */
+export function useUndoTarget(chatId: string | null): WorkspaceSnapshot | null {
   const snapshots = useLiveQuery(
     (): Promise<WorkspaceSnapshot[]> =>
       chatId ? db.wsSnapshots.where('chatId').equals(chatId).toArray() : Promise.resolve([]),
     [chatId],
   );
-  const target = useMemo<WorkspaceSnapshot | null>(
+  return useMemo<WorkspaceSnapshot | null>(
     () => (snapshots ? getUndoTarget(snapshots) : null),
     [snapshots],
   );
+}
+
+export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props) {
+  const target = useUndoTarget(chatId);
 
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
@@ -178,22 +190,17 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
           role="dialog"
           aria-modal="true"
           aria-label="Hoàn tác thay đổi của AI"
-          className={`fixed inset-0 ${Z_CLASS.navigation} flex items-center justify-center bg-black/70 p-4`}
+          className={`fixed inset-0 ${Z_CLASS.navigation} flex items-center justify-center bg-sunken/75 p-4`}
           onClick={() => {
             if (!running) setOpen(false);
           }}
         >
           <div
-            className="pi-frame relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-none border border-subtle bg-panel-bg font-mono"
+            className="lift-lg relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-subtle bg-panel-bg font-mono"
             onClick={(e) => e.stopPropagation()}
           >
-            <span className="pi-corner-tl" />
-            <span className="pi-corner-tr" />
-            <span className="pi-corner-bl" />
-            <span className="pi-corner-br" />
-
             <div className="border-b border-subtle bg-raised px-4 py-3">
-              <div className="flex items-center gap-2 font-pixel text-[16px] font-semibold text-text-primary [image-rendering:pixelated]">
+              <div className="flex items-center gap-2 uic text-[16px] font-semibold text-text-primary ">
                 <span className="font-bold text-accent-steel">$</span>
                 <span className="text-accent-steel">undo</span>
                 <span>· Khôi phục {ops.length} file về trước lượt sửa của AI</span>
@@ -210,7 +217,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                   return (
                     <li
                       key={f.path}
-                      className="rounded-none border border-subtle bg-raised px-3 py-2"
+                      className="rounded-lg border border-subtle bg-raised px-3.5 py-2.5"
                     >
                       <details
                         onToggle={(e) => {
@@ -220,10 +227,10 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                       >
                         <summary className="cursor-pointer select-none font-mono text-[12px] text-text-primary">
                           <span
-                            className={`mr-2 rounded-none px-1.5 py-0.5 font-mono text-[10px] ${
+                            className={`mr-2 rounded-full px-2 py-0.5 font-mono text-[10px] ${
                               f.existedBefore
-                                ? 'border border-accent/40/30 bg-accent/10 text-accent-steel'
-                                : 'border border-danger/40/30 bg-danger/10 text-status-error'
+                                ? 'border border-accent/40 bg-accent/10 text-accent-steel'
+                                : 'border border-danger/40 bg-danger/10 text-status-error'
                             }`}
                           >
                             {f.existedBefore ? 'restore' : 'delete new'}
@@ -247,7 +254,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                               <span className="text-status-success">+{pv.adds}</span>{' '}
                               <span className="text-status-error">-{pv.dels}</span> — nội dung sẽ khôi phục:
                             </p>
-                            <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-none border border-subtle bg-bg-deep p-2 font-mono text-[11px] leading-relaxed text-text-primary">
+                            <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-subtle bg-bg-deep p-3 font-mono text-[11px] leading-relaxed text-text-primary">
                               {pv.text}
                             </pre>
                           </>
@@ -268,7 +275,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                   type="button"
                   disabled={running}
                   onClick={() => setOpen(false)}
-                  className="rounded-none border border-subtle bg-panel-soft px-3 py-1.5 text-xs text-text-primary transition-colors hover:border-border-hover disabled:opacity-50"
+                  className="rounded-lg border border-subtle bg-panel-soft px-3.5 py-1.5 text-xs text-text-primary transition-colors hover:border-border-hover disabled:opacity-50"
                 >
                   Để nguyên
                 </button>
@@ -276,7 +283,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                   type="button"
                   disabled={running || busy}
                   onClick={() => void performRestore()}
-                  className="flex items-center gap-1.5 rounded-none bg-accent px-3.5 py-1.5 text-xs font-semibold text-sunken transition-colors hover:bg-accent/85 disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-on-fill transition-colors hover:bg-accent/85 disabled:opacity-60"
                 >
                   {running ? (
                     <Loader2 size={13} className="animate-spin" aria-hidden />

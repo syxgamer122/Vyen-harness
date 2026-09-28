@@ -106,7 +106,7 @@ function ToolbarButton({
       aria-label={label}
       aria-expanded={ariaExpanded}
       title={label}
-      className={`relative flex h-8 w-8 flex-none items-center justify-center rounded-none transition-colors duration-100 after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+      className={`relative flex h-8 w-8 flex-none items-center justify-center rounded-lg transition-colors duration-150 after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
         active
           ? 'bg-raised text-accent'
           : 'text-tertiary hover:bg-raised hover:text-primary'
@@ -114,7 +114,7 @@ function ToolbarButton({
     >
       <Icon size={14} />
       {badge && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-warning px-0.5 text-micro font-mono font-bold text-base">
+        <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-warning px-0.5 text-micro font-mono font-bold text-on-fill">
           {badge}
         </span>
       )}
@@ -141,7 +141,7 @@ function SendButton({
         isStreaming
           ? 'rounded-md bg-danger/20 text-danger border border-danger/40 animate-pulse hover:bg-danger/30'
           : canSubmit
-            ? 'rounded-full bg-accent text-base hover:scale-105 active:scale-95 transition-transform'
+            ? 'rounded-full bg-accent text-on-fill hover:scale-105 active:scale-95 transition-transform'
             : 'rounded-full bg-raised text-disabled cursor-not-allowed'
       }`}
     >
@@ -280,7 +280,7 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
               width: pos.width,
               maxHeight: pos.maxHeight,
             }}
-            className={`surface-panel ${Z_CLASS.dropdown} flex animate-slide-up flex-col overflow-y-auto p-1.5 custom-scrollbar`}
+            className={`surface-panel ${Z_CLASS.dropdown} flex animate-slide-up flex-col overflow-y-auto p-1.5`}
           >
             {groups.map((group) => (
               <div key={group.key} role="presentation">
@@ -307,7 +307,7 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
                         t.onClick();
                         setOpen(false);
                       }}
-                      className="flex w-full items-center gap-2.5 rounded-none px-2 py-2 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Icon
                         size={15}
@@ -324,7 +324,7 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
                         )}
                       </span>
                       {t.badge && (
-                        <span className="flex-none rounded-full bg-warning px-1.5 text-micro font-bold text-base">
+                        <span className="flex-none rounded-full bg-warning px-1.5 text-micro font-bold text-on-fill">
                           {t.badge}
                         </span>
                       )}
@@ -857,14 +857,24 @@ export const Composer = memo(function Composer({
   ].filter((g) => g.items.length > 0);
 
   return (
-    <div className="w-full pb-[env(safe-area-inset-bottom)] px-4 flex-none">
-      <div className="sticky bottom-4 mx-auto max-w-4xl z-20">
+    /*
+     * Gutter ngang PHẢI khớp hệt container cuộn của message list (`px-5 md:px-8`),
+     * vì cả hai cùng bám `max-w-thread`. Trước đây vỏ ở đây là `px-4` còn
+     * message list là `px-4 md:px-8` + `px-4` bên trong mỗi hàng — mép ô nhập
+     * lệch 40px so với mép chữ. Giờ cả hai cùng một con số, nên nhìn dọc thấy
+     * thẳng hàng.
+     *
+     * `pb-[env(safe-area-inset-bottom)]` giữ nguyên: vỏ ngoài phải full-bleed
+     * để nền chạy hết chiều rộng, chỉ khối dán bên trong mới canh giữa.
+     */
+    <div className="w-full px-5 pb-[env(safe-area-inset-bottom)] pt-3 md:px-8 flex-none">
+      <div className="relative mx-auto max-w-thread z-20">
         {canContinue && !isStreaming && (
-          <div className="mb-2 flex justify-center">
+          <div className="mb-3 flex justify-center">
             <button
               type="button"
               onClick={onContinue}
-              className="flex items-center gap-1.5 rounded-full border border-default bg-overlay px-3.5 py-1.5 font-mono text-ui font-medium text-accent transition-all duration-150 hover:border-strong hover:bg-raised hover:text-primary"
+              className="lift-sm flex items-center gap-1.5 rounded-full border border-default bg-overlay px-4 py-1.5 font-mono text-ui font-medium text-accent transition-all duration-150 hover:border-strong hover:bg-raised hover:text-primary"
             >
               <CornerDownLeft size={12} aria-hidden="true" />
               Viết tiếp
@@ -873,7 +883,7 @@ export const Composer = memo(function Composer({
         )}
 
         {fileError && (
-          <div role="status" className="notice-warn mb-2 px-3 py-1.5 rounded-none border border-warning/40 bg-warning/10 text-amber-warn text-xs">
+          <div role="status" className="notice-warn mb-2 px-3.5 py-2 rounded-lg border border-warning/40 bg-warning/10 text-amber-warn text-xs">
             {fileError}
           </div>
         )}
@@ -890,17 +900,24 @@ export const Composer = memo(function Composer({
             setDragging(false);
             acceptFiles(e.dataTransfer?.files ?? null);
           }}
-          className={`group relative rounded-none shadow-bevel-in transition-all duration-300 ${
+          className={`group relative lift-md rounded-ink bg-surface shadow-lift-md transition-all duration-200 ${
             isFocused
-              ? 'ring-1 ring-accent/30 border-accent/40'
-              : 'border border-subtle'
-          } ${dragging ? 'border-accent ring-1 ring-accent/40' : ''}`}
+              ? 'border-2 border-accent'
+              : 'border-2 border-default'
+          } ${dragging ? 'border-2 border-accent' : ''}`}
         >
           <PulseGlow active={isFocused} />
 
-          {/* Top Micro-Bar */}
-          <div className="flex items-center justify-between border-b border-white/[0.04] px-3.5 py-2">
-            <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto no-scrollbar min-w-0">
+          {/*
+           * Dải công cụ dính trên ô nhập. Đường kẻ `border-b` ở đây là MỘT
+           * trong ba đường trang trí chồng lên nhau (đường kẻ này + viền ngoài
+           * của form + nền khác) — bỏ đi, khoảng trống giữa dải và vùng gõ đã
+           * đủ tách hai vùng. Giữ lại nền `bg-raised/40` để dải vẫn nổi nhẹ.
+           */}
+          {/* Bo góc phải khớp `rounded-ink` của vỏ form, nếu không dải này bo
+              kiểu control trong khi vỏ bo kiểu vẽ tay — thấy ngay mép lệch. */}
+          <div className="flex items-center justify-between rounded-t-[15px_6px_0_0] bg-raised/60 px-4 py-2.5">
+            <div className="flex items-center gap-2 flex-nowrap overflow-x-auto no-scrollbar min-w-0">
               <ModelSelector
                 models={models}
                 value={model}
@@ -918,7 +935,7 @@ export const Composer = memo(function Composer({
                   type="button"
                   onClick={onCycleAutoPilot}
                   title="Chế độ phê duyệt (bấm để đổi)"
-                  className="inline-flex items-center gap-1 rounded-none bg-white/[0.03] hover:bg-white/[0.08] transition-colors px-2.5 py-1 text-xs text-tertiary hover:text-primary"
+                  className="inline-flex items-center gap-1 rounded-full bg-raised transition-colors px-3 py-1 text-xs text-tertiary hover:text-primary"
                 >
                   <Zap size={11} className={approvalPolicy === 'never' ? 'text-amber-warn' : 'text-accent'} />
                   <span>{approvalPolicy === 'never' ? 'Autonomous' : approvalPolicy === 'always' ? 'Manual' : approvalPolicy === 'chat_only' ? 'Chat Only' : 'Smart'}</span>
@@ -934,7 +951,7 @@ export const Composer = memo(function Composer({
             <div
               role="listbox"
               aria-label="Danh sách prompt"
-              className="absolute bottom-full left-0 right-0 z-30 mb-2 max-h-64 overflow-y-auto rounded-none border border-default bg-overlay p-1.5 font-mono shadow-bevel-out custom-scrollbar"
+              className="absolute bottom-full left-0 right-0 z-30 mb-3 max-h-64 overflow-y-auto lift-lg rounded-2xl border border-default bg-overlay p-2 font-mono shadow-lift-lg"
               onMouseDown={(e) => e.preventDefault()}
             >
               {slashMatches.map((p, i) => (
@@ -946,8 +963,8 @@ export const Composer = memo(function Composer({
                   id={`slash-opt-${p.id}`}
                   onClick={() => applyPrompt(p)}
                   onMouseEnter={() => setSlashIndex(i)}
-                  className={`flex w-full flex-col items-start gap-0.5 rounded-none px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
-                    i === slashIndex ? 'bg-panel-soft text-primary' : 'text-primary hover:bg-white/[0.04]'
+                  className={`flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
+                    i === slashIndex ? 'bg-panel-soft text-primary' : 'text-primary hover:bg-accent-mint/40'
                   }`}
                 >
                   <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
@@ -972,11 +989,11 @@ export const Composer = memo(function Composer({
           )}
 
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-4 pt-3">
+            <div className="flex flex-wrap gap-2 px-4 pt-3.5">
               {attachments.map((a) => (
                 <span
                   key={a.id}
-                  className="group/chip flex max-w-[220px] items-center gap-1.5 rounded-none border border-subtle bg-raised px-2.5 py-1 font-mono text-meta text-primary transition-colors hover:border-default"
+                  className="group/chip lift-sm flex max-w-[220px] items-center gap-1.5 rounded-full border border-subtle bg-raised px-3 py-1.5 font-mono text-meta text-primary transition-colors hover:border-default"
                 >
                   <Paperclip size={11} aria-hidden="true" className="flex-shrink-0 text-accent" />
                   <span className="truncate">{a.name}</span>
@@ -1007,7 +1024,7 @@ export const Composer = memo(function Composer({
             </div>
           )}
 
-          <div className="relative flex items-start px-3.5 pt-2">
+          <div className="relative flex items-start px-4 pt-3">
             <TextareaAutosize
               ref={textareaRef}
               value={draft}
@@ -1036,7 +1053,7 @@ export const Composer = memo(function Composer({
                 slashOpen ? `slash-opt-${slashMatches[slashIndex]?.id}` : undefined
               }
               placeholder="Soạn thảo prompt hoặc tác vụ, gõ / để mở danh sách lệnh..."
-              className="w-full resize-none border-none bg-transparent p-0 font-sans text-[14px] leading-relaxed text-primary outline-none focus:ring-0 placeholder:text-tertiary"
+              className="w-full resize-none border-none bg-transparent p-0 font-sans text-[15px] leading-relaxed text-primary outline-none focus:ring-0 placeholder:text-tertiary"
             />
           </div>
 
@@ -1064,19 +1081,19 @@ export const Composer = memo(function Composer({
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-2">
+          <div className="flex items-center justify-between gap-2 px-3 pb-3.5 pt-1.5">
             {/* Cụm TRÁI: đính kèm + thư mục + Voice STT */}
             <div className="flex min-w-0 items-center gap-1">
               <ToolbarButton
                 icon={Paperclip}
                 label="Đính kèm tệp"
-                className="rounded-none hover:bg-white/[0.06]"
+                className="rounded-lg hover:bg-accent-mint/50"
                 onClick={() => fileInputRef.current?.click()}
               />
               {onPickWorkspace && (
                 <ToolbarButton
                   icon={pickPending ? Loader2 : FolderOpen}
-                  className={`rounded-none hover:bg-white/[0.06] ${pickPending ? 'animate-spin' : ''}`}
+                  className={`rounded-lg hover:bg-accent-mint/50 ${pickPending ? 'animate-spin' : ''}`}
                   active={workspace?.connected}
                   label={
                     workspace?.connected
@@ -1091,7 +1108,7 @@ export const Composer = memo(function Composer({
                   <ToolbarButton
                     icon={speech.listening ? MicOff : Mic}
                     active={speech.listening}
-                    className={`rounded-none hover:bg-white/[0.06] ${speech.listening ? 'animate-pulse text-status-error' : ''}`}
+                    className={`rounded-lg hover:bg-accent-mint/50 ${speech.listening ? 'animate-pulse text-status-error' : ''}`}
                     label={
                       speech.listening
                         ? 'Dừng nhận diện giọng nói (đang nghe)'
@@ -1107,7 +1124,7 @@ export const Composer = memo(function Composer({
             {/* Cụm GIỮA: Autonomous / Smart Budget Badge */}
             <div className="hidden md:flex items-center gap-2">
               {(approvalPolicy === 'never' || approvalPolicy === 'smart' || autoPilot) && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.03] border border-white/[0.06] px-2.5 py-0.5 font-mono text-[11px] text-tertiary">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-raised border border-subtle px-2.5 py-0.5 font-mono text-[11px] text-tertiary">
                   <Zap size={11} className="text-amber-warn" />
                   <span>{goalLoopInfo || 'Autonomous Tools Active'}</span>
                 </span>
@@ -1124,7 +1141,7 @@ export const Composer = memo(function Composer({
             </div>
           </div>
         </form>
-        <div className="mt-2 hidden sm:block text-center font-mono text-[10.5px] text-tertiary">
+        <div className="mt-3 hidden sm:block text-center font-mono text-[10.5px] text-disabled">
           Enter để gửi · Shift+Enter xuống dòng · Enter/Alt+Enter khi AI chạy = xếp hàng · Alt+↑ lấy lại · / lệnh nhanh
         </div>
       </div>

@@ -14,9 +14,9 @@ export default function ErrorBoundary({
   }, [error]);
 
   return (
-    <div className="flex h-dvh flex-col items-center justify-center gap-4 rounded-none bg-sunken p-4 text-center font-sans text-primary">
-      <div className="w-full max-w-md rounded-none border border-default bg-surface p-6 shadow-bevel-out">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-none border border-subtle bg-warning/10 text-warning">
+    <div className="flex h-dvh flex-col items-center justify-center gap-4 rounded-xl bg-sunken p-4 text-center font-sans text-primary">
+      <div className="w-full max-w-md lift-lg rounded-xl border border-default bg-surface p-6 shadow-lift-lg">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-subtle bg-warning/10 text-warning">
           <svg
             className="h-6 w-6"
             fill="none"
@@ -57,7 +57,7 @@ export default function ErrorBoundary({
           <button
             type="button"
             onClick={() => reset()}
-            className="rounded-none border border-default bg-accent/20 px-4 py-2 text-xs font-semibold text-accent transition-all hover:bg-accent/30 active:scale-[0.98]"
+            className="rounded-lg border border-default bg-accent/20 px-4 py-2 text-xs font-semibold text-accent transition-all hover:bg-accent/30 active:scale-[0.98]"
           >
             Thử lại
           </button>
@@ -66,7 +66,7 @@ export default function ErrorBoundary({
             onClick={() => {
               if (typeof window !== 'undefined') window.location.reload();
             }}
-            className="rounded-none border border-default bg-raised px-4 py-2 text-xs font-medium text-secondary transition-all hover:bg-overlay hover:text-primary active:scale-[0.98]"
+            className="rounded-lg border border-default bg-raised px-4 py-2 text-xs font-medium text-secondary transition-all hover:bg-overlay hover:text-primary active:scale-[0.98]"
           >
             Tải lại trang
           </button>

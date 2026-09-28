@@ -287,24 +287,24 @@ export function DiffConfirm({
       role="dialog"
       aria-modal="true"
       aria-labelledby="diff-confirm-title"
-      className={`fixed inset-0 ${Z_CLASS.approval} flex items-end sm:items-center justify-center bg-black/70 p-3 sm:p-4`}
+      className={`fixed inset-0 ${Z_CLASS.approval} flex items-end sm:items-center justify-center bg-sunken/75 p-3 sm:p-4`}
       onClick={() => decide(false)}
     >
       {/*
        * PHẲNG, không kính. `.glass-panel` ép `box-shadow` drop-shadow bằng
-       * `!important` — thứ hợp đồng token cấm, vì chỉ `shadow-bevel-out` /
-       * `shadow-bevel-in` được sinh bóng. Modal là tầng trên cùng nên
-       * `bg-overlay` + bevel đã đủ tách khỏi nền (cùng cách làm với
+       * `!important` — thứ hợp đồng token cấm, vì chỉ `shadow-lift-lg` /
+       * `shadow-lift-sm` được sinh bóng. Modal là tầng trên cùng nên
+       * `bg-overlay` + bóng ngoài đã đủ tách khỏi nền (cùng cách làm với
        * settings-dialog).
        */}
       <div
-        className="relative mb-2 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-none border border-default bg-overlay font-mono shadow-bevel-out animate-pop-in sm:mb-0 sm:max-h-[70vh]"
+        className="relative mb-2 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg animate-pop-in sm:mb-0 sm:max-h-[70vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-subtle bg-raised px-4 py-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-7 w-7 flex-none items-center justify-center rounded-none bg-sunken text-accent">
+            <div className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-sunken text-accent">
               <FileCode className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -326,7 +326,7 @@ export function DiffConfirm({
           <div className="flex flex-none items-center gap-2">
             {/* Số đếm nói về TOÀN BỘ thay đổi, không phải phần đang hiện. */}
             <div
-              className="flex items-center gap-1.5 rounded-none border border-subtle bg-sunken px-2 py-1 font-mono text-meta"
+              className="flex items-center gap-1.5 rounded-lg border border-subtle bg-sunken px-2.5 py-1.5 font-mono text-meta"
               title={`So với nội dung hiện tại: ${view.totalAdds} dòng thêm, ${view.totalDels} dòng bị xoá`}
             >
               <span className="font-semibold text-diff-add">+{view.totalAdds}</span>
@@ -341,7 +341,7 @@ export function DiffConfirm({
               onClick={handleCopy}
               title="Sao chép TOÀN BỘ diff (kể cả phần đang bị ẩn)"
               aria-label="Sao chép toàn bộ diff, kể cả phần đang bị ẩn"
-              className="flex h-7 w-7 items-center justify-center rounded-none border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:bg-overlay hover:text-primary"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:bg-overlay hover:text-primary"
             >
               {copied ? (
                 <CheckCheck className="h-3.5 w-3.5 text-success" />
@@ -391,7 +391,7 @@ export function DiffConfirm({
               onClick={() => setShowFull((v) => !v)}
               aria-pressed={showFull}
               data-diff-fulltoggle=""
-              className="flex flex-none items-center gap-1.5 rounded-none border border-default bg-sunken px-2 py-1 text-meta text-secondary transition-colors hover:border-strong hover:text-primary"
+              className="flex flex-none items-center gap-1.5 rounded-lg border border-default bg-sunken px-2.5 py-1.5 text-meta text-secondary transition-colors hover:border-strong hover:text-primary"
             >
               {showFull ? <Minimize2 className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               {showFull ? 'Thu gọn' : 'Xem toàn bộ'}
@@ -400,7 +400,7 @@ export function DiffConfirm({
         )}
 
         {/* Diff content view */}
-        <div className="custom-scrollbar flex-1 overflow-auto bg-sunken">
+        <div className="flex-1 overflow-auto bg-sunken">
           {bodyRows.map((row, idx) => {
             if (row.kind === 'elision') {
               return (
@@ -463,7 +463,7 @@ export function DiffConfirm({
         <div className="flex items-center justify-between gap-3 border-t border-subtle bg-raised px-4 py-3 sm:px-5">
           <div className="hidden items-center gap-2 font-mono text-meta text-tertiary sm:flex">
             <span className="flex items-center gap-1">
-              <kbd className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-secondary">
+              <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Esc
               </kbd>
               <span>reject</span>
@@ -472,7 +472,7 @@ export function DiffConfirm({
               •
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-secondary">
+              <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Tab
               </kbd>
               <span>then ↵ on the chosen button</span>
@@ -485,7 +485,7 @@ export function DiffConfirm({
               data-diff-discard=""
               type="button"
               onClick={() => decide(false)}
-              className="flex items-center justify-center gap-1.5 rounded-none border border-default bg-raised px-4 py-2 text-ui font-medium text-secondary transition-all hover:border-strong hover:text-primary active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 lift-sm rounded-lg border border-default bg-raised px-4 py-2 text-ui font-medium text-secondary transition-all hover:border-strong hover:text-primary active:scale-[0.98]"
             >
               <X size={14} />
               <span>[ Esc ] Từ chối</span>
@@ -493,7 +493,7 @@ export function DiffConfirm({
             <button
               type="button"
               onClick={() => decide(true)}
-              className="flex items-center justify-center gap-1.5 rounded-none bg-success px-4 py-2 text-ui font-semibold text-sunken shadow-bevel-in transition-all hover:bg-success/85 active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 lift-sm rounded-lg bg-success px-4 py-2 text-ui font-semibold text-on-fill shadow-lift-sm transition-all hover:bg-success/85 active:scale-[0.98]"
             >
               <Check size={14} />
               <span>{isNewFile ? 'Duyệt & Tạo File' : 'Duyệt & Ghi Đĩa'}</span>

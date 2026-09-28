@@ -441,7 +441,7 @@ function LeadWorkerRoutingSection() {
             type="checkbox"
             checked={modelRouting.enabled}
             onChange={(e) => patch({ enabled: e.target.checked })}
-            className="h-3.5 w-3.5 rounded-none accent-accent"
+            className="h-3.5 w-3.5 rounded-full accent-accent"
           />
           Bật
         </label>

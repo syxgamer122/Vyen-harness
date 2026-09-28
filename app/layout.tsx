@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono, Patrick_Hand } from 'next/font/google';
 import { PWARegister } from '@/components/pwa-register';
 import './globals.css';
 
@@ -7,6 +7,20 @@ const inter = Inter({
   subsets: ['latin', 'vietnamese'],
   display: 'swap',
   variable: '--font-sans',
+});
+
+/**
+ * Chữ vẽ tay — nét kẻ cho nhãn, nút, tiêu đề.
+ *
+ * CHỈ có weight 400: font-data.json của `next/font` liệt kê `weights: ['400']`
+ * cho Patrick Hand. Nên phân cấp đậm/nhạt trong UI không đến từ `font-bold` mà
+ * đến từ cỡ chữ + độ đậm của nét mực — xem `.uic` trong globals.css.
+ */
+const patrickHand = Patrick_Hand({
+  subsets: ['latin', 'vietnamese'],
+  display: 'swap',
+  weight: '400',
+  variable: '--font-hand',
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -33,36 +47,32 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   interactiveWidget: 'resizes-content',
-  colorScheme: 'dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#07090d' },
-    { media: '(prefers-color-scheme: dark)', color: '#07090d' },
-  ],
+  colorScheme: 'light',
+  themeColor: '#f2f2ef',
 };
 
 /**
- * Chống FOUC: gắn cứng class `dark` lên <html> trước first-paint.
+ * Ứng dụng LIGHT-ONLY (một theme, xem globals.css).
+ *
+ * Không còn script chống FOUC: theme không đổi theo hệ điều hành nên không có
+ * gì để nhấp nháy — trước first-paint nền đã là giấy trắng, tức cùng màu với
+ * màn trắng trình duyệt. Cổng chặn FOUC của một theme động không áp dụng ở đây.
  */
-const THEME_NO_FLASH_SCRIPT = `(document.documentElement.classList.add('dark'));`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="vi"
-      className={`dark ${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${patrickHand.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link
-          href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400..700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="relative min-h-dvh bg-sunken font-sans text-primary antialiased overscroll-none selection:bg-accent/30 selection:text-primary">
-        <script dangerouslySetInnerHTML={{ __html: THEME_NO_FLASH_SCRIPT }} />
+      {/*
+        KHÔNG còn `<head>` với preconnect tới fonts.googleapis.com: cả ba họ font
+        đều đi qua `next/font/google`, tức được tải và TỰ HOST lúc build. Trình
+        duyệt không hề gọi ra Google Fonts lúc chạy, nên preconnect chỉ là một
+        DNS+TLS tới một host không bao giờ được dùng.
+      */}
+      <body className="relative min-h-dvh bg-sunken font-sans text-primary antialiased overscroll-none selection:bg-accent-mint/40 selection:text-primary">
         <PWARegister />
         {children}
       </body>

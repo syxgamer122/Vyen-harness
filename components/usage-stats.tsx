@@ -42,9 +42,9 @@ export function UsageStats() {
               type="button"
               aria-pressed={days === r.days}
               onClick={() => setDays(r.days)}
-              className={`rounded-none px-2.5 py-1 text-[11px] font-medium transition ${
+              className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
                 days === r.days
-                  ? 'bg-accent text-sunken font-semibold'
+                  ? 'bg-accent text-on-fill font-semibold'
                   : 'text-text-muted hover:text-text-primary hover:bg-panel-bg'
               }`}
             >

@@ -261,7 +261,7 @@ export function ProviderManager() {
     <div className="space-y-3 font-mono">
       {/* Máy chủ mặc định */}
       <label
-        className={`flex cursor-pointer items-center justify-between gap-2 rounded-none border px-3 py-2.5 transition-colors ${
+        className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-3.5 py-3 transition-colors ${
           activeProviderId === SERVER_PROVIDER_ID
             ? 'border-accent/60 bg-accent/10'
             : 'border-subtle bg-raised hover:bg-overlay'
@@ -279,7 +279,7 @@ export function ProviderManager() {
         <input
           type="radio"
           name="provider"
-          className="rounded-none accent-accent"
+          className="rounded-full accent-accent"
           checked={activeProviderId === SERVER_PROVIDER_ID}
           onChange={() => void choose(SERVER_PROVIDER_ID)}
         />
@@ -288,10 +288,10 @@ export function ProviderManager() {
       {/* Giai đoạn 2: opt-in lưu key mã hoá — chỉ hiện trên desktop có
           safeStorage. Ảnh hưởng lần LƯU key kế tiếp (ô key bên dưới / form Sửa). */}
       {vaultAvailable && (
-        <label className="flex cursor-pointer items-start gap-2 rounded-none border border-subtle bg-raised px-3 py-2 text-meta leading-relaxed text-primary">
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-subtle bg-raised px-3.5 py-2.5 text-meta leading-relaxed text-primary">
           <input
             type="checkbox"
-            className="mt-0.5 rounded-none accent-accent"
+            className="mt-0.5 rounded-full accent-accent"
             checked={secureVaultOn}
             onChange={(e) => setSecureVaultOn(e.target.checked)}
           />
@@ -309,7 +309,7 @@ export function ProviderManager() {
         return (
           <div
             key={p.id}
-            className={`rounded-none border px-3 py-2.5 transition-colors ${
+            className={`rounded-lg border px-3.5 py-3 transition-colors ${
               active ? 'border-accent/60 bg-accent/10' : 'border-subtle bg-raised'
             }`}
           >
@@ -318,7 +318,7 @@ export function ProviderManager() {
                 <input
                   type="radio"
                   name="provider"
-                  className="rounded-none accent-accent"
+                  className="rounded-full accent-accent"
                   checked={active}
                   onChange={() => void choose(p.id)}
                 />
@@ -328,14 +328,14 @@ export function ProviderManager() {
                     {p.apiKey ? (
                       <span
                         title="Đã lưu API key"
-                        className="flex items-center gap-0.5 rounded-none border border-success/30 bg-success/10 px-1 py-0.5 text-micro font-medium text-success"
+                        className="flex items-center gap-0.5 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-micro font-medium text-success"
                       >
                         <KeyRound size={9} /> có key
                       </span>
                     ) : (
                       <span
                         title="Chưa có API key"
-                        className="flex items-center gap-0.5 rounded-none border border-warning/30 bg-warning/10 px-1 py-0.5 text-micro font-medium text-warning"
+                        className="flex items-center gap-0.5 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-micro font-medium text-warning"
                       >
                         <KeyRound size={9} /> chưa key
                       </span>

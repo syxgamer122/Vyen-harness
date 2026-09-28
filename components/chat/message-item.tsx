@@ -6,6 +6,7 @@ import { MarkdownRenderer } from '@/components/markdown-renderer';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { BranchSwitcher } from '@/components/branch-switcher';
 import { MessageStatusBadge } from '@/components/message-status-badge';
+import { ChibiAvatar } from '@/components/chat/chibi-avatar';
 import { sanitizeContent, getFinishInfo } from '@/lib/chat-tree-persistence';
 import { stripEmulatedToolMarkup } from '@/lib/text-tool-guard';
 import { ToolTrace } from '@/components/chat/tool-trace';
@@ -21,12 +22,11 @@ function ThinkingBlock({ reasoning, isStreaming }: { reasoning: string; isStream
   return (
     /*
      * Suy luận là CHROME, không phải nội dung: nó thuộc về quá trình, không
-     * thuộc về câu trả lời. Vì vậy nó đánh dấu bằng một sườn trái 2px + một lớp
-     * nền cực mỏng, KHÔNG đóng khung như panel. Trước đây khối này mang
-     * `shadow-reasoning-glow` — key đó không còn sinh CSS nào, nên chỉ còn lại
-     * `none`; toàn bộ tầng bậc giờ do sườn trái đảm nhiệm.
+     * thuộc về câu trả lời. Vì vậy nó là một thẻ bo tròn TÔ MÀU NHẠT
+     * (`reasoning/10`) với sườn trái 3px — KHÔNG phải khối `bg-reasoning` đặc,
+     * vì khối đặc nặng bằng cả câu trả lời đứng cạnh nó.
      */
-    <div className="my-3 border-l-2 border-reasoning/40 bg-reasoning p-3.5">
+    <div className="my-4 rounded-xl rounded-l-md border border-reasoning/30 bg-reasoning/10 p-4">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -44,7 +44,7 @@ function ThinkingBlock({ reasoning, isStreaming }: { reasoning: string; isStream
         </span>
       </button>
       {open && (
-        <div className="mt-2.5 max-h-60 overflow-y-auto whitespace-pre-wrap border-t border-reasoning/40/20 pt-2 font-mono text-meta leading-relaxed text-tertiary custom-scrollbar">
+        <div className="mt-3 max-h-60 overflow-y-auto whitespace-pre-wrap border-t border-reasoning/20 pt-3 font-mono text-meta leading-relaxed text-tertiary">
           {reasoning}
         </div>
       )}
@@ -114,7 +114,7 @@ function ActionButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`relative flex h-6 w-6 items-center justify-center rounded-none transition-colors after:absolute after:-inset-[10px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+      className={`relative flex h-6 w-6 items-center justify-center rounded-md transition-colors after:absolute after:-inset-[10px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
         active ? 'bg-raised text-accent' : 'text-tertiary hover:bg-raised hover:text-primary'
       }`}
     >
@@ -149,10 +149,17 @@ export const MessageItem = memo(
 
     if (m.role === 'user') {
       return (
-        <div className="group relative w-full py-4 px-4 sm:px-6 max-w-4xl mx-auto">
+        /*
+         * KHÔNG có padding ngang ở đây. Container cuộn của message list đã nắm
+         * gutter (`px-5 md:px-8`) và bọc cột ở `max-w-thread`; trước đây hàng
+         * lại tự thêm `px-4 sm:px-6` BÊN TRONG nên chữ lệch 56px về trái so với
+         * ô nhập (chỉ 16px) — cùng một nội dung nhưng hai mép không khớp.
+         * `max-w-4xl mx-auto` cũng là vô nghĩa ở đây: cha đã chặn ở 48rem.
+         */
+        <div className="group relative w-full py-4">
           {!isEditing && (
             <div
-              className={`absolute top-2 right-4 sm:right-6 z-10 flex items-center gap-1 rounded-none border border-subtle bg-overlay px-1 py-0.5 ${MSG_ACTIONS}`}
+              className={`absolute top-1.5 right-1 z-10 flex items-center gap-0.5 lift-sm rounded-lg border border-subtle bg-overlay px-1 py-0.5 ${MSG_ACTIONS}`}
             >
               {branchInfo && (
                 <BranchSwitcher
@@ -179,17 +186,23 @@ export const MessageItem = memo(
           )}
 
           {/*
-           * Bubble của người dùng là MỘT LỚP MÀU, không phải một khung.
-           * Câu trả lời của assistant ở dưới hoàn toàn trần (không viền, không
-           * nền) — nếu bubble cũng đóng viền + bóng + bo góc, cả hai đều là
-           * "thẻ" và mắt không biết cái nào là nội dung. Vì vậy bubble chỉ giữ
-           * `bg-raised` để phân biệt tác giả, không viền, không bóng.
+           * BONG BÓT TRUYỆN TRANH — nét mực 2px, bo bất đối xứng, đuôi chỉ vẽ
+           * tay ở góc dưới, và avatar chibi đứng NGOÀI bubble (không phải trong).
+           *
+           * Avatar đứng ngoài là cố ý: đặt nó trong bubble thì nó thành một ô
+           * tròn thứ hai nữa trong hộp, và mắt phải đọc ba lớp thay vì hai.
+           *
+           * Cụm bubble+avatar là MỘT hàng: `ml-auto` đẩy cả cụm sang phải, nên
+           * mép phải của bubble vẫn chạm mép phải của cột hội thoại — giữ được
+           * bất biến gutter mà `tests/design-system.test.ts` canh.
            */}
-          <div className="ml-auto max-w-[85%] rounded-none bg-raised p-4">
+          <div className="ml-auto flex max-w-[85%] items-end justify-end gap-2">
+            <ChibiAvatar side="user" />
+            <div className="bubble-user lift-sm px-4 py-3.5">
             {m.experimental_attachments && m.experimental_attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {m.experimental_attachments.map((att, idx) => (
-                  <div key={idx} className="relative overflow-hidden rounded-none border border-subtle bg-surface">
+                  <div key={idx} className="relative overflow-hidden lift-sm rounded-lg border border-subtle bg-surface">
                     {att.contentType?.startsWith('image/') ? (
                       <img
                         src={att.url}
@@ -212,7 +225,7 @@ export const MessageItem = memo(
             )}
 
             {isEditing ? (
-              <div className="flex w-full min-w-[280px] flex-col gap-2 rounded-none border border-default bg-base p-3">
+              <div className="flex w-full min-w-[280px] flex-col gap-2 lift-sm rounded-lg border border-default bg-base p-3">
                 <TextareaAutosize
                   value={draft}
                   onChange={(e) => onDraftChange(e.target.value)}
@@ -231,14 +244,14 @@ export const MessageItem = memo(
                   <button
                     type="button"
                     onClick={onCancelEdit}
-                    className="rounded-none px-2.5 py-1 text-tertiary transition-colors hover:bg-overlay hover:text-primary"
+                    className="rounded-lg px-2.5 py-1 text-tertiary transition-colors hover:bg-overlay hover:text-primary hover:text-primary"
                   >
                     Hủy
                   </button>
                   <button
                     type="button"
                     onClick={() => onSaveEdit(m.id)}
-                    className="rounded-none bg-accent px-3 py-1 font-medium text-sunken transition-colors hover:bg-accent/85"
+                    className="rounded-lg bg-accent px-3.5 py-1.5 font-medium text-on-fill transition-colors hover:bg-accent/85"
                   >
                     Lưu & Gửi lại
                   </button>
@@ -257,13 +270,13 @@ export const MessageItem = memo(
 
                 {isLongUserMsg && !isExpanded && (
                   /*
-                   * Lớp mờ dần phải dừng đúng ở màu bubble, không phải ở một hex
-                   * viết tay: bubble nằm trên lưới giấy nền của app, nên màu
-                   * nền thật của nó là `bg-raised` hoà với nền phía dưới —
-                   * `from-raised/70` bám theo bubble, `from-sunken` sẽ để lộ
-                   * đường viền nơi hai lớp gặp nhau.
+                   * Lớp mờ dần phải dừng đúng ở màu BUBBLE, không phải ở một hex
+                   * viết tay và cũng không phải ở nền app: bubble nay là MINT
+                   * (`bg-accent-mint/70`), nên gradient phải kết thúc bằng
+                   * chính mint đó. Dùng `from-raised` sẽ để lộ một vệt xám ở
+                   * chỗ hai lớp gặp nhau — đúng lỗi mà comment cũ cảnh báo.
                    */
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-raised/70 from-70% via-raised/60 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-accent-mint/70 from-70% via-accent-mint/60 to-transparent" />
                 )}
               </div>
             )}
@@ -288,16 +301,17 @@ export const MessageItem = memo(
                 )}
               </button>
             )}
+            </div>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="group relative w-full py-5 px-4 sm:px-6 max-w-4xl mx-auto">
+      <div className="group relative w-full py-5">
         {!isStreaming && (
           <div
-            className={`absolute top-2 right-4 sm:right-6 z-10 flex items-center gap-1 rounded-none border border-subtle bg-overlay px-1.5 py-0.5 ${MSG_ACTIONS}`}
+            className={`absolute top-1 right-1 z-10 flex items-center gap-0.5 lift-sm rounded-lg border border-subtle bg-overlay px-1 py-0.5 ${MSG_ACTIONS}`}
           >
             <ActionButton
               icon={isCopied ? Check : Copy}
@@ -328,7 +342,7 @@ export const MessageItem = memo(
           {m.experimental_attachments && m.experimental_attachments.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {m.experimental_attachments.map((att, idx) => (
-                <div key={idx} className="relative overflow-hidden rounded-none border border-subtle bg-surface">
+                <div key={idx} className="relative overflow-hidden lift-sm rounded-lg border border-subtle bg-surface">
                   {att.contentType?.startsWith('image/') ? (
                     <img
                       src={att.url}
@@ -373,6 +387,18 @@ export const MessageItem = memo(
             return null;
           })()}
 
+          {/*
+           * Bong bóng của bot đảo chiều với bubble user: avatar bên trái, đuôi
+           * chỉ xuống-trái, nền GIẤY TRẮNG (không phải mint) — vì đây là nội
+           * dung chính, nó phải là thứ nền sạch nhất trên màn hình.
+           *
+           * Chỉ PHẦN LỜI nằm trong bubble. Tool trace, khối suy luận và tệp đính
+           * kèm nằm ngoài: chúng là bảng kê công việc, không phải lời nói, và
+           * bọc chúng vào bong bóng sẽ khiến một hàng dài trông như nói dối.
+           */}
+          <div className="flex items-start gap-2">
+            <ChibiAvatar side="bot" className="mt-1" />
+            <div className="bubble-bot lift-sm min-w-0 flex-1 px-4 py-3.5">
           <div
             className={`claude-prose text-primary ${isStreaming ? 'streaming-caret' : ''}`}
             aria-busy={isStreaming}
@@ -385,18 +411,20 @@ export const MessageItem = memo(
               />
             </ErrorBoundary>
           </div>
+            </div>
+          </div>
 
           {(() => {
             const { truncated, message: note } = getFinishInfo(m);
             if (!truncated || isStreaming) return null;
             return (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-none border border-warning/30 bg-raised px-3.5 py-2 font-mono text-ui text-warning">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 lift-sm rounded-lg border border-warning/30 bg-raised px-4 py-2.5 font-mono text-ui text-warning">
                 <span className="min-w-0">{note ?? 'Câu trả lời có thể chưa hoàn chỉnh.'}</span>
                 {onContinueGenerating && (
                   <button
                     type="button"
                     onClick={onContinueGenerating}
-                    className="flex-shrink-0 rounded-none bg-warning px-2.5 py-1 font-medium text-sunken transition-colors hover:bg-warning/85"
+                    className="flex-shrink-0 rounded-lg bg-warning px-3 py-1.5 font-medium text-on-fill transition-colors hover:bg-warning/85"
                   >
                     Viết tiếp
                   </button>
@@ -430,7 +458,7 @@ export const MessageItem = memo(
               <button
                 type="button"
                 onClick={() => onRegenerate(m.id)}
-                className="inline-flex items-center gap-1 rounded-none px-2 py-1 text-meta text-accent transition-colors hover:bg-raised hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-meta text-accent transition-colors hover:bg-raised hover:text-primary"
               >
                 <RefreshCcw size={12} />
                 <span>Tạo nhánh mới</span>

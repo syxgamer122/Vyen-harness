@@ -234,7 +234,7 @@ function ToolChip({ ev, className }: { ev: ToolEvent; className?: string }) {
         title={catalogEntry?.description}
         className={`flex w-full items-center gap-2 py-1 text-left transition-colors ${
           running
-            ? 'bg-raised text-secondary shadow-bevel-out'
+            ? 'lift-sm rounded-lg bg-raised text-secondary shadow-lift-sm'
             : failed
               ? 'text-danger hover:bg-danger/5'
               : 'text-tertiary hover:text-secondary'
@@ -265,7 +265,7 @@ function ToolChip({ ev, className }: { ev: ToolEvent; className?: string }) {
       </button>
 
       {expanded && hasOutput && (
-        <div className="mt-1 bg-sunken p-2 shadow-bevel-in">
+        <div className="well mt-1 rounded-lg bg-sunken p-3">
           <div className="flex items-center justify-end pb-1.5">
             <button
               type="button"
@@ -276,7 +276,7 @@ function ToolChip({ ev, className }: { ev: ToolEvent; className?: string }) {
               <span>{copied ? 'Đã sao chép' : 'Sao chép kết quả'}</span>
             </button>
           </div>
-          <pre className="custom-scrollbar max-h-60 overflow-y-auto whitespace-pre-wrap border border-subtle p-2 text-secondary">
+          <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap border border-subtle p-2 text-secondary">
             {ev.summary}
           </pre>
         </div>

@@ -132,25 +132,25 @@ export function ToolPermissionsTable() {
     switch (perm) {
       case 'auto':
         return (
-          <span className="inline-flex items-center gap-1 rounded-none border border-success/30 bg-success/10 px-1.5 py-0.5 text-micro font-medium text-success">
+          <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-micro font-medium text-success">
             <ShieldCheck size={11} /> Tự duyệt
           </span>
         );
       case 'ask':
         return (
-          <span className="inline-flex items-center gap-1 rounded-none border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-micro font-medium text-warning">
+          <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-micro font-medium text-warning">
             <ShieldQuestion size={11} /> Luôn hỏi
           </span>
         );
       case 'deny':
         return (
-          <span className="inline-flex items-center gap-1 rounded-none border border-danger/30 bg-danger/10 px-1.5 py-0.5 text-micro font-medium text-danger">
+          <span className="inline-flex items-center gap-1 rounded-full border border-danger/30 bg-danger/10 px-2 py-0.5 text-micro font-medium text-danger">
             <ShieldAlert size={11} /> Chặn
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 rounded-none border border-subtle/40 bg-overlay px-1.5 py-0.5 text-micro font-medium text-tertiary">
+          <span className="inline-flex items-center gap-1 rounded-full border border-subtle/40 bg-overlay px-2 py-0.5 text-micro font-medium text-tertiary">
             <Shield size={11} /> Mặc định
           </span>
         );
@@ -158,7 +158,7 @@ export function ToolPermissionsTable() {
   };
 
   return (
-    <div className="space-y-3 rounded-none border border-subtle bg-raised p-3 font-mono">
+    <div className="lift-sm space-y-3 rounded-xl border border-subtle bg-raised p-4 font-mono">
       {/* Header controls: Search, Group Filter, Reset */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -206,14 +206,14 @@ export function ToolPermissionsTable() {
               <button
                 type="button"
                 onClick={() => void handleReset()}
-                className="rounded-none bg-danger px-2 py-1 text-meta font-semibold text-sunken hover:bg-danger/85"
+                className="rounded-lg bg-danger px-2.5 py-1 text-meta font-semibold text-on-fill hover:bg-danger/85"
               >
                 Reset
               </button>
               <button
                 type="button"
                 onClick={() => setResetConfirm(false)}
-                className="rounded-none border border-subtle bg-overlay px-2 py-1 text-meta text-primary hover:bg-raised"
+                className="rounded-lg border border-subtle bg-overlay px-2.5 py-1 text-meta text-primary hover:bg-raised"
               >
                 Hủy
               </button>
@@ -222,7 +222,7 @@ export function ToolPermissionsTable() {
             <button
               type="button"
               onClick={() => setResetConfirm(true)}
-              className="inline-flex items-center gap-1 rounded-none border border-subtle bg-overlay px-2.5 py-1 text-meta font-medium text-primary hover:bg-raised"
+              className="inline-flex items-center gap-1 rounded-lg border border-subtle bg-overlay px-3 py-1 text-meta font-medium text-primary hover:bg-raised"
               title="Đặt lại toàn bộ quyền về mặc định"
             >
               <RotateCcw size={12} /> Đặt lại mặc định
@@ -232,7 +232,7 @@ export function ToolPermissionsTable() {
       </div>
 
       {/* Bảng phân quyền */}
-      <div className="max-h-[380px] overflow-y-auto rounded-none border border-subtle text-xs">
+      <div className="max-h-[380px] overflow-y-auto rounded-xl border border-subtle text-xs">
         <table className="w-full border-collapse text-left">
           <thead className="sticky top-0 z-10 bg-overlay font-medium text-primary">
             <tr className="border-b border-subtle">
@@ -260,7 +260,7 @@ export function ToolPermissionsTable() {
                       </span>
                       {row.desktopOnly && (
                         <span
-                          className="rounded-none bg-overlay border border-subtle px-1 py-0.2 text-micro text-tertiary"
+                          className="rounded-full bg-overlay border border-subtle px-2 py-0.5 text-micro text-tertiary"
                           title="Chỉ khả dụng trên bản Desktop"
                         >
                           desktop

@@ -1,13 +1,13 @@
 import type { MetadataRoute } from 'next';
 
 /**
- * App dark-only (app/layout.tsx gắn cứng `dark`). `background_color` và
- * `theme_color` phải trùng `viewport.themeColor` của layout — cùng `#0d1116`.
- * Nếu để nền sáng ở đây thì lúc mở bằng "install as app" màn hình splash
- * trắng nháy trước khi shell tối kịp vẽ, đúng thứ `theme_color` sinh ra để
- * chống.
+ * App LIGHT-ONLY (một theme, xem globals.css). `background_color` và
+ * `theme_color` phải trùng `viewport.themeColor` của layout — cùng `#f2f2ef`.
+ *
+ * Đây là màu splash khi mở bằng "install as app", nên nó PHẢI khớp nền app:
+ * lệch một bậc là thấy một vệt trắng/vàng nháy trước khi shell kịp vẽ.
  */
-const APP_BACKGROUND = '#0d1116';
+const APP_BACKGROUND = '#f2f2ef';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

@@ -99,14 +99,14 @@ export function MemoriesSection() {
           <h5 className="flex items-center gap-1.5 text-ui font-semibold text-primary">
             <Clock size={13} className="text-warning" />
             <span>Đang chờ duyệt</span>
-            <span className="rounded-none border border-warning/40 bg-warning/10 px-1.5 py-0.2 font-mono text-micro tabular-nums text-warning">
+            <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-mono text-micro tabular-nums text-warning">
               {(candidates ?? []).length}
             </span>
           </h5>
         </div>
 
         {(candidates ?? []).length === 0 ? (
-          <p className="rounded-none border border-subtle bg-surface px-3 py-2 text-meta italic text-tertiary">
+          <p className="rounded-lg border border-subtle bg-surface px-3.5 py-2.5 text-meta italic text-tertiary">
             Không có ghi nhớ nào đang chờ duyệt.
           </p>
         ) : (
@@ -114,7 +114,7 @@ export function MemoriesSection() {
             {(candidates ?? []).map((cand) => (
               <div
                 key={cand.id}
-                className="rounded-none border border-warning/40 bg-raised p-3 text-ui"
+                className="lift-sm rounded-lg border border-warning/40 bg-raised p-3.5 text-ui"
               >
                 <div className="flex items-center justify-between gap-2 border-b border-subtle pb-1.5">
                   <div className="flex items-center gap-1.5">
@@ -139,7 +139,7 @@ export function MemoriesSection() {
                 </div>
 
                 {refusePromptId === cand.id ? (
-                  <div className="mt-2 space-y-2 rounded-none border border-danger/40 bg-surface p-2">
+                  <div className="mt-2 space-y-2 rounded-lg border border-danger/40 bg-surface p-2.5">
                     <div className="text-meta font-medium text-danger">
                       Nhập lý do từ chối (bắt buộc):
                     </div>
@@ -210,13 +210,13 @@ export function MemoriesSection() {
         <h5 className="flex items-center gap-1.5 text-ui font-semibold text-primary">
           <Sparkles size={13} className="text-accent" />
           <span>Ký ức đã duyệt</span>
-          <span className="rounded-none border border-accent/30 bg-accent/10 px-1.5 py-0.2 font-mono text-micro tabular-nums text-accent">
+          <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-micro tabular-nums text-accent">
             {(records ?? []).length}
           </span>
         </h5>
 
         {(records ?? []).length === 0 ? (
-          <p className="rounded-none border border-subtle bg-surface px-3 py-2 text-meta italic text-tertiary">
+          <p className="rounded-lg border border-subtle bg-surface px-3.5 py-2.5 text-meta italic text-tertiary">
             Chưa có ký ức nào được kích hoạt.
           </p>
         ) : (
@@ -224,13 +224,13 @@ export function MemoriesSection() {
             {(records ?? []).map((rec) => (
               <div
                 key={rec.id}
-                className="group flex items-start justify-between gap-2 rounded-none border border-subtle bg-surface p-2.5 text-ui"
+                className="group flex items-start justify-between gap-2 rounded-lg border border-subtle bg-surface p-3 text-ui"
               >
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-meta">{kindIcons[rec.kind] || '📌'}</span>
                     <span
-                      className={`rounded-none border px-1.5 py-0.5 font-mono text-micro font-semibold uppercase tracking-wider ${
+                      className={`rounded-full border px-2 py-0.5 font-mono text-micro font-semibold uppercase tracking-wider ${
                         rec.status === 'active'
                           ? 'border-success/40 bg-success/10 text-success'
                           : rec.status === 'reference'
@@ -283,7 +283,7 @@ export function MemoriesSection() {
       </div>
 
       {/* 3. Propose New Memory Card */}
-      <div className="space-y-2 rounded-none border border-dashed border-default bg-surface p-3">
+      <div className="space-y-2 rounded-lg border border-dashed border-default bg-surface p-4">
         <div className="flex items-center justify-between">
           <label htmlFor="memory-new-kind" className="field-label">
             Thêm đề xuất ghi nhớ mới

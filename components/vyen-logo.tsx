@@ -53,8 +53,8 @@ export function VyenLogo({ size = 'sm', withWordmark = true, className }: VyenLo
     <div
       className={
         isLarge
-          ? 'relative flex h-16 w-16 items-center justify-center rounded-none bg-raised border border-subtle'
-          : 'relative flex h-7 w-7 items-center justify-center rounded-none bg-raised border border-subtle'
+          ? 'relative flex h-16 w-16 items-center justify-center rounded-lg bg-raised border border-subtle'
+          : 'relative flex h-8 w-8 items-center justify-center rounded-lg bg-raised border border-subtle'
       }
     >
       <VyenMark size={isLarge ? 34 : 16} />
@@ -68,12 +68,12 @@ export function VyenLogo({ size = 'sm', withWordmark = true, className }: VyenLo
       <div className={`flex flex-col items-center ${className ?? ''}`}>
         {tile}
         <div className="mt-4 flex items-center gap-2">
-          <span className="font-pixel text-[32px] font-bold tracking-[0.05em] text-text-primary [image-rendering:pixelated]">Vyen</span>
-          <span className="rounded-none border border-subtle bg-raised px-1.5 py-0.5 font-pixel text-meta uppercase tracking-[0.08em] text-accent">
+          <span className="uic text-[32px] font-bold tracking-[0.05em] text-text-primary">Vyen</span>
+          <span className="rounded-full border border-subtle bg-raised px-2 py-0.5 uic text-meta uppercase tracking-[0.08em] text-accent">
             agent
           </span>
         </div>
-        <div className="mt-1 font-pixel text-meta uppercase tracking-[0.08em] text-text-muted">
+        <div className="mt-1 uic text-meta uppercase tracking-[0.08em] text-text-muted">
           AI Innovations
         </div>
       </div>
@@ -85,12 +85,12 @@ export function VyenLogo({ size = 'sm', withWordmark = true, className }: VyenLo
       {tile}
       <div className="leading-tight">
         <div className="flex items-center gap-1.5">
-          <span className="font-pixel text-[16px] font-bold tracking-[0.05em] text-text-primary [image-rendering:pixelated]">Vyen</span>
-          <span className="rounded-none border border-subtle bg-raised px-1 py-0.5 font-pixel text-micro uppercase tracking-[0.08em] text-accent">
+          <span className="uic text-[16px] font-bold tracking-[0.05em] text-text-primary">Vyen</span>
+          <span className="rounded-full border border-subtle bg-raised px-2 py-0.5 uic text-micro uppercase tracking-[0.08em] text-accent">
             v0.1
           </span>
         </div>
-        <div className="font-pixel text-[9.5px] uppercase tracking-[0.08em] text-text-muted">
+        <div className="uic text-[9.5px] uppercase tracking-[0.08em] text-text-muted">
           AI Innovations
         </div>
       </div>

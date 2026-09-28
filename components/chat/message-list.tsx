@@ -128,7 +128,7 @@ function ThinkingIndicator() {
       : 'text-text-muted';
 
   return (
-    <div className="mx-auto flex max-w-thread items-start gap-3 px-4 py-3 md:px-4">
+    <div className="mx-auto flex max-w-thread items-start gap-3 py-3">
       <p className="flex min-w-0 items-baseline gap-2 py-1 font-mono text-xs" role="status">
         <span className="text-text-muted">$</span>
         <span className="text-text-primary">đang soạn câu trả lời</span>
@@ -426,24 +426,29 @@ export const MessageList = memo(function MessageList({
         role="log"
         aria-label="Danh sách tin nhắn"
         style={{ overflowAnchor: 'none' }}
-        className="chat-scroll h-full overflow-hidden overflow-y-auto px-4 md:px-8 [overflow-anchor:none]"
+        className="chat-scroll h-full overflow-hidden overflow-y-auto px-5 md:px-8 [overflow-anchor:none]"
       >
         {!hasMessages ? (
-          <div className="mx-auto flex h-full max-w-thread flex-col justify-center px-4 pb-16 pt-8">
-            <h1 className="font-pixel text-[24px] tracking-[0.05em] text-text-primary [image-rendering:pixelated]">
+          /*
+           * Gutter ngang do CHÍNH container cuộn nắm (`px-5 md:px-8` ở trên),
+           * nên trang trạng thái rỗng không thêm padding nữa — trước đây nó
+           * cộng thêm `px-4` và lệch khỏi cột so với mọi tin nhắn thật.
+           */
+          <div className="mx-auto flex h-full max-w-thread flex-col justify-center pb-20 pt-8">
+            <h1 className="uic text-[28px] tracking-[0.05em] text-text-primary ">
               VYEN<span className="text-accent-steel">_</span>
             </h1>
-            <p className="mt-2 font-mono text-xs text-text-muted leading-relaxed">
+            <p className="mt-3 max-w-prose font-mono text-xs leading-relaxed text-text-muted">
               Agent harness tối giản: session tree, core tools, tự mở rộng theo workflow của bạn.
             </p>
 
-            <div className="mt-6 flex w-full max-w-lg flex-col gap-2">
+            <div className="mt-8 flex w-full max-w-lg flex-col gap-3">
               {suggestions.map((prompt) => (
                 <button
                   key={prompt}
                   type="button"
                   onClick={() => onSelectSuggestion(prompt)}
-                  className="rounded-none border border-subtle bg-panel-bg px-3 py-2 text-left font-mono text-xs text-text-primary transition-colors duration-150 hover:border-border-hover hover:bg-panel-soft"
+                  className="lift-sm rounded-wobble border-2 border-default bg-surface px-4 py-3.5 text-left font-mono text-xs text-text-primary transition-all duration-150 hover:bg-accent-mint/40 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
                 >
                   {prompt}
                 </button>
@@ -483,7 +488,7 @@ export const MessageList = memo(function MessageList({
                     {compaction && compactionBannerBeforeId === m.id && (
                       <div className="mb-2">
                         {compaction.summary ? (
-                          <details className="rounded-none border border-[accent-dim] bg-raised px-3 py-1.5 font-mono text-xs text-status-warning">
+                          <details className="lift-sm rounded-lg border border-accent-dim bg-raised px-4 py-2.5 font-mono text-xs text-status-warning">
                             <summary className="cursor-pointer select-none font-medium text-accent-steel">
                               Đã nén {compaction.compactedCount} tin nhắn trước đó. Bấm để xem tóm tắt
                             </summary>
@@ -492,7 +497,7 @@ export const MessageList = memo(function MessageList({
                             </div>
                           </details>
                         ) : (
-                          <div className="rounded-none border border-[accent-dim] bg-raised px-3 py-1.5 font-mono text-xs text-status-warning">
+                          <div className="lift-sm rounded-lg border border-accent-dim bg-raised px-4 py-2.5 font-mono text-xs text-status-warning">
                             Đã lược bỏ {compaction.compactedCount} tin nhắn cũ
                           </div>
                         )}
@@ -572,7 +577,7 @@ export const MessageList = memo(function MessageList({
             <button
               type="button"
               onClick={onReload}
-              className="flex-shrink-0 rounded-none bg-danger px-3 py-1 font-mono text-xs font-medium text-sunken transition-colors hover:bg-danger/85"
+              className="flex-shrink-0 rounded-lg bg-danger px-3.5 py-1.5 font-mono text-xs font-medium text-on-fill transition-colors hover:bg-danger/85"
             >
               Thử lại
             </button>
@@ -585,7 +590,7 @@ export const MessageList = memo(function MessageList({
           type="button"
           onClick={onScrollToBottom}
           aria-label="Xuống tin nhắn mới nhất"
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-subtle bg-panel-bg p-2 text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-soft hover:text-text-primary"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 lift-md rounded-full border border-subtle bg-panel-bg p-2.5 text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-soft hover:text-text-primary"
         >
           <ArrowDown size={16} />
         </button>

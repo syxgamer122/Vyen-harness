@@ -106,23 +106,18 @@ export function McpToolApprovalDialog() {
   return createPortal(
     <div
       ref={containerRef}
-      className={`fixed inset-0 ${Z_CLASS.approvalCritical} flex items-center justify-center bg-black/70 p-4`}
+      className={`fixed inset-0 ${Z_CLASS.approvalCritical} flex items-center justify-center bg-sunken/75 p-4`}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="mcp-approval-title"
-        className="pi-frame relative w-full max-w-lg overflow-hidden rounded-none border border-default bg-overlay font-mono text-primary shadow-bevel-out"
+        className="lift-lg relative w-full max-w-lg overflow-hidden rounded-2xl border border-default bg-overlay font-mono text-primary shadow-lift-lg"
       >
-        <span className="pi-corner-tl" />
-        <span className="pi-corner-tr" />
-        <span className="pi-corner-bl" />
-        <span className="pi-corner-br" />
-
         <div className="flex items-start gap-3 border-b border-subtle bg-raised px-4 py-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
           <div className="min-w-0">
-            <h2 id="mcp-approval-title" className="font-pixel text-body font-semibold text-primary [image-rendering:pixelated]">
+            <h2 id="mcp-approval-title" className="uic text-body font-semibold text-primary ">
               <span className="mr-1 font-bold text-accent">$</span>mcp approval
             </h2>
             <p className="mt-0.5 font-sans text-meta leading-relaxed text-secondary">
@@ -132,12 +127,12 @@ export function McpToolApprovalDialog() {
         </div>
 
         <div className="space-y-3 px-4 py-3">
-          <div className="flex items-center gap-2 rounded-none border border-subtle bg-sunken px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg border border-subtle bg-sunken px-3.5 py-2.5">
             <Terminal className="h-4 w-4 flex-shrink-0 text-accent" />
             <code className="min-w-0 flex-1 truncate text-ui font-medium text-primary">
               {current.toolName}
             </code>
-            <span className="flex-shrink-0 rounded-none border border-subtle bg-raised px-1.5 py-0.5 text-micro text-secondary">
+            <span className="flex-shrink-0 rounded-full border border-subtle bg-raised px-2 py-0.5 text-micro text-secondary">
               {current.serverId}
             </span>
           </div>
@@ -146,7 +141,7 @@ export function McpToolApprovalDialog() {
             <div className="mb-1 font-sans text-meta font-medium text-secondary">Tham số</div>
             {/* JSON là MÁY — `font-mono`, và luôn là text child, KHÔNG BAO GIỜ
                 `dangerouslySetInnerHTML`: đây là dữ liệu từ server bên thứ ba. */}
-            <pre className="custom-scrollbar max-h-48 overflow-auto rounded-none border border-subtle bg-sunken px-3 py-2 text-meta leading-relaxed text-secondary">
+            <pre className="max-h-48 overflow-auto rounded-lg border border-subtle bg-sunken px-3.5 py-2.5 text-meta leading-relaxed text-secondary">
               {formatArgs(current.arguments)}
             </pre>
           </div>
@@ -158,7 +153,7 @@ export function McpToolApprovalDialog() {
           )}
 
           {error && (
-            <p className="rounded-none border border-danger/40 bg-danger/10 px-3 py-2 font-sans text-meta text-danger">
+            <p className="rounded-lg border border-danger/40 bg-danger/10 px-3.5 py-2.5 font-sans text-meta text-danger">
               {error}
             </p>
           )}
@@ -178,8 +173,8 @@ export function McpToolApprovalDialog() {
               onClick={() => void decide(d.value)}
               className={
                 d.primary
-                  ? 'rounded-none bg-accent px-3.5 py-1.5 text-ui font-semibold text-sunken shadow-bevel-in transition-colors hover:bg-accent/85'
-                  : 'rounded-none border border-default bg-raised px-3 py-1.5 text-ui font-medium text-secondary transition-colors hover:border-strong hover:bg-overlay hover:text-primary'
+                  ? 'lift-sm rounded-lg bg-accent px-3.5 py-1.5 text-ui font-semibold text-on-fill shadow-lift-sm transition-colors hover:bg-accent/85'
+                  : 'rounded-md border border-default bg-raised px-3 py-1.5 text-ui font-medium text-secondary transition-colors hover:border-strong hover:bg-overlay hover:text-primary'
               }
             >
               {d.label}

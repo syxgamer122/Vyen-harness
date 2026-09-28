@@ -233,7 +233,7 @@ export function SchedulerPanel() {
     };
     const t = tone[status ?? 'idle'];
     return (
-      <span className={`inline-flex items-center gap-1 rounded-none px-2 py-0.5 text-meta font-medium ${t.className}`} title={error}>
+      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-meta font-medium ${t.className}`} title={error}>
         {t.icon}
         {t.label}
       </span>
@@ -436,7 +436,7 @@ export function SchedulerPanel() {
       {/* Danh sách Schedule */}
       <div className="space-y-2">
         {(!schedules || schedules.length === 0) && !isEditing && (
-          <div className="rounded-none border border-dashed border-default bg-surface p-6 text-center text-tertiary">
+          <div className="rounded-xl border border-dashed border-default bg-surface p-8 text-center text-tertiary">
             <Calendar size={24} className="mx-auto mb-2 text-tertiary" />
             <p>Chưa có lịch trình nào được tạo.</p>
             <button
@@ -453,7 +453,7 @@ export function SchedulerPanel() {
         {schedules?.map((s) => (
           <div
             key={s.id}
-            className={`rounded-none border p-3 transition ${
+            className={`rounded-lg border p-3.5 transition ${
               s.enabled
                 ? 'border-subtle bg-raised hover:border-default'
                 : 'border-subtle bg-surface opacity-60'
@@ -469,7 +469,7 @@ export function SchedulerPanel() {
                 </div>
 
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-tertiary">
-                  <span className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 font-mono text-primary">
+                  <span className="rounded-full border border-subtle bg-sunken px-2 py-0.5 font-mono text-primary">
                     {s.cron}
                   </span>
                   <span>{describeCron(s.cron)}</span>
@@ -555,7 +555,7 @@ export function SchedulerPanel() {
                     {s.sessions.map((sessId) => (
                       <div
                         key={sessId}
-                        className="flex items-center justify-between rounded-none border border-subtle bg-sunken px-2 py-1 text-meta text-primary"
+                        className="flex items-center justify-between rounded-md border border-subtle bg-sunken px-2 py-1 text-meta text-primary"
                       >
                         <span className="truncate">{sessId}</span>
                         <button

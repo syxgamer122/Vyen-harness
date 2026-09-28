@@ -53,7 +53,7 @@ function StatusBadge({ status }: { status: VyenMcpServerState }) {
   };
   const item = map[status] ?? map.disconnected;
   return (
-    <span className={`rounded-none px-1.5 py-0.5 text-micro font-medium ${item.className}`}>
+    <span className={`rounded-full px-2 py-0.5 text-micro font-medium ${item.className}`}>
       {item.label}
     </span>
   );
@@ -339,7 +339,7 @@ export function McpSettingsPanel() {
       ) : (
         <ul className="space-y-2">
           {servers.map((server) => (
-            <li key={server.id} className="rounded-none border border-subtle bg-surface px-3 py-2">
+            <li key={server.id} className="lift-sm rounded-lg border border-subtle bg-surface px-3.5 py-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -374,9 +374,9 @@ export function McpSettingsPanel() {
                         ? 'Chế độ proxy: model tìm tool qua mcp__search thay vì nhận toàn bộ schema. Bấm để trả về chế độ đầy đủ.'
                         : 'Bật chế độ proxy: schema không nằm trong ngữ cảnh mỗi request — model tìm tool qua mcp__search (thêm một lượt gọi trung gian).'
                     }
-                    className={`rounded-none px-1.5 py-0.5 font-mono text-micro font-medium disabled:opacity-50 ${
+                    className={`rounded-full px-2 py-0.5 font-mono text-micro font-medium disabled:opacity-50 ${
                       server.exposeMode === 'proxy'
-                        ? 'bg-accent font-semibold text-sunken'
+                        ? 'bg-accent font-semibold text-on-fill'
                         : 'border border-default bg-raised text-tertiary hover:bg-overlay'
                     }`}
                   >

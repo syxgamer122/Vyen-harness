@@ -160,13 +160,27 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
        * safelist. `Z_CLASS` vẫn được giữ nguyên ở đây để khai báo ý định.
        */
       style={{ zIndex: Z_INDEX.system }}
-      className={`fixed inset-0 ${Z_CLASS.system} flex animate-fade-in items-center justify-center bg-black/60 p-3 sm:p-4`}
+      className={`fixed inset-0 ${Z_CLASS.system} flex animate-fade-in items-center justify-center bg-sunken/70 p-3 sm:p-4`}
     >
       {/*
        * PHẳNG, không kính. `.glass-panel` ép `box-shadow` drop-shadow bằng
-       * `!important` — thứ mà hợp đồng token cấm (`.bevel-out` / `.bevel-in` là
+       * `!important` — thứ mà hợp đồng token cấm (`.lift-sm` / `.lift-md` là
        * hai `box-shadow` hợp lệ DUY NHẤT). Modal là tầng trên cùng nên đủ tư
-       *ơng để tách khỏi nền: `bg-overlay` + `shadow-bevel-out`.
+       *ơng để tách khỏi nền: `bg-overlay` + `shadow-lift-lg`.
+       */}
+      {/*
+       * Trần chiều cao. Số 70vh không phải ngẫu nhiên: 85vh cũ ép modal phủ 85%
+       * chiều cao màn hình — đọc như một tấm kín dán lên trang dù thực tế chỉ
+       * chiếm 56% DIỆN TÍCH. Bỏ hẳn trần còn tệ hơn: thử nghiệm đo được modal
+       * phủ 96-97% chiều cao, vì nội dung 6 tab dài là 914-1782px, lớn hơn màn
+       * hình, nên thứ giữ nó lại chỉ có thể là trần.
+       *
+       * `min(...)` với `100dvh` để không bao giờ tràn trên màn hình thấp; `w-full`
+       * + `max-w-4xl` phía dưới giữ chiều rộng không đổi so với trước.
+       *
+       * Lưu ý: bỏ `flex-1` ở hàng bên dưới KHÔNG phải nguyên nhân chuyện này —
+       * nó chỉ quyết định trường hợp tab NGẮN hơn trần (Telemetry co được nhờ
+       * đó). 6 tab dài hơn trần thì `flex-1` có hay không đều bị trần ép.
        */}
       <div
         ref={panelRef}
@@ -174,12 +188,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-labelledby="settings-dialog-title"
         tabIndex={-1}
-        className="relative flex h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-none border border-default bg-overlay font-mono shadow-bevel-out focus:outline-none sm:h-[82vh] sm:max-h-[calc(100dvh-1.5rem)]"
+        className="relative flex max-h-[min(70vh,calc(100dvh-3rem))] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg focus:outline-none"
       >
         {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-subtle bg-raised px-5 py-3">
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-subtle bg-raised px-4 py-2.5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-none bg-accent-dim text-micro font-bold text-accent">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-dim text-micro font-bold text-accent">
               $
             </span>
             <div className="flex items-center gap-2">
@@ -190,7 +204,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 Studio Settings
               </h2>
               <span className="hidden items-center text-micro text-tertiary sm:inline-flex">
-                <kbd className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-secondary">
+                <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                   ⌘,
                 </kbd>
               </span>
@@ -201,14 +215,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Đóng cài đặt"
-            className="flex h-7 w-7 items-center justify-center rounded-none border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:text-primary"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:text-primary"
           >
             <X size={15} />
           </button>
         </div>
 
         {/* Search Bar */}
-        <div className="relative flex-shrink-0 border-b border-subtle bg-surface px-5 py-2">
+        <div className="relative flex-shrink-0 border-b border-subtle bg-surface px-4 py-1.5">
           <div className="relative">
             <Search
               size={13}
@@ -236,7 +250,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           {searchOpen && (
-            <div className="surface-panel absolute left-5 right-5 top-full z-20 mt-1 max-h-56 overflow-y-auto custom-scrollbar">
+            <div className="surface-panel absolute left-4 right-4 top-full z-20 mt-1 max-h-56 overflow-y-auto">
               {searchResults.length === 0 ? (
                 <p className="px-3 py-3 text-ui leading-relaxed text-tertiary">
                   Không có cài đặt nào khớp &ldquo;{searchQuery.trim()}&rdquo;. Thử từ khoá ngắn
@@ -266,7 +280,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                           <div className="font-semibold text-primary">{item.title}</div>
                           <div className="text-meta text-tertiary">{item.description}</div>
                         </div>
-                        <span className="flex-shrink-0 rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-accent">
+                        <span className="flex-shrink-0 rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-accent">
                           {tabMeta?.label}
                         </span>
                       </button>
@@ -279,9 +293,19 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* 2-Column Body: Left Sidebar Nav + Right Content Panel */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden sm:flex-row">
+        {/*
+         * KHÔNG dùng `flex-1` ở đây. Panel cha cao theo nội dung, nên hàng này
+         * `flex-1` sẽ giãn hết khoảng trống của cha, khiến modal cao tối đa
+         * dù tab nào chỉ có vài dòng. `flex-row` + cột trái `sm:w-56` đã đủ để
+         * xếp cạnh nhau; cột phải tự cao theo nội dung rồi mới cuộn trong nó.
+         *
+         * Cần phân biệt: đây KHÔNG phải thứ gây ra hiện tượng "modal che màn
+         * hình" trước đây — trần 85vh trên panel cha mới là thứ đó. Sửa ở đây
+         * chỉ giúp các tab NGẮN hơn trần co lại đúng bằng nội dung.
+         */}
+        <div className="flex min-h-0 flex-col overflow-hidden sm:flex-row">
           {/* Left Navigation Sidebar */}
-          <div className="flex-shrink-0 overflow-x-auto border-b border-subtle bg-surface p-2 custom-scrollbar sm:w-56 sm:overflow-x-visible sm:overflow-y-auto sm:border-b-0 sm:border-r sm:p-3">
+          <div className="flex-shrink-0 overflow-x-auto border-b border-subtle bg-surface p-1.5 sm:w-48 sm:overflow-x-visible sm:overflow-y-auto sm:border-b-0 sm:border-r sm:border-subtle sm:p-2">
             <div
               ref={tabListRef}
               className="flex gap-1 sm:flex-col"
@@ -302,7 +326,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                     tabIndex={isActive ? 0 : -1}
                     onClick={() => switchTab(t.id)}
                     onKeyDown={onTabKeyDown}
-                    className={`flex flex-shrink-0 items-center gap-2.5 rounded-none border px-3 py-2 text-left font-mono text-ui transition-colors duration-150 ${
+                    className={`flex flex-shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left font-mono text-ui transition-colors duration-150 ${
                       isActive
                         ? 'border-strong bg-raised font-medium text-accent'
                         : 'border-transparent text-secondary hover:border-subtle hover:bg-raised hover:text-primary'
@@ -317,14 +341,17 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Right Content Panels Container */}
-          <div className="min-h-0 flex-1 overflow-y-auto bg-sunken custom-scrollbar">
+          {/* Không `flex-1`: cột này phảI cao theo nội dung tab đang mở, không
+              phải cao theo khoảng trống còn lại của hàng. `min-h-0` giữ cho nó
+              cuộn được khi nội dung dài hơn trần của panel cha. */}
+          <div className="min-h-0 w-full overflow-y-auto bg-sunken sm:flex-1">
             {/* TAB 1: GIAO DIỆN & TRẢI NGHIỆM */}
             <div
               role="tabpanel"
               id="settings-panel-appearance"
               aria-labelledby="settings-tab-appearance"
               hidden={tab !== 'appearance'}
-              className={`settings-panel p-4 sm:p-6 ${tab === 'appearance' ? 'block' : 'hidden'}`}
+              className={`settings-panel p-3 sm:p-4 ${tab === 'appearance' ? 'block' : 'hidden'}`}
             >
               {visited.has('appearance') && <AppearanceTab />}
             </div>
@@ -335,7 +362,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               id="settings-panel-providers"
               aria-labelledby="settings-tab-providers"
               hidden={tab !== 'providers'}
-              className={`settings-panel p-4 sm:p-6 ${tab === 'providers' ? 'block' : 'hidden'}`}
+              className={`settings-panel p-3 sm:p-4 ${tab === 'providers' ? 'block' : 'hidden'}`}
             >
               {visited.has('providers') && <ProvidersTab />}
             </div>
@@ -346,7 +373,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               id="settings-panel-safety"
               aria-labelledby="settings-tab-safety"
               hidden={tab !== 'safety'}
-              className={`settings-panel p-4 sm:p-6 ${tab === 'safety' ? 'block' : 'hidden'}`}
+              className={`settings-panel p-3 sm:p-4 ${tab === 'safety' ? 'block' : 'hidden'}`}
             >
               {visited.has('safety') && <SafetyTab />}
             </div>
@@ -357,7 +384,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               id="settings-panel-extensions"
               aria-labelledby="settings-tab-extensions"
               hidden={tab !== 'extensions'}
-              className={`settings-panel p-4 sm:p-6 ${tab === 'extensions' ? 'block' : 'hidden'}`}
+              className={`settings-panel p-3 sm:p-4 ${tab === 'extensions' ? 'block' : 'hidden'}`}
             >
               {visited.has('extensions') && <ExtensionsTab />}
             </div>
@@ -368,7 +395,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               id="settings-panel-memory"
               aria-labelledby="settings-tab-memory"
               hidden={tab !== 'memory'}
-              className={`settings-panel p-4 sm:p-6 ${tab === 'memory' ? 'block' : 'hidden'}`}
+              className={`settings-panel p-3 sm:p-4 ${tab === 'memory' ? 'block' : 'hidden'}`}
             >
               {visited.has('memory') && <MemoryTab />}
             </div>
@@ -379,7 +406,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               id="settings-panel-data"
               aria-labelledby="settings-tab-data"
               hidden={tab !== 'data'}
-              className={`settings-panel p-4 sm:p-6 ${tab === 'data' ? 'block' : 'hidden'}`}
+              className={`settings-panel p-3 sm:p-4 ${tab === 'data' ? 'block' : 'hidden'}`}
             >
               {visited.has('data') && <DataTab />}
             </div>
@@ -390,7 +417,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               id="settings-panel-telemetry"
               aria-labelledby="settings-tab-telemetry"
               hidden={tab !== 'telemetry'}
-              className={`settings-panel p-4 sm:p-6 ${tab === 'telemetry' ? 'block' : 'hidden'}`}
+              className={`settings-panel p-3 sm:p-4 ${tab === 'telemetry' ? 'block' : 'hidden'}`}
             >
               {visited.has('telemetry') && <TelemetryTab />}
             </div>

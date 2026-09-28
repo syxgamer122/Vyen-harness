@@ -116,7 +116,7 @@ export function SafetyTab() {
               type="checkbox"
               checked={settings.stagingSandbox ?? true}
               onChange={(e) => updateSettings({ stagingSandbox: e.target.checked })}
-              className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+              className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full accent-accent"
             />
           </label>
 
@@ -156,7 +156,7 @@ export function SafetyTab() {
             <input
               id="code-mode-toggle"
               type="checkbox"
-              className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+              className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full accent-accent"
               checked={settings.codeModeEnabled ?? false}
               onChange={(e) => updateSettings({ codeModeEnabled: e.target.checked })}
             />
@@ -181,7 +181,7 @@ export function SafetyTab() {
               type="checkbox"
               checked={settings.forceEmulatedTools ?? false}
               onChange={(e) => updateSettings({ forceEmulatedTools: e.target.checked })}
-              className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+              className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full accent-accent"
             />
           </label>
         </>

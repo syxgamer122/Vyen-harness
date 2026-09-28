@@ -230,7 +230,7 @@ const CodeBlock = memo(function CodeBlock({
         <button
           type="button"
           onClick={onCopy}
-          className="flex items-center gap-1 rounded-none px-1 py-0.5 text-[11px] text-text-muted transition-colors hover:bg-white/10 hover:text-text-primary"
+          className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[11px] text-text-muted transition-colors hover:bg-accent-mint/50 hover:text-text-primary"
           aria-label={copied ? 'Đã chép đoạn mã' : 'Chép đoạn mã'}
         >
           {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
@@ -360,7 +360,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
               src={href}
               controls
               preload="metadata"
-              className="my-2 max-h-[480px] w-auto max-w-full rounded-none border border-subtle bg-sunken"
+              className="my-2 max-h-[480px] w-auto max-w-full rounded-lg border border-subtle bg-sunken"
               onLoadedMetadata={emitImageLoaded}
             />
           );
@@ -391,7 +391,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
               src={src}
               controls
               preload="metadata"
-              className="my-2 max-h-[480px] w-auto max-w-full rounded-none border border-subtle bg-sunken"
+              className="my-2 max-h-[480px] w-auto max-w-full rounded-lg border border-subtle bg-sunken"
               onLoadedMetadata={emitImageLoaded}
             />
           );
@@ -410,7 +410,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
               loading="lazy"
               decoding="async"
               referrerPolicy={MEDIA_REFERRER_POLICY}
-              className="max-h-[420px] w-auto max-w-full rounded-none border border-subtle bg-sunken object-contain"
+              className="max-h-[420px] w-auto max-w-full rounded-lg border border-subtle bg-sunken object-contain"
               onLoad={emitImageLoaded}
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';

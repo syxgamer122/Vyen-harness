@@ -272,9 +272,9 @@ export function ModelSelector({
         title={optionTitle(m)}
         onClick={() => commit(idx)}
         onPointerEnter={() => setCursor(idx)}
-        className={`group relative flex min-h-11 cursor-pointer flex-col justify-center rounded-none px-2 py-1 text-left transition-colors ${
+        className={`group relative flex min-h-11 cursor-pointer flex-col justify-center rounded-lg px-2.5 py-2 text-left transition-colors ${
           active
-            ? 'pi-active-indicator bg-raised text-primary'
+            ? 'bg-raised text-primary'
             : focused
               ? 'bg-raised text-primary'
               : 'hover:bg-raised text-primary'
@@ -307,7 +307,7 @@ export function ModelSelector({
             title={favorited ? 'Bỏ yêu thích' : 'Yêu thích'}
             /* Vùng chạm 40px (24px + inset 8px mỗi cạnh), lọt vừa trong hàng
                min-h-11 (44px) nên không đụng sao của hàng kế bên. */
-            className={`relative flex h-6 w-6 flex-none items-center justify-center rounded-none transition-colors after:absolute after:-inset-2 after:content-[''] ${
+            className={`relative flex h-6 w-6 flex-none items-center justify-center rounded-lg transition-colors after:absolute after:-inset-2 after:content-[''] ${
               favorited
                 ? 'text-accent'
                 : 'text-tertiary opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100'
@@ -357,7 +357,7 @@ export function ModelSelector({
         title={triggerTitle}
         id="model-selector-trigger"
         data-testid="model-selector-trigger"
-        className="relative flex h-8 max-w-full items-center gap-1.5 rounded-none border border-subtle bg-raised px-2.5 font-mono text-ui font-medium text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-default hover:bg-overlay disabled:opacity-40"
+        className="relative flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-subtle bg-raised px-3 font-mono text-ui font-medium text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-default hover:bg-overlay disabled:opacity-40"
       >
         <span className="min-w-0 max-w-[30vw] truncate sm:max-w-[160px]">{selectionLabel}</span>
         <ChevronDown size={12} className="flex-none text-tertiary" aria-hidden="true" />
@@ -377,11 +377,11 @@ export function ModelSelector({
               width: pos.width,
               maxHeight: pos.maxHeight,
             }}
-            className={`surface-panel ${Z_CLASS.popover} flex animate-pop-in flex-col overflow-hidden rounded-none border border-subtle bg-overlay`}
+            className={`surface-panel ${Z_CLASS.popover} flex animate-pop-in flex-col overflow-hidden lift-md rounded-xl border border-subtle bg-overlay`}
           >
             {/* Ô tìm kiếm + số lượng model */}
             <div className="flex flex-none items-center gap-2 border-b border-subtle p-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-none border border-subtle bg-sunken px-2.5 py-1.5 transition-colors focus-within:border-accent">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-subtle bg-sunken px-3 py-1.5 transition-colors focus-within:border-accent">
                 <Search size={12} aria-hidden="true" className="shrink-0 text-tertiary" />
                 <input
                   ref={searchRef}
@@ -418,7 +418,7 @@ export function ModelSelector({
                       setQuery('');
                       searchRef.current?.focus();
                     }}
-                    className="rounded-none border border-subtle bg-raised px-2.5 py-1 text-meta text-primary transition-colors hover:border-default hover:bg-overlay"
+                    className="rounded-full border border-subtle bg-raised px-2.5 py-1 text-meta text-primary transition-colors hover:border-default hover:bg-overlay"
                   >
                     Xóa tìm kiếm
                   </button>

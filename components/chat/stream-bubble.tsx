@@ -25,25 +25,32 @@ function StreamThinkingBlock({
   const preview = lines[lines.length - 1] || 'thinking...';
 
   return (
-    <div className="my-2 rounded-r-xl border-l-2 border-reasoning/40 bg-reasoning p-3 shadow-reasoning-glow">
+    /*
+     * Suy luận là CHROME, không phải nội dung: nó là một thẻ bo tròn TÔ MÀU
+     * NHẠT (`reasoning/10`) với sườn trái — KHÔNG phải khối `bg-reasoning`
+     * đặc. Nền đặc `#a78bd4` làm `text-primary` rơi còn 2.39:1 (fail WCAG AA),
+     * còn icon `text-reasoning` trên chính nền đó là 1.00:1 — vô hình.
+     * Cùng cách làm với khối suy luận ở `chat/message-item.tsx:28`.
+     */
+    <div className="my-2 rounded-r-xl border-l-2 border-reasoning/40 bg-reasoning/10 p-3 shadow-lift-sm">
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between gap-2 text-left transition-colors"
       >
         <span className="flex min-w-0 items-center gap-2">
-          <BrainCircuit size={14} className="flex-shrink-0 text-violet-reasoning animate-pulse" />
-          <span className="font-medium text-[12px] text-text-primary">Đang suy luận (Reasoning)</span>
+          <BrainCircuit size={14} className="flex-shrink-0 text-reasoning animate-pulse" />
+          <span className="font-medium text-[12px] text-primary">Đang suy luận (Reasoning)</span>
           {isStreaming && <span className="w-1.5 h-3 bg-cyan-glow inline-block align-middle ml-1 animate-pulse" aria-hidden="true" />}
-          {!open && <span className="truncate text-xs text-text-muted italic">· {preview}</span>}
+          {!open && <span className="truncate text-xs text-secondary italic">· {preview}</span>}
         </span>
-        <span className="flex items-center gap-1 text-[10.5px] text-text-muted flex-shrink-0">
+        <span className="flex items-center gap-1 text-[10.5px] text-secondary flex-shrink-0">
           <span>{open ? 'Thu gọn' : 'Chi tiết'}</span>
           {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </span>
       </button>
       {open && (
-        <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-text-muted custom-scrollbar pt-2 border-t border-reasoning/40/20">
+        <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-[12px] leading-relaxed text-secondary pt-2 border-t border-reasoning/40">
           {reasoning}
         </div>
       )}
@@ -83,7 +90,7 @@ export const StreamBubble = memo(function StreamBubble({
     <div
       data-testid="stream-bubble"
       aria-live="polite"
-      className={`sticky bottom-0 z-10 w-full px-4 py-3 bg-surface/80 backdrop-blur-md border-t border-white/[0.05] transition-opacity duration-100 ${
+      className={`sticky bottom-0 z-10 w-full px-4 py-3 bg-surface/80 backdrop-blur-md border-t border-subtle transition-opacity duration-100 ${
         handoffActive && !isStreaming ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >

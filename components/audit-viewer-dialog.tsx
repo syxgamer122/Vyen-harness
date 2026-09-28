@@ -202,7 +202,7 @@ export function AuditViewerDialog({ isOpen, onClose, chatIdFilter }: AuditViewer
    */
   return createPortal(
     <div
-      className={`fixed inset-0 ${Z_CLASS.navigation} flex items-center justify-center bg-black/70 p-4`}
+      className={`fixed inset-0 ${Z_CLASS.navigation} flex items-center justify-center bg-sunken/75 p-4`}
       onClick={onClose}
     >
       <div
@@ -210,7 +210,7 @@ export function AuditViewerDialog({ isOpen, onClose, chatIdFilter }: AuditViewer
         role="dialog"
         aria-modal="true"
         aria-labelledby="audit-viewer-title"
-        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-none border border-default bg-overlay font-mono shadow-bevel-out animate-pop-in"
+        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg animate-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -225,7 +225,7 @@ export function AuditViewerDialog({ isOpen, onClose, chatIdFilter }: AuditViewer
             type="button"
             onClick={onClose}
             aria-label="Đóng nhật ký kiểm toán"
-            className="flex h-7 w-7 flex-none items-center justify-center rounded-none border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:bg-overlay hover:text-primary"
+            className="flex h-7 w-7 flex-none items-center justify-center rounded-lg border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:bg-overlay hover:text-primary"
           >
             <X size={14} />
           </button>
@@ -315,7 +315,7 @@ export function AuditViewerDialog({ isOpen, onClose, chatIdFilter }: AuditViewer
         </div>
 
         {/* Table */}
-        <div className="custom-scrollbar flex-1 overflow-auto bg-sunken px-3 py-2">
+        <div className="flex-1 overflow-auto bg-sunken px-3 py-2">
           {loading ? (
             <p className="py-10 text-center font-sans text-ui text-secondary">Đang nạp nhật ký kiểm toán…</p>
           ) : filteredLogs.length === 0 ? (
@@ -357,7 +357,7 @@ export function AuditViewerDialog({ isOpen, onClose, chatIdFilter }: AuditViewer
                     <td className="px-2 py-1.5 font-sans font-medium text-primary">{log.action}</td>
                     <td className="px-2 py-1.5">
                       <span
-                        className={`inline-block rounded-none border px-1.5 py-0.5 font-sans text-micro font-medium ${decisionTone(log.decision)}`}
+                        className={`inline-block rounded-full border px-2 py-0.5 font-sans text-micro font-medium ${decisionTone(log.decision)}`}
                       >
                         {log.decision}
                       </span>

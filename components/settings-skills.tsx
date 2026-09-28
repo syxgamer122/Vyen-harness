@@ -109,7 +109,7 @@ export function DiskSkillsSection() {
                 type="checkbox"
                 checked={!disabled}
                 onChange={() => toggle(e.name)}
-                className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-none accent-accent"
+                className="mt-0.5 h-4 w-4 flex-shrink-0 rounded-full accent-accent"
               />
               <label htmlFor={`skill-toggle-${e.source}-${e.name}`} className="min-w-0 flex-1 cursor-pointer">
                 <span className="block text-ui font-medium text-primary">

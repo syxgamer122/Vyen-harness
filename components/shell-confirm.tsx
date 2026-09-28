@@ -50,17 +50,17 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
       role="dialog"
       aria-modal="true"
       aria-labelledby="shell-confirm-title"
-      className={`fixed inset-0 ${Z_CLASS.approval} flex items-end sm:items-center justify-center bg-black/70 p-3 sm:p-4`}
+      className={`fixed inset-0 ${Z_CLASS.approval} flex items-end sm:items-center justify-center bg-sunken/75 p-3 sm:p-4`}
       onClick={() => decide(false)}
     >
       {/*
        * PHẲNG, không kính. `.glass-panel` ép `box-shadow` bằng `!important` —
-       * thứ hợp đồng token cấm, vì chỉ `shadow-bevel-out` / `shadow-bevel-in`
-       * được sinh bóng. Modal là tầng trên cùng nên `bg-overlay` + bevel đã đủ
+       * thứ hợp đồng token cấm, vì chỉ `shadow-lift-lg` / `shadow-lift-sm`
+       * được sinh bóng. Modal là tầng trên cùng nên `bg-overlay` + bóng ngoài đã đủ
        * tách khỏi nền (cùng cách làm với diff-confirm).
        */}
       <div
-        className={`relative mb-2 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-none border bg-overlay font-mono shadow-bevel-out animate-pop-in sm:mb-0 ${
+        className={`relative mb-2 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden lift-lg rounded-2xl border bg-overlay font-mono shadow-lift-lg animate-pop-in sm:mb-0 ${
           isDestructive ? 'border-danger' : 'border-default'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -85,7 +85,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
           </div>
 
           {isDestructive && (
-            <span className="inline-flex items-center gap-1 rounded-none border border-danger/40 bg-danger/10 px-2 py-0.5 text-micro font-bold uppercase tracking-wider text-danger">
+            <span className="inline-flex items-center gap-1 rounded-full border border-danger/40 bg-danger/10 px-2.5 py-0.5 text-micro font-bold uppercase tracking-wider text-danger">
               <AlertTriangle size={11} />
               Destructive Action
             </span>
@@ -107,7 +107,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
            * ký tự đầu. `break-all` vì lệnh dài không có chỗ trắng.
            */}
           <div
-            className={`rounded-none border p-3.5 font-mono ${
+            className={`rounded-lg border p-4 font-mono ${
               isDestructive ? 'border-danger/40 bg-danger/5' : 'border-subtle bg-sunken'
             }`}
           >
@@ -130,7 +130,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
         <div className="flex items-center justify-between gap-3 border-t border-subtle bg-raised px-4 py-3 sm:px-5">
           <div className="hidden items-center gap-2 font-mono text-meta text-tertiary sm:flex">
             <span className="flex items-center gap-1">
-              <kbd className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-secondary">
+              <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Esc
               </kbd>
               <span>reject</span>
@@ -139,7 +139,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
               •
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded-none border border-subtle bg-sunken px-1.5 py-0.5 text-micro text-secondary">
+              <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Tab
               </kbd>
               <span>then ↵ on the chosen button</span>
@@ -156,7 +156,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
               data-shell-discard=""
               type="button"
               onClick={() => decide(false)}
-              className="flex items-center justify-center gap-1.5 rounded-none border border-default bg-raised px-4 py-2 text-ui font-medium text-secondary transition-all hover:border-strong hover:text-primary active:scale-[0.98]"
+              className="flex items-center justify-center gap-1.5 lift-sm rounded-lg border border-default bg-raised px-4 py-2 text-ui font-medium text-secondary transition-all hover:border-strong hover:text-primary active:scale-[0.98]"
             >
               <X size={14} />
               <span>[ Esc ] Từ chối</span>
@@ -164,10 +164,10 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
             <button
               type="button"
               onClick={() => decide(true)}
-              className={`flex items-center justify-center gap-1.5 rounded-none px-4 py-2 text-ui font-semibold shadow-bevel-in transition-all active:scale-[0.98] ${
+              className={`flex items-center justify-center gap-1.5 lift-sm rounded-lg px-4 py-2 text-ui font-semibold shadow-lift-sm transition-all active:scale-[0.98] ${
                 isDestructive
-                  ? 'bg-danger text-sunken hover:bg-danger/85'
-                  : 'bg-accent text-sunken hover:bg-accent/85'
+                  ? 'bg-danger text-on-fill hover:bg-danger/85'
+                  : 'bg-accent text-on-fill hover:bg-accent/85'
               }`}
             >
               <Check size={14} />

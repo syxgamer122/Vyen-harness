@@ -115,11 +115,11 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
       role="dialog"
       aria-modal="true"
       aria-labelledby="tools-panel-title"
-      className={`fixed inset-0 ${Z_CLASS.navigation} flex justify-end bg-black/60`}
+      className={`fixed inset-0 ${Z_CLASS.navigation} flex justify-end bg-sunken/70`}
       onClick={onClose}
     >
       <aside
-        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden rounded-none border border-subtle bg-overlay font-mono"
+        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden lift-md rounded-xl border border-subtle bg-overlay font-mono"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2 border-b border-subtle bg-raised px-4 py-3">
@@ -140,7 +140,7 @@ export function ToolsPanel({ open, onClose }: { open: boolean; onClose: () => vo
             type="button"
             onClick={onClose}
             aria-label="Đóng panel công cụ"
-            className="icon-btn icon-btn-md relative rounded-none after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            className="icon-btn icon-btn-md relative rounded-lg after:absolute after:-inset-[6px] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           >
             <X size={14} />
           </button>

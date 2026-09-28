@@ -29,16 +29,6 @@ export default function Home() {
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const isSidebarCollapsed = useAppStore((s) => s.isSidebarCollapsed);
   const animations = useAppStore((s) => s.settings.perf.animations);
-  const theme = useAppStore((s) => s.theme);
-
-  /*
-   * Vyen đã commit dark-only (xem app/layout.tsx). Effect này giữ cứng
-   * class `dark` lên <html> cho mọi lần re-render, phòng extension hoặc
-   * mã khác gỡ nhầm. Có thể xoá khi nào `theme` bị gỡ khỏi store.
-   */
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
-  }, [theme]);
 
   /* Preload chunk Cài đặt lúc idle: lần bấm Cài đặt đầu tiên không còn đóng
      băng main thread để parse chunk (CDP baseline: longtask đỉnh 353ms).

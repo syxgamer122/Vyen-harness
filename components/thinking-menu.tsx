@@ -274,7 +274,7 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
         aria-expanded={open}
         title={snapped ? snappedLabel : 'Mức độ suy luận của AI'}
         /* `after:-inset-6px` nới vùng chạm 36px lên 48px (mốc 44px trên mobile) mà không đổi khối hiển thị, giống nút icon trong composer. */
-        className={`relative flex h-8 items-center gap-1.5 rounded-none border border-subtle bg-raised px-2.5 text-xs font-medium text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`relative flex h-8 items-center gap-1.5 rounded-lg border border-subtle bg-raised px-3 text-xs font-medium text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
           open ? 'border-border-hover' : ''
         }`}
       >
