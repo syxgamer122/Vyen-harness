@@ -2634,7 +2634,35 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         ].join("");
         return JSON.stringify({ note: steer });
       }
-      const result = await rawHandleClientToolCall(call);
+      let result: string;
+      try {
+        result = await rawHandleClientToolCall(call);
+      } catch (err) {
+        /* PHẢI trả string, không được nuốt lỗi. `ai@4` giữ invocation ở
+           state `call` mãi mãi khi onToolCall không trả gì → stream kết thúc
+           `tool-calls` nhưng không resubmit, và người dùng thấy agent
+           "dừng giữa chừng" không giải thích (đã quan sát: fs_list trên thư mục
+           không tồn tại → ENOENT → im lặng).
+
+           Nhánh lỗi trong raw handler vốn đã trả JSON lỗi cho tool *bị từ chối*,
+           nhưng bất kỳ throw nào lọt ra ngoài — handler lạ, deps hỏng, exception
+           không dự đoán — trước đây làm treo cả phiên. Giờ thành thông điệp
+           để model biết cần thử đường khác (thường là đường dẫn sai). */
+        const detail = err instanceof Error ? err.message : String(err);
+        result = JSON.stringify({
+          error: `Tool "${toolName}" thất bại: ${detail}`,
+          tool: toolName,
+        });
+      }
+      /* onToolCall PHẢI trả string khác rỗng. `ai@4` coi undefined/null/rỗng
+         là "chưa xong" và giữ invocation ở state `call` → treo. Một handler
+         quên return lọt vào đây thì im lặng thay vì báo lỗi. */
+      if (typeof result !== 'string' || result.length === 0) {
+        result = JSON.stringify({
+          error: `Tool "${toolName}" trả về rỗng — không có kết quả để xử lý.`,
+          tool: toolName,
+        });
+      }
       /* Chỉ đánh dấu khi tool thực sự CHẠY (không bị deny/policy chặn) —
          payload bị deny là thông điệp lỗi harness, không có dữ liệu ngoài. */
       if (!/"denied":true/.test(result) && noteUntrustedToolResult(chatKey, toolName, result, (call.toolCall.args ?? {}) as Record<string, unknown>)) {

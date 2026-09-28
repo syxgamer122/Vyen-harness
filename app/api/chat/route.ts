@@ -63,7 +63,7 @@ import {
   buildSubRecipeServerTools,
   toResolvedSubRecipes,
 } from '@/lib/recipes/subrecipe-exec';
-import { SERVER_MAX_STEPS, TOOL_RESULT_MAX_CHARS, truncateToolResult } from '@/lib/tool-limits';
+import { MAX_TOOL_CALLS_PER_TURN, SERVER_MAX_STEPS, TOOL_RESULT_MAX_CHARS, truncateToolResult } from '@/lib/tool-limits';
 import { redactSecretText, redactSecretsDeep } from '@/lib/secret-registry';
 import { resolveRoute, DEFAULT_CHAINS, type CategoryId, type RouteReceipt, type ChainEntry } from '@/lib/routing/categories';
 import { scoreRequest } from '@/lib/routing/score-request';
@@ -631,7 +631,13 @@ const MessageSchema = z.object({
   experimental_attachments: z.array(AttachmentSchema).max(4).optional(),
   /* Kết quả fs_* client-executed quay lại trong đây khi useChat resubmit —
      KHÔNG được strip (zod mặc định) nếu không model không bao giờ thấy kết
-     quả và lặp gọi tool vô hạn. */
+     quả và lặp gọi tool vô hạn.
+
+     Trần PHẢI bằng MAX_TOOL_CALLS_PER_TURN (32). Trước đây để cứng 12 trong
+     khi budget cho phép 32 → model gọi thứ 13 là cả lượt tool rớt: server
+     trả 400 BAD_SCHEMA ("Array must contain at most 12 element(s)"), useChat
+     nhận lỗi nên vòng agent chết im lặng giữa chừng — đúng triệu chứng "chạy
+     được vài tool rồi đùng". Dùng chung hằng số để hai nơi không lệch nhau. */
   toolInvocations: z
     .array(
       z.object({
@@ -642,7 +648,7 @@ const MessageSchema = z.object({
         result: z.unknown().optional(),
       }),
     )
-    .max(12)
+    .max(MAX_TOOL_CALLS_PER_TURN)
     .optional(),
 });
 
