@@ -52,7 +52,28 @@ export interface ClientDoomVerdict {
   counted: number;
 }
 
-/** Chữ ký call client — giống stableKey của agent-tools (tên + args JSON). */
+/**
+ * Băm FNV-1a 32-bit nhanh (đủ tốt cho fingerprint phân biệt, không cần
+ * crypto-grade). Trả hex 8 ký tự.
+ */
+function fnv1a32(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    // 32-bit FNV prime multiply (dùng Math.imul để giữ 32-bit).
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Chữ ký call client — tên tool + hash TOÀN BỘ args đã serialize.
+ *
+ * Trước đây chỉ lấy 300 ký tự đầu của args JSON: hai lần fs_edit KHÁC NHAU
+ * ở phần đuôi (block SEARCH/REPLACE sau ký tự 300) bị coi là CÙNG một call
+ * → doom-loop guard chặn nhầm thao tác hợp lệ. Hash toàn bộ args giữ chữ ký
+ * nhỏ gọn mà không mất khả năng phân biệt.
+ */
 export function clientToolSignature(toolName: string, args: unknown): string {
   let raw: string;
   try {
@@ -60,7 +81,7 @@ export function clientToolSignature(toolName: string, args: unknown): string {
   } catch {
     raw = String(args);
   }
-  return `${toolName}:${raw.slice(0, 300)}`;
+  return `${toolName}:${fnv1a32(raw)}`;
 }
 
 /**
@@ -91,6 +112,18 @@ export function checkClientDoomLoop(chatKey: string, signature: string): ClientD
   }
   sessions.set(chatKey, recent);
   return { blocked: false, counted };
+}
+
+/**
+ * Đặt lại lịch sử lặp của một hội thoại khi người dùng gửi tin nhắn MỚI.
+ * TTL 10 phút chỉ là giới hạn dọn bộ nhớ, KHÔNG phải ranh giới lượt: trước
+ * đây đọc lại cùng một file ở hai lượt người dùng khác nhau trong 10 phút
+ * bị chặn oan ở lần thứ ba. Lượt người dùng mới = ngữ cảnh mới, chuỗi lặp
+ * cũ không được ảnh hưởng.
+ */
+export function resetClientDoomLoop(chatKey: string): void {
+  sessions.delete(chatKey);
+  lastTouchAt.delete(chatKey);
 }
 
 /** Chỉ dùng trong test. */
