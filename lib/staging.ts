@@ -79,6 +79,14 @@ export interface StagedFile {
   stagedAt: number;
   /** SHA-256 hash của original trên đĩa tại thời điểm stage đầu tiên (null nếu file mới). */
   baseHash?: string | null;
+  /**
+   * Định danh workspace (tên thư mục gốc hoặc đường dẫn desktop) tại thời điểm
+   * stage. Staging được gắn với workspace: đổi workspace → staging cũ không
+   * hiển thị và Apply KHÔNG thể ghi nhầm sang workspace đang kết nối khác.
+   * Record cũ (persist trước khi có field này) thiếu workspaceKey — Apply
+   * phải TỪ CHỐI chúng để tránh ghi mù sang workspace sai.
+   */
+  workspaceKey?: string;
 }
 
 /** Key của record = path đã chuẩn hóa (normalizeStagingPath). Plain object để
@@ -107,6 +115,7 @@ export function stageFile(
   diskOriginal: string | null,
   content: string,
   baseHash?: string | null,
+  workspaceKey?: string,
 ): StagingStore {
   const key = normalizeStagingPath(path);
   const existing = store[key];
@@ -118,6 +127,7 @@ export function stageFile(
       content,
       stagedAt: Date.now(),
       baseHash: existing?.baseHash !== undefined ? existing.baseHash : (baseHash !== undefined ? baseHash : null),
+      workspaceKey: existing?.workspaceKey !== undefined ? existing.workspaceKey : workspaceKey,
     },
   };
 }
@@ -135,6 +145,21 @@ export function unstageFile(store: StagingStore, path: string): StagingStore {
 
 export function clearStaging(_store: StagingStore): StagingStore {
   return {};
+}
+
+/**
+ * Lọc staging xuống chỉ còn các record thuộc `workspaceKey` hiện tại.
+ * Dùng khi workspace thay đổi / ngắt kết nối: staging của workspace cũ không
+ * được hiển thị hay Apply vào workspace mới. Record THIẾU workspaceKey (payload
+ * cũ tồn đọng từ trước khi gắn key) bị loại bỏ luôn — an toàn hơn là để chúng
+ * có thể ghi mù vào workspace bất kỳ.
+ */
+export function filterStagingByWorkspace(store: StagingStore, workspaceKey: string): StagingStore {
+  const out: StagingStore = {};
+  for (const [key, file] of Object.entries(store)) {
+    if (file.workspaceKey === workspaceKey) out[key] = file;
+  }
+  return out;
 }
 
 /** Thống kê ± dòng cho một file staged. */
@@ -213,6 +238,7 @@ export function parseStaging(raw: unknown): StagingStore {
       content: f.content,
       stagedAt: typeof f.stagedAt === 'number' ? f.stagedAt : Date.now(),
       baseHash: typeof f.baseHash === 'string' ? f.baseHash : (f.baseHash === null ? null : undefined),
+      workspaceKey: typeof f.workspaceKey === 'string' ? f.workspaceKey : undefined,
     };
   }
   return out;
@@ -220,3 +246,12 @@ export function parseStaging(raw: unknown): StagingStore {
 
 /** Key lưu kv. Staging là tài nguyên WORKSPACE-LEVEL (một workspace active). */
 export const STAGING_KV_KEY = 'staging:current';
+
+/**
+ * Key kv scoped theo workspace — staging của workspace A không đọ thấy/không
+ * ghi đè lên khi đang kết nối workspace B. Giữ STAGING_KV_KEY cho backward
+ * compat (đọc payload cũ); mọi ghi MỚI dùng key scoped này.
+ */
+export function stagingKvKeyForWorkspace(workspaceKey: string): string {
+  return `${STAGING_KV_KEY}:${workspaceKey}`;
+}
