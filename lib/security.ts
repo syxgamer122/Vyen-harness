@@ -5,6 +5,13 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 /**
  * Số proxy hop tin cậy ở trước app. Client IP thật = phần tử TRÁI NHẤT của
  * x-forwarded-for; chạy thẳng không qua proxy thì đặt TRUSTED_PROXY_HOPS=0.
+ *
+ * LƯU Ý phạm vi: `checkRateLimit` + `getClientIp` chỉ còn dùng ở /api/bridge,
+ * nơi nó đếm SAI TOKEN để chặn brute-force. Các route LLM khác ĐÃ GỠ rate
+ * limit: app chạy loopback một người dùng, nên bucket IP chỉ có một key
+ * `0.0.0.0` và limiter chỉ throttle chính chủ sở hữu — trong khi trần request
+ * nhỏ hơn số resubmit một lượt agent (CLIENT_MAX_STEPS) nên chặn nhầm việc
+ * hợp lệ. Giữ lại ở bridge vì đó là chống đoán token, không phải chia tải.
  */
 const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS ?? '1');
 
@@ -33,7 +40,7 @@ export function getClientIp(req: NextRequest | Request): string {
 
   /* Hardening: cf-connecting-ip / x-real-ip là header CLIENT GỬI ĐƯỢC nếu
      không đứng sau proxy tương ứng — kẻ tấn công xoay header mỗi request để
-     đổi bucket rate-limit, brute-force ACCESS_CODE miễn phí. Mặc định chỉ
+     đổi bucket rate-limit. Mặc định chỉ
      tin x-forwarded-for (đã trừ hop tin cậy). Self-host sau Cloudflare:
      đặt TRUST_PROXY_IP_HEADERS=1. */
   const trustExtraIpHeaders = process.env.TRUST_PROXY_IP_HEADERS === '1';
@@ -58,7 +65,7 @@ export function getClientIp(req: NextRequest | Request): string {
   }
 
   return '0.0.0.0';
-}export const normalizeIp = (ip: string): string => ip;
+}
 
 export function checkSameOrigin(req: NextRequest | Request): boolean {
   const hosts = allowedHosts();
@@ -178,43 +185,4 @@ export function timingSafeEqual(a: string, b: string): boolean {
     diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   }
   return diff === 0;
-}
-
-export interface AuthResult {
-  ok: boolean;
-  authorized: boolean;
-  status?: number;
-  error?: string;
-}
-
-export function verifyAccessAuth(req: NextRequest | Request): AuthResult {
-  const expected = (process.env.ACCESS_CODE ?? '').trim();
-  if (!expected) return { ok: true, authorized: true };
-
-  const header = req.headers.get('authorization') ?? '';
-  const token = header.replace(/^Bearer\s+/i, '').trim();
-  if (token && timingSafeEqual(token, expected)) return { ok: true, authorized: true };
-
-  /* Fallback hợp đồng client: useChat gửi mã qua header x-access-code
-     (không phải Authorization Bearer) — chat/compact/title đều đi qua đây.
-     Thiếu nhánh này, đặt ACCESS_CODE = toàn bộ route trả 401 (bug B1). */
-  const alt = req.headers.get('x-access-code')?.trim() ?? '';
-  if (alt && timingSafeEqual(alt, expected)) return { ok: true, authorized: true };
-
-  if (!token && !alt) return { ok: false, authorized: false, status: 401, error: 'Thiếu mã truy cập.' };
-  return { ok: false, authorized: false, status: 401, error: 'Mã truy cập (Access Code) không chính xác.' };
-}
-
-/** Định danh bucket ổn định: ưu tiên access token (đã hash) rồi mới tới IP. */
-export function rateLimitIdentity(req: NextRequest | Request): string {
-  const token = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
-  if (token) {
-    let h = 2166136261;
-    for (let i = 0; i < token.length; i += 1) {
-      h ^= token.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return `u_${(h >>> 0).toString(36)}`;
-  }
-  return `ip_${getClientIp(req)}`;
 }

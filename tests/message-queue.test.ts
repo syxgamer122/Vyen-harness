@@ -4,7 +4,6 @@ import {
   drainQueue,
   enqueueMessage,
   isQueueMode,
-  pickQueuedPrompt,
 } from '@/lib/message-queue';
 
 describe('drainQueue — QueueMode', () => {
@@ -43,25 +42,7 @@ describe('enqueueMessage — trần hàng đợi', () => {
   });
 });
 
-describe('pickQueuedPrompt — thứ tự poll', () => {
-  it('ưu tiên steering trước follow-up', () => {
-    const r = pickQueuedPrompt(['s1'], ['f1'], 'one-at-a-time', 'one-at-a-time');
-    expect(r.kind).toBe('steering');
-    expect(r.taken).toEqual(['s1']);
-    expect(r.followUpRest).toEqual(['f1']);
-  });
-
-  it('hết steering mới tới follow-up', () => {
-    const r = pickQueuedPrompt([], ['f1', 'f2'], 'one-at-a-time', 'one-at-a-time');
-    expect(r.kind).toBe('follow-up');
-    expect(r.taken).toEqual(['f1']);
-    expect(r.followUpRest).toEqual(['f2']);
-  });
-
-  it('trống cả hai → null', () => {
-    expect(pickQueuedPrompt([], [], 'one-at-a-time', 'one-at-a-time').kind).toBeNull();
-  });
-
+describe('isQueueMode', () => {
   it('isQueueMode chỉ nhận 2 giá trị Pi', () => {
     expect(isQueueMode('all')).toBe(true);
     expect(isQueueMode('one-at-a-time')).toBe(true);

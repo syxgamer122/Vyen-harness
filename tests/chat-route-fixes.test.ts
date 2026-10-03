@@ -14,7 +14,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { looksLikePseudoError } from '@/lib/pseudo-error-response';
-import { MAX_TOOL_CALLS_PER_TURN } from '@/lib/tool-limits';
 
 const ROUTE_PATH = path.resolve(__dirname, '../app/api/chat/route.ts');
 const source = fs.readFileSync(ROUTE_PATH, 'utf8');
@@ -32,7 +31,7 @@ const REAL_GATEWAY_ERROR =
  * phải nhận ĐỦ server tools + MCP tools. Bản cũ điều kiện chỉ là
  * `allowAgentTools || forceEmulatedTools`: vào emulated do isToolUnsupported
  * đặt allowAgentTools=false thì serverTools={} và mcpTools=mapMcpTools([]) —
- * model mất trắng web_search/web_fetch/weather/exchange_rates/memory_save và
+ * model mất trắng web_search/web_fetch/memory_save và
  * toàn bộ tool MCP mà không có thông báo nào.
  *
  * Đảo điều kiện (bỏ `emulatedToolPath` khỏi một trong hai ternary) → cả
@@ -286,24 +285,22 @@ describe('doc — runtime Node.js, thông báo không nói sai "Edge Function"',
     expect(source).toMatch(/của phiên stream và đã bị cắt\./);
   });
 });
-
 /**
- * Trần `toolInvocations` PHẢI bằng MAX_TOOL_CALLS_PER_TURN.
+ * Trần `toolInvocations` phải rộng và dùng hằng số, không để số cứng.
  *
  * Lỗi thật (đo từ log trình duyệt): trần để cứng 12 trong khi budget tool cho
- * phép 32. Model gọi thứ 13 trong một lượt → server trả 400 BAD_SCHEMA với
- * `too_big / maximum: 12` → useChat nhận lỗi → vòng agent chết im lặng giữa
- * chừng, đúng triệu chứng "chạy được vài tool rồi đùng luôn".
+ * phép nhiều hơn. Model gọi thứ 13 trong một lượt → server trả 400 BAD_SCHEMA
+ * với `too_big / maximum: 12` → useChat nhận lỗi → vòng agent chết im lặng
+ * giữa chừng, đúng triệu chứng "chạy được vài tool rồi đùng luôn".
  *
- * Đảo điều kiện: đổi lại số 12 cứng → describe này ĐỎ.
+ * Lưu ý: sau khi bỏ trần lượt agent, đây là trần KÍCH THƯỚC payload
+ * (MAX_TOOL_INVOCATIONS_PER_REQUEST), không còn gắn với budget theo lượt.
+ *
+ * Đảo điều kiện: dán .max(12) trở lại → describe này ĐỎ.
  */
-describe('schema toolInvocations khớp trần budget tool', () => {
+describe('schema toolInvocations dùng hằng số, rộng cho lượt dài', () => {
   it('dùng hằng số chung, không để số cứng', () => {
-    expect(source).toMatch(/\.max\(MAX_TOOL_CALLS_PER_TURN\)/);
-  });
-
-  it('import MAX_TOOL_CALLS_PER_TURN từ lib/tool-limits', () => {
-    expect(source).toMatch(/import \{[^}]*MAX_TOOL_CALLS_PER_TURN[^}]*\} from '@\/lib\/tool-limits';/);
+    expect(source).toMatch(/\.max\(MAX_TOOL_INVOCATIONS_PER_REQUEST\)/);
   });
 
   it('không còn .max(12) cứng trên toolInvocations', () => {
@@ -311,9 +308,9 @@ describe('schema toolInvocations khớp trần budget tool', () => {
     expect(source).not.toMatch(/\.max\(12\)/);
   });
 
-  it('hằng số chung thực sự là 32', () => {
-    // Khoá giá trị: đổi MAX_TOOL_CALLS_PER_TURN khỏi 32 thì budget và schema
-    // lại lệch nhau — test này bắt được trước khi lỗi quay lại lúc chạy.
-    expect(MAX_TOOL_CALLS_PER_TURN).toBe(32);
+  it('hằng số đủ rộng cho một lượt agent dài', () => {
+    const m = source.match(/MAX_TOOL_INVOCATIONS_PER_REQUEST = (\d+)/);
+    expect(m).not.toBeNull();
+    expect(Number(m![1])).toBeGreaterThanOrEqual(32);
   });
 });

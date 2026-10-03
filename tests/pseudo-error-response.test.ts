@@ -7,7 +7,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   extractPseudoErrorMessage,
-  isErrorChunkId,
   looksLikePseudoError,
 } from '@/lib/pseudo-error-response';
 
@@ -24,13 +23,6 @@ describe('nhận diện lỗi trá hình dưới HTTP 200', () => {
 
   it('bắt được ngay cả khi mới nhận một phần đầu (stream chưa xong)', () => {
     expect(looksLikePseudoError(REAL_GATEWAY_ERROR.slice(0, 60))).toBe(true);
-  });
-
-  it('id chunk "err" của gateway được nhận diện', () => {
-    expect(isErrorChunkId('err')).toBe(true);
-    expect(isErrorChunkId('error')).toBe(true);
-    expect(isErrorChunkId('chatcmpl-abc123')).toBe(false);
-    expect(isErrorChunkId(undefined)).toBe(false);
   });
 
   it('trích thông điệp gọn, bỏ ngoặc vuông', () => {

@@ -271,7 +271,6 @@ import {
   executeCodeVerify,
 } from '@/lib/sarsed/tools';
 import { gatherPdfContexts } from '@/lib/use-pdf-context';
-import { gatherLiveContext } from '@/lib/live-tools';
 import { addMemory, listMemories } from '@/lib/db';
 import { proposeCandidate, queryRecallPack } from '@/lib/memory/store';
 import type { RecallPack, MemoryKind } from '@/lib/memory/types';
@@ -412,7 +411,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   const thinkingLevel = useAppStore((s) => s.settings.thinkingLevel);
   const systemPrompt = useAppStore((s) => s.settings.systemPrompt);
   const apiKey = useAppStore((s) => s.settings.apiKey);
-  const accessCode = useAppStore((s) => s.settings.accessCode);
   const activeProviderId = useAppStore((s) => s.activeProviderId);
   const activeProvider = useAppStore((s) => s.activeProvider);
   const sendOnEnter = useAppStore((s) => s.settings.sendOnEnter);
@@ -1297,7 +1295,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
    *  Khai báo TRƯỚC handleClientToolCall: luồng mô tả ảnh (fs_read ảnh, ảnh MCP)
    *  gọi /api/vision ngay trong tool handler và cần đúng headers provider này. */
   const buildApiHeaders = useCallback((): Record<string, string> => ({
-    ...(accessCode ? { 'x-access-code': accessCode } : {}),
     ...(activeProvider?.baseUrl
       ? {
           'x-api-base': activeProvider.baseUrl,
@@ -1306,7 +1303,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       : apiKey
         ? { 'x-api-key': apiKey }
         : {}),
-  }), [accessCode, activeProvider, apiKey]);
+  }), [activeProvider, apiKey]);
 
   /**
  * fs_*, shell, git tools chạy NGAY TRÊN MÁY USER — server không thể chạm file.
@@ -3069,8 +3066,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         showNotice('API Key khong hop le hoac da bi thu hoi. Kiem tra lai trong Cai dat.', 8000);
       } else if (code === 'UPSTREAM_CONTEXT_OVERFLOW') {
         showNotice('Hoi thoai qua dai. Hay nen bot hoac bat dau cuoc tro chuyen moi.', 6000);
-      } else if (code === 'RATE_LIMITED') {
-        showNotice('Dang gui tin nhan qua nhanh. Vui long doi vai giay.', 4000);
       } else if (code === 'INJECTION_BLOCKED') {
         showNotice('Tin nhan bi tu choi vi co dau hieu vuot qua huong dan he thong.', 5000);
       } else if (code && !code.startsWith('UPSTREAM_SERVER_')) {
@@ -3675,14 +3670,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       await db.chats.update(chatId, { title: String(title).slice(0, 60), updatedAt: Date.now() });
       notifyChatUpdated(chatId);
     },
-    accessCode,
-    apiKey,
-    providerBase: activeProvider?.baseUrl,
-    providerKey: activeProvider?.apiKey,
-    /* Model đang chat được /api/title thử đầu tiên khi có provider active —
-       không gửi thì tiêu đề chạy bằng model env, thường 404 trên gateway BYOK
-       và tụt về tiêu đề heuristic cắt 5 từ. */
-    model,
   });
 
   const reloadTreeFromDatabase = useCallback(async () => {
@@ -5257,17 +5244,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         } finally {
           setWebBusy(false);
           webBusyRef.current = false;
-        }
-      }
-
-      /* Live tools (thời tiết/tỷ giá): chạy MỌI lượt có ý định, không phụ thuộc
-         toggle web. Lỗi tool chỉ nghĩa là thiếu khối dữ liệu, không báo lỗi. */
-      if (userText) {
-        try {
-          const liveCtx = await gatherLiveContext(userText);
-          if (liveCtx) options.body = { ...options.body, liveContext: liveCtx };
-        } catch {
-          /* bỏ qua — đã là best-effort */
         }
       }
 

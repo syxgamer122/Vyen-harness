@@ -6,17 +6,12 @@ import { getKeyLabel, PROVIDER_NO_KEY_SENTINEL } from '@/lib/api-keys';
 import { validateProviderBaseUrl } from '@/lib/provider-url';
 import { filterSupportedModels, markModelUnsupported } from '@/lib/model-negative-cache';
 import { ACTIVE_MODEL_BODY_FIELD, buildActiveModelChain, isActiveProvider } from '@/lib/aux-llm-chain';
-import {
-  checkRateLimit,
-  rateLimitIdentity,
-  verifyAccessAuth,
-} from '@/lib/security';
 import { redactSecretText } from '@/lib/secret-registry';
 
 /**
  * POST /api/compact — tóm tắt phần cũ của hội thoại dài (nền của compaction).
  *
- * Khác /api/title: compaction XẢY RA HIẾM (vài lần mỗi hội thoại dài) nên
+ * Compaction XẢY RA HIẾM (vài lần mỗi hội thoại dài) nên
  * ĐÁNG tiêu một lượt LLM kể cả trên gateway free — miễn là đi qua hàng đợi
  * upstream để không phá ngân sách chung. Client nhận summary rồi tự lưu vào
  * ChatSession.compaction; các request /api/chat sau chỉ gửi summary + tin mới.
@@ -132,18 +127,6 @@ const SUMMARY_SYSTEM = [
 
 export async function POST(req: Request) {
   try {
-    if (!checkRateLimit(`compact:${rateLimitIdentity(req)}`, 6, 60_000).ok) {
-      return Response.json(
-        { summary: null, reason: 'rate_limited' },
-        { status: 429, headers: NO_STORE },
-      );
-    }
-
-    const auth = verifyAccessAuth(req);
-    if (!auth.ok) {
-      return Response.json({ summary: null, reason: auth.error ?? 'unauthorized' }, { status: 401, headers: NO_STORE });
-    }
-
     const rawCustomKey = req.headers.get('x-api-key')?.trim();
     const rawProviderBase = req.headers.get('x-api-base')?.trim() || undefined;
     const providerBaseCheck = rawProviderBase

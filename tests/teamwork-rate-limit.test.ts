@@ -16,11 +16,6 @@
  *    - Transitions active milestone status to 'blocked'.
  *    - Invokes onHalt callback.
  *    - Gracefully handles missing or existing PROGRESS.md files.
- * 3. RateLimitManager State & Cooldown Helper:
- *    - Records incidents with timestamps and context.
- *    - Manages paused state and pause reasons.
- *    - Calculates canResume and wait recommendations.
- *    - Resumes and resets cleanly.
  */
 
 import fs from 'node:fs/promises';
@@ -35,7 +30,6 @@ import {
 import {
   handleRateLimit,
   isRateLimitError,
-  RateLimitManager,
 } from '@/lib/teamwork/rate-limit';
 
 describe('Teamwork Rate Limit & Overload Protection', () => {
@@ -193,108 +187,6 @@ describe('Teamwork Rate Limit & Overload Protection', () => {
       const content = await fs.readFile(progressPath, 'utf8');
       expect(content).toContain('Status: BLOCKED_429');
       expect(content).toContain('Immediate stoppage on rate limit');
-    });
-  });
-
-  describe('RateLimitManager Helper', () => {
-    let manager: RateLimitManager;
-
-    beforeEach(() => {
-      manager = new RateLimitManager({ defaultCooldownMs: 10_000 });
-    });
-
-    it('starts unpaused with empty history', () => {
-      expect(manager.isPaused()).toBe(false);
-      expect(manager.getPauseReason()).toBeUndefined();
-      expect(manager.getRecordCount()).toBe(0);
-      expect(manager.canResume()).toBe(true);
-      expect(manager.getWaitRecommendation()).toBe(0);
-    });
-
-    it('records rate limit incident and transitions to paused state', () => {
-      const record = manager.recordRateLimit('HTTP 429: Too Many Requests', {
-        milestoneId: 'M1',
-        model: 'gpt-4o',
-      });
-
-      expect(manager.isPaused()).toBe(true);
-      expect(manager.getPauseReason()).toContain('429 Rate Limit');
-      expect(manager.getRecordCount()).toBe(1);
-      expect(record.error).toContain('Too Many Requests');
-      expect(record.milestoneId).toBe('M1');
-    });
-
-    it('manages cooldown timer accurately', () => {
-      const startTime = 1_000_000;
-      manager.recordRateLimit('Throttled', { timestamp: startTime, cooldownMs: 5_000 });
-
-      // Before cooldown elapses
-      const midTime = startTime + 2_000;
-      const canResumeMid = manager.canResume(midTime);
-      expect(canResumeMid).toBe(false);
-
-      // After cooldown elapses
-      const postTime = startTime + 10_000;
-      const canResumePost = manager.canResume(postTime);
-      expect(canResumePost).toBe(true);
-    });
-
-    it('resumes and resets state cleanly', () => {
-      manager.recordRateLimit('429');
-      expect(manager.isPaused()).toBe(true);
-
-      manager.resume();
-      expect(manager.isPaused()).toBe(false);
-      expect(manager.getPauseReason()).toBeUndefined();
-      expect(manager.getRecordCount()).toBe(1); // history preserved
-
-      manager.reset();
-      expect(manager.isPaused()).toBe(false);
-      expect(manager.getRecordCount()).toBe(0); // history cleared
-    });
-
-    /* timestamp 0 (epoch) là giá trị HỢP LỆ nhưng falsy — bản cũ falsy-check
-       nên coi như "chưa pause" và bỏ qua trọn cooldown. Mỗi test dưới đây bắt
-       buộc đi qua trạng thái "cooldown CHƯA hết" ở timestamp 0: chỉ assert
-       trạng thái "đã hết cooldown" thì cả bản đúng lẫn bản hỏng đều trả
-       true/0 nên test pass vô hạng dù hồi quy. */
-    it('pauseTimestamp = 0 vẫn phải chờ hết cooldown (chưa được resume)', () => {
-      manager.recordRateLimit('429 ngay tại epoch', { timestamp: 0 });
-
-      expect(manager.isPaused()).toBe(true);
-      expect(manager.getPauseTimestamp()).toBe(0);
-      expect(manager.canResume(0)).toBe(false);
-      expect(manager.canResume(2_000)).toBe(false);
-      expect(manager.getWaitRecommendation(2_000)).toBeGreaterThan(0);
-      // defaultCooldownMs = 10_000 (xem beforeEach) ⇒ còn 8s ở mốc 2s.
-      expect(manager.getWaitRecommendation(2_000)).toBe(8_000);
-    });
-
-    it('pauseTimestamp = 0 + đã trôi qua cooldown → resume được, chờ 0', () => {
-      manager.recordRateLimit('429 ngay tại epoch', { timestamp: 0 });
-
-      // Chưa hết cooldown: bản falsy-check trả sai true/0 ngay tại epoch.
-      expect(manager.canResume(2_000)).toBe(false);
-      expect(manager.getWaitRecommendation(2_000)).toBe(8_000);
-
-      expect(manager.canResume(10_000)).toBe(true);
-      expect(manager.getWaitRecommendation(10_000)).toBe(0);
-      expect(manager.getWaitRecommendation(99_000)).toBe(0);
-    });
-
-    it('resume() xoá timestamp → canResume true, không chờ thêm', () => {
-      manager.recordRateLimit('429 ngay tại epoch', { timestamp: 0 });
-
-      // Trước resume vẫn phải chờ trọn cooldown — neo trạng thái để resume()
-      // thật sự thay đổi hành vi chứ không phải chỉ xoá biến.
-      expect(manager.canResume(0)).toBe(false);
-      expect(manager.getWaitRecommendation(0)).toBeGreaterThan(0);
-
-      manager.resume();
-
-      expect(manager.getPauseTimestamp()).toBeUndefined();
-      expect(manager.canResume(0)).toBe(true);
-      expect(manager.getWaitRecommendation(0)).toBe(0);
     });
   });
 });

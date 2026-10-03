@@ -33,17 +33,6 @@ const PSEUDO_ERROR_PATTERNS: readonly RegExp[] = Object.freeze([
   /account pool refreshes/i,
 ]);
 
-/** Id mà gateway dùng để tự đánh dấu chunk lỗi (vd: "err"). */
-const ERROR_IDS: readonly string[] = Object.freeze(['err', 'error']);
-
-/**
- * true khi `id` của SSE chunk cho thấy đây là payload lỗi.
- * Tín hiệu rẻ và chắc chắn nhất — kiểm tra trước khi soi nội dung.
- */
-export function isErrorChunkId(id: unknown): boolean {
-  return typeof id === 'string' && ERROR_IDS.includes(id.trim().toLowerCase());
-}
-
 /**
  * true khi đoạn text mang dấu hiệu thông báo lỗi hạ tầng của gateway.
  * Chỉ soi ~600 ký tự đầu: thông báo dạng này luôn nằm ngay đầu phản hồi, còn

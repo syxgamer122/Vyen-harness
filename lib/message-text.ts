@@ -31,7 +31,7 @@ export function safeAppend(acc: string, chunk: unknown): string {
   return typeof chunk === 'string' && chunk.length > 0 ? acc + chunk : acc;
 }
 
-/** Text để lưu Dexie / gửi /api/title — không bao giờ chứa artifact. */
+/** Text để lưu Dexie / gửi /api/chat — không bao giờ chứa artifact. */
 export function toPersistableText(message: UIMessage | { parts?: any[]; content?: unknown } | null | undefined): string {
   return extractTextFromMessage(message).replace(/[\s\u200B]+$/, '');
 }

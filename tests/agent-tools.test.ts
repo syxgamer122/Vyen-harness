@@ -53,49 +53,10 @@ describe('agent tools', () => {
     expect((out as any).note).toBeTruthy();
   });
 
-  it('weather: geocoding + forecast → report chứa nhiệt độ', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) =>
-        String(url).includes('geocoding')
-          ? jsonResponse({
-              results: [{ name: 'Hà Nội', country: 'Việt Nam', latitude: 21.03, longitude: 105.85 }],
-            })
-          : jsonResponse({
-              current: {
-                temperature_2m: 31.2,
-                apparent_temperature: 35,
-                relative_humidity_2m: 70,
-                weather_code: 61,
-                wind_speed_10m: 9.4,
-              },
-              daily: {
-                time: ['2026-08-25', '2026-08-26'],
-                temperature_2m_max: [33, 32],
-                temperature_2m_min: [26, 25],
-                precipitation_probability_max: [40, 10],
-              },
-            }),
-      ),
-    );
-    const out = await buildAgentTools().weather.execute!({ location: 'Hà Nội' }, {} as any);
-    const report = (out as any).report as string;
-    expect(report).toContain('[DỮ LIỆU THỜI TIẾT');
-    expect(report).toContain('mưa nhẹ');
-  });
 
-  it('exchange_rates: có VND → block tỷ giá', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => jsonResponse({ time_last_update_utc: 'Tue, 25 Aug 2026 00:00:00 +0000', rates: { VND: 26000, EUR: 0.9 } })),
-    );
-    const out = await buildAgentTools().exchange_rates.execute!({}, {} as any);
-    expect((out as any).rates).toContain('[TỶ GIÁ HÔM NAY');
-  });
-
-  it('đủ 4 tool với schema zod hợp lệ', () => {
+  it('đủ tool với schema zod hợp lệ', () => {
     const t = buildAgentTools();
-    for (const name of ['web_search', 'web_fetch', 'weather', 'exchange_rates']) {
+    for (const name of ['web_search', 'web_fetch']) {
       expect(t[name as keyof typeof t]).toBeTruthy();
     }
     // web_fetch parse được url param
@@ -106,13 +67,9 @@ describe('agent tools', () => {
   it('không đăng ký lại capability đã được prefetch trong cùng lượt', () => {
     const t = buildAgentTools({
       includeWeb: false,
-      includeWeather: false,
-      includeExchangeRates: false,
     });
     expect(Object.hasOwn(t, 'web_search')).toBe(false);
     expect(Object.hasOwn(t, 'web_fetch')).toBe(false);
-    expect(Object.hasOwn(t, 'weather')).toBe(false);
-    expect(Object.hasOwn(t, 'exchange_rates')).toBe(false);
     expect(Object.hasOwn(t, 'memory_save')).toBe(true);
   });
 });
@@ -136,15 +93,28 @@ describe('loop-guard — chỉ còn doom-loop, gọi lại hợp lệ không b�
     expect((b as any).note).toBeUndefined();
   });
 
-  it('lặp LIÊN TIẾP cùng args tới ngưỡng → steering buộc đổi hướng', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ rates: { VND: 26000 } })));
+  /**
+   * Sau khi bỏ trần lượt (MAX_TOOL_CALLS_PER_TURN → CLIENT_MAX_STEPS_UNBOUNDED),
+   * thứ chặn vòng lặp KHÔNG phải con số đếm mà là doom-loop guard: cùng
+   * (tool, args) lặp LIÊN TIẾP thì chặn, đọc nhiều thứ khác nhau thì không.
+   * Đảo điều kiện: đổi DOOM_LOOP_THRESHOLD khỏi 3 là test này ĐỎ.
+   */
+  it('lặp LIÊN TIẾP cùng args tới ngưỡng doom-loop → steering buộc đổi hướng', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => htmlResponse(SEARCH_FIXTURE)));
     const t = buildAgentTools();
-    const one = await t.exchange_rates.execute!({}, {} as any);
-    const two = await t.exchange_rates.execute!({}, {} as any);
-    expect((one as any).note).toBeUndefined();
-    expect((two as any).note).toBeUndefined();
-    const third = await t.exchange_rates.execute!({}, {} as any);
-    expect(String((third as any).note)).toContain('LIÊN TIẾP');
+    await t.web_search.execute!({ query: 'same' }, {} as any);
+    await t.web_search.execute!({ query: 'same' }, {} as any);
+    const third = await t.web_search.execute!({ query: 'same' }, {} as any);
+    expect(String((third as any).note ?? '')).toContain('LIÊN TIẾP');
+  });
+
+  it('args khác nhau không dính doom-loop (đọc nhiều file vẫn chạy)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => htmlResponse(SEARCH_FIXTURE)));
+    const t = buildAgentTools();
+    for (const q of ['a', 'b', 'c', 'd']) {
+      const out = await t.web_search.execute!({ query: q }, {} as any);
+      expect((out as any).note).toBeUndefined();
+    }
   });
 });
 

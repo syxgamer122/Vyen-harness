@@ -3,13 +3,11 @@
 import React, { memo, useState, useCallback } from 'react';
 import {
   Activity,
-  ArrowLeftRight,
   Bookmark,
   Brain,
   Check,
   ChevronDown,
   ChevronUp,
-  Cloud,
   Copy,
   FileCode,
   FileEdit,
@@ -142,8 +140,6 @@ const TOOL_META: Record<string, { label: string; Icon: React.ElementType; color?
   read_url_content: { label: 'fetch', Icon: FileCode },
 
   // Utilities
-  weather: { label: 'weather', Icon: Cloud },
-  exchange_rates: { label: 'exchange', Icon: ArrowLeftRight },
   memory_search: { label: 'memory', Icon: Brain },
 };
 

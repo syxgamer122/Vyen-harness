@@ -101,22 +101,6 @@ export function isModelLockedOut(
   return true;
 }
 
-/**
- * Lọc chuỗi model bỏ các ô đang khóa của `keyLabel`. Nếu lọc sạch → trả chuỗi
- * gốc (phải luôn còn ít nhất MỘT cơ hội thử thật để có lỗi rõ ràng / tự phục
- * hồi — cùng triết lý filterSupportedModels).
- */
-export function filterLockedModels(
-  baseUrl: string,
-  keyLabel: string,
-  models: readonly string[],
-  now: number = Date.now(),
-): string[] {
-  if (!baseUrl || models.length <= 1) return [...models];
-  const alive = models.filter((m) => !isModelLockedOut(baseUrl, keyLabel, m, now));
-  return alive.length ? alive : [...models];
-}
-
 /** Dùng cho test — xoá sạch state giữa các case. */
 export function resetModelLockout(): void {
   locks.clear();

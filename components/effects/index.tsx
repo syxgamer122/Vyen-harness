@@ -30,7 +30,7 @@
  *
  * VÌ SAO JS VẪN CẦN DÙ CÓ LỚP CSS: lưới ở (2) chỉ đặt duration về 0.01ms,
  * KHÔNG đổi phần tử nào cả. Nhánh animated vẫn render; chỉ là animation chạy
- * hết một vòng rồi đứng. Nên với effect có nhánh tĩnh riêng (SiriWave) lớp CSS
+ * hết một vòng rồi đứng. Nên với effect có nhánh tĩnh riêng lớp CSS
  * không thay thế được cổng JS — nó chỉ tạo ra MỘT trạng thái tĩnh thứ hai.
  *
  * Quy tắc hội tụ: mọi phần tử ở nhánh animated phải khai báo trạng thái tĩnh
@@ -81,33 +81,6 @@ export function useFxEnabled(): boolean {
 }
 
 /* ------------------------------------------------------------------ */
-/* SiriWave — 5 thanh nhún khi mic đang nghe                           */
-/* ------------------------------------------------------------------ */
-
-export function SiriWave({ active = true }: { active?: boolean }) {
-  const fx = useFxEnabled();
-  return (
-    <div className="flex h-6 items-center space-x-1" aria-hidden="true">
-      {[0, 1, 2, 3, 4].map((i) =>
-        fx && active ? (
-          // `h-1` (4px) là TRẠNG THÁI TĨNH của thanh: khớp với 0%/100% của
-          // fx-bar-bounce, nên khi globals.css ép animation-duration về 0.01ms
-          // (reduced-motion hoặc data-animations='off') thanh đứng yên ở 4px —
-          // đúng bằng nhánh fallback bên dưới, không nhảy kích thước lúc tải.
-          <span
-            key={i}
-            className="h-1 w-1 animate-fx-bar-bounce rounded-full bg-brand"
-            style={{ animationDelay: `${i * 0.12}s` }}
-          />
-        ) : (
-          // Fallback tĩnh — cùng 4px, transition-[height] giữ độ mượt 0.2s như bản framer.
-          <span key={i} className="h-1 w-1 rounded-full bg-brand transition-[height] duration-200" />
-        ),
-      )}
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* TextShimmer — vệt sáng quét qua chữ đang chờ                        */
 /* ------------------------------------------------------------------ */

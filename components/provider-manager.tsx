@@ -47,7 +47,6 @@ function keyGuideFor(baseUrl: string): { url: string; note: string } | null {
 export function ProviderManager() {
   const activeProviderId = useAppStore((s) => s.activeProviderId);
   const setActiveProvider = useAppStore((s) => s.setActiveProvider);
-  const accessCode = useAppStore((s) => s.settings.accessCode);
 
   const [providers, setProviders] = useState<ProviderConfig[]>([]);
   const [editing, setEditing] = useState<ProviderConfig | null>(null);
@@ -156,8 +155,7 @@ export function ProviderManager() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(accessCode ? { Authorization: `Bearer ${accessCode}` } : {}),
-        },
+              },
         body: JSON.stringify({ baseUrl: p.baseUrl, apiKey }),
       });
       const data = await res.json();

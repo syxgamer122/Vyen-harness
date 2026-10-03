@@ -1,7 +1,5 @@
 'use client';
 
-import { memo } from 'react';
-
 /**
  * Context meter — hairline 2px + text mono "12.3k / 200k" hiển thị ngữ cảnh
  * đã dùng / trần của model đang chọn (resolveContextWindow: metadata provider
@@ -49,55 +47,3 @@ export function computeMeter(used: number, max: number): {
   };
 }
 
-export const ContextMeter = memo(function ContextMeter({
-  used,
-  max,
-}: {
-  used: number;
-  max: number;
-}) {
-  const { fillRatio, percent, tone, safeMax } = computeMeter(used, max);
-
-  const textTone =
-    percent > 80 ? 'text-status-error' : percent >= 50 ? 'text-status-warning' : 'text-status-success';
-
-  return (
-    <div
-      className="mx-auto w-full max-w-thread px-4 font-mono"
-      title={`Ngữ cảnh: ${fmt(used)} / ${fmt(safeMax)} token (${percent}%)`}
-    >
-      <div
-        role="progressbar"
-        aria-label="Mức sử dụng ngữ cảnh"
-        aria-valuenow={Math.min(100, percent)}
-        aria-valuetext={`${fmt(used)} / ${fmt(safeMax)} token (${percent}%)`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        className="flex items-center gap-2"
-      >
-        <div className="flex flex-1 items-center gap-1">
-          {[...Array(10)].map((_, i) => {
-            const filled = fillRatio >= (i + 1) / 10;
-            const segColor =
-              percent > 80
-                ? 'bg-status-error animate-pulse'
-                : percent >= 50
-                  ? 'bg-status-warning'
-                  : 'bg-status-success';
-            return (
-              <div
-                key={i}
-                className={`h-2 flex-1 rounded-[1px] transition-colors ${
-                  filled ? segColor : 'bg-sunken'
-                }`}
-              />
-            );
-          })}
-        </div>
-        <span className={`flex-shrink-0 text-[10px] tabular-nums ${textTone}`}>
-          {fmt(used)} / {fmt(safeMax)} ({percent}%)
-        </span>
-      </div>
-    </div>
-  );
-});

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   decayModelFailure,
-  filterLockedModels,
   isModelLockedOut,
   markModelFailure,
   resetModelLockout,
@@ -46,19 +45,5 @@ describe('model lockout per key×model', () => {
     markModelFailure(BASE, 'k1', 'gpt-x', NOW); // lại từ đầu = 1
     expect(isModelLockedOut(BASE, 'k1', 'gpt-x', NOW + 30_000)).toBe(true);
     expect(isModelLockedOut(BASE, 'k1', 'gpt-x', NOW + 61_000)).toBe(false);
-  });
-
-  it('filterLockedModels: lọc ô khóa của key đó, sạch thì trả nguyên chuỗi', () => {
-    const chain = ['a', 'b', 'c'];
-    markModelFailure(BASE, 'k1', 'B', NOW);
-    expect(filterLockedModels(BASE, 'k1', chain.map((m) => m.toUpperCase()), NOW)).toEqual([
-      'A',
-      'C',
-    ]);
-    // Khóa hết → vẫn trả nguyên chuỗi để còn cơ hội thử thật.
-    for (const m of ['a', 'b', 'c']) markModelFailure(BASE, 'k1', m.toUpperCase(), NOW);
-    expect(filterLockedModels(BASE, 'k1', ['A', 'B', 'C'], NOW)).toEqual(['A', 'B', 'C']);
-    // Chuỗi 1 phần tử — không cần lọc.
-    expect(filterLockedModels(BASE, 'k1', ['only'], NOW)).toEqual(['only']);
   });
 });

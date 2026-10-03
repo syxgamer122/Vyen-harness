@@ -2,7 +2,7 @@
  * SecretRegistry — che giá trị bí mật trước khi vào ngữ cảnh model.
  *
  * VÌ SAO CÓ FILE NÀY: cùng một regex che bí mật từng bị copy ở 5 nơi
- * (app/api/chat, app/api/compact, app/api/orchestrate, app/api/title,
+ * (app/api/chat, app/api/compact, app/api/orchestrate,
  * lib/fs-access) và chúng đã drift thật (fs-access thêm nhánh `key`, các route
  * khác không có). Quan trọng hơn: KHÔNG nơi nào che bí mật nằm trong KẾT QUẢ
  * TOOL trước khi kết quả đó vào ngữ cảnh model — đúng lỗ mà registry bịt bằng
@@ -39,11 +39,11 @@ export const MIN_REGISTERED_SECRET_LENGTH = 8;
  * Khoá env TRÔNG NHƯ bí mật — dùng để quyết định giá trị nào đáng đăng ký.
  *
  * Gồm danh sách deny chuẩn (vốn nhắm strip env của tiến trình con) CỘNG
- * các đuôi *_KEY / *_TOKEN / *_SECRET / *_PASSWORD / *_CREDENTIAL và ACCESS_CODE.
+ * các đuôi *_KEY / *_TOKEN / *_SECRET / *_PASSWORD / *_CREDENTIAL.
  * Lý do phải cộng thêm: danh sách deny chuẩn chỉ liệt kê biến của NHÀ CUNG CẤP
  * (OPENAI_API_KEY, AWS_SECRET_ACCESS_KEY…) nên nó bỏ sót biến thật của Vyen —
  * `BRAVE_SEARCH_KEY`, `TINYFISH_API_KEY` (khớp), `DIAG_SECRET` (khớp), nhưng
- * `ACCESS_CODE`, `CUSTOM_ACME_TOKEN`, `VYEN_KEY` thì KHÔNG. Với mục đích
+ * `CUSTOM_ACME_TOKEN`, `VYEN_KEY` thì KHÔNG. Với mục đích
  * STRIP thì bỏ sót là chuyện nhỏ; với mục đích CHE thì bỏ sót = rò rỉ, còn bắt
  * dư chỉ tốn vài phép so chuỗi.
  */

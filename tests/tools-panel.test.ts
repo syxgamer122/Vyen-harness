@@ -110,11 +110,11 @@ describe('filterPanelSections - lọc theo tên, mô tả, shortLabel', () => {
     expect(out[0].tools.map((t) => t.name)).toEqual(['fs_read']);
   });
 
-  it('khớp theo mô tả: "tỷ giá" tìm ra exchange_rates', () => {
-    // Đột biến bị chặn: bỏ dòng match `t.description` → exchange_rates
+  it('khớp theo mô tả: "đọc URL" tìm ra web_fetch', () => {
+    // Đột biến bị chặn: bỏ dòng match `t.description` → web_fetch
     // không khớp field nào khác → kết quả rỗng là đỏ.
-    const out = filterPanelSections(sections, 'tỷ giá');
-    expect(out.flatMap((s) => s.tools.map((t) => t.name))).toContain('exchange_rates');
+    const out = filterPanelSections(sections, 'đọc URL');
+    expect(out.flatMap((s) => s.tools.map((t) => t.name))).toContain('web_fetch');
   });
 
   it('khớp theo shortLabel: "git status" chỉ tìm được qua nhãn ngắn', () => {
@@ -179,7 +179,7 @@ describe('resolveToolEntry - tra cả tên di sản TOOL_META của tool-trace',
       'fs_readFile', 'fs_writeFile', 'fs_editFile', 'fs_listDir', 'list_dir',
       'read_file', 'write_to_file', 'replace_file_content',
       'web_search', 'search_web', 'web_fetch', 'read_url_content',
-      'weather', 'exchange_rates', 'memory_search',
+      'memory_search',
     ];
     for (const name of traceNames) {
       expect(resolveToolEntry(name), `"${name}" phải tra được entry`).toBeDefined();

@@ -1,11 +1,5 @@
 import { z } from 'zod';
-import {
-  checkSameOrigin,
-  checkRateLimit,
-  rateLimitIdentity,
-  timingSafeEqual,
-  verifyAccessAuth,
-} from '@/lib/security';
+import { checkSameOrigin } from '@/lib/security';
 import {
   WebOpError,
   capHits,
@@ -97,27 +91,6 @@ export async function POST(req: Request) {
     /* --- Same-Origin --- */
     if (!checkSameOrigin(req)) {
       return jsonError(requestId, 403, 'ORIGIN_FORBIDDEN', 'Truy cập bị từ chối: Origin không được phép.');
-    }
-
-    /* --- Rate limit TRƯỚC auth để đoán sai mã cũng tốn quota. Một lượt gửi
-       bật web tốn ~3 call (1 search + ≤2 fetch) nên hạn mức rộng hơn chat. --- */
-    const rl = checkRateLimit(`web:${rateLimitIdentity(req)}`, 90, 60_000);
-    if (!rl.ok) {
-      return Response.json(
-        { error: 'Bạn đang tra cứu web quá nhanh.', code: 'RATE_LIMITED', requestId },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
-      );
-    }
-
-    /* --- Access code: nhận cả Authorization Bearer lẫn x-access-code
-       (client useChat gửi header x-access-code, không phải Bearer). --- */
-    const auth = verifyAccessAuth(req);
-    if (!auth.ok) {
-      const expected = (process.env.ACCESS_CODE ?? '').trim();
-      const alt = req.headers.get('x-access-code')?.trim() ?? '';
-      if (!(expected && alt && timingSafeEqual(alt, expected))) {
-        return jsonError(requestId, auth.status ?? 401, 'UNAUTHORIZED', auth.error ?? 'Unauthorized');
-      }
     }
 
     /* --- Body --- */

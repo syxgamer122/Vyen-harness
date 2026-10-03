@@ -3,7 +3,6 @@
  * (pattern fx/OpenClaw): không còn đoán ý định bằng regex hay toggle thủ công.
  *
  * - web_search / web_fetch: tái dùng đúng đường ống SSRF-guarded của /api/web
- * - weather / exchange_rates: bọc live-tools (Open-Meteo, open.er-api)
  * - memory_search: tra ghi nhớ dài hạn của người dùng (chỉ đọc)
  *
  * Ba lớp tự vệ trong file này (port triết lý fx auto_classifier):
@@ -22,7 +21,6 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { capHits, fetchReadablePage, searchWeb } from '@/lib/web-backend';
-import { fetchRates, fetchWeather } from '@/lib/live-tools';
 import { WEB_LIMITS } from '@/lib/web-context';
 import { judgeInjection } from '@/lib/injection-guard';
 import { getToolCallBudget, checkDoomLoop } from '@/lib/tool-call-budget';
@@ -60,10 +58,6 @@ export interface AgentToolsOptions {
   allowedHosts?: Iterable<string>;
   /** Tắt khi lượt hiện tại đã có webContext được người dùng yêu cầu. */
   includeWeb?: boolean;
-  /** Tắt riêng khi client đã lấy được dữ liệu thời tiết cho lượt này. */
-  includeWeather?: boolean;
-  /** Tắt riêng khi client đã lấy được tỷ giá cho lượt này. */
-  includeExchangeRates?: boolean;
   /**
    * Id hội thoại — khoá ngân sách gọi tool sống xuyên các resubmit của
    * client tool. Thiếu id thì rơi về hành vi cũ (đếm theo từng request).
@@ -117,8 +111,6 @@ export function summarizeToolArgs(name: string, args: unknown): string {
       return String(a.query ?? '').slice(0, 80);
     case 'web_fetch':
       return shortenUrl(String(a.url ?? ''));
-    case 'weather':
-      return String(a.location ?? '').slice(0, 60);
     case 'memory_search':
       return String(a.query ?? '').slice(0, 60);
     case 'shell_run':
@@ -190,10 +182,6 @@ export function summarizeToolResult(name: string, result: unknown): string {
       if (r.content === null || r.content === undefined) return String(r.note ?? 'Không đọc được');
       return `${String(r.title ?? '').slice(0, 70) || shortenUrl(String(r.url ?? ''))}`;
     }
-    case 'weather':
-      return r.report ? 'Có báo cáo thời tiết' : String(r.note ?? 'Không tra được');
-    case 'exchange_rates':
-      return r.rates ? 'Có bảng tỷ giá' : String(r.note ?? 'Thất bại');
     case 'memory_search': {
       const matches = Array.isArray(r.matches) ? r.matches : [];
       return matches.length ? `${matches.length} ghi nhớ khớp` : 'Không có ghi nhớ khớp';
@@ -511,44 +499,6 @@ export function buildAgentTools(
         ),
     }),
 
-    weather: tool({
-      description:
-        'Thời tiết hiện tại + dự báo 2 ngày theo tên nơi (thành phố, tỉnh, quốc gia). ' +
-        'Dùng khi người dùng hỏi thời tiết/nhiệt độ/mưa.',
-      parameters: z.object({
-        location: z.string().min(1).max(80).describe('Tên nơi, ví dụ "Hà Nội", "Tokyo", "Paris"'),
-      }),
-      execute: async (args) =>
-        guarded(
-          'weather',
-          args,
-          async () => {
-            const report = await fetchWeather(args.location);
-            return report ? { report } : { report: null, note: `Không tra được thời tiết "${args.location}".` };
-          },
-          { report: null },
-        ),
-    }),
-
-    exchange_rates: tool({
-      description:
-        'Tỷ giá hối đoái hôm nay, quy về gốc USD. Dùng khi người dùng hỏi tỷ giá hoặc cần quy ' +
-        'đổi tiền tệ. KHÔNG nhận tham số và LUÔN trả về TOÀN BỘ bảng các đồng phổ biến ' +
-        '(VND, EUR, JPY, CNY, KRW...) — tự tìm đồng cần dùng trong bảng đó rồi tính, đừng gọi ' +
-        'lại nhiều lần cho từng đồng tiền.',
-      parameters: z.object({}).describe('Không cần tham số'),
-      execute: async (args) =>
-        guarded(
-          'exchange_rates',
-          args,
-          async () => {
-            const block = await fetchRates();
-            return block ? { rates: block } : { rates: null, note: 'Tra tỷ giá thất bại.' };
-          },
-          { rates: null },
-        ),
-    }),
-
     ...(memories.length
       ? {
           memory_search: tool({
@@ -626,11 +576,6 @@ export function buildAgentTools(
     Reflect.deleteProperty(serverTools, 'web_search');
     Reflect.deleteProperty(serverTools, 'web_fetch');
   }
-  if (opts.includeWeather === false) Reflect.deleteProperty(serverTools, 'weather');
-  if (opts.includeExchangeRates === false) {
-    Reflect.deleteProperty(serverTools, 'exchange_rates');
-  }
-
   return serverTools;
 }
 

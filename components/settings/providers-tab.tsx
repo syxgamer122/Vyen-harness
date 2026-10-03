@@ -66,22 +66,6 @@ export function ProvidersTab() {
         <VisionModelSection />
       </div>
 
-      <div className="border-t border-subtle pt-3">
-        <label htmlFor="access-code" className="field-label mb-1.5 block">
-          Mã truy cập (Access Code cho server gateway)
-        </label>
-        <input
-          id="access-code"
-          type="password"
-          value={settings.accessCode || ''}
-          onChange={(e) => updateSettings({ accessCode: e.target.value })}
-          placeholder="Nhập mã truy cập..."
-          className="field w-full"
-        />
-        <p className="field-hint mt-1">
-          Gửi kèm mỗi yêu cầu tới server gateway dùng chung. Để trống nghĩa là không yêu cầu.
-        </p>
-      </div>
 
       <div className="border-t border-subtle pt-3">
         <RoutingSettingsPanel />

@@ -21,8 +21,6 @@ import {
   Globe,
   ListChecks,
   Loader2,
-  Mic,
-  MicOff,
   MoreHorizontal,
   Paperclip,
   Pencil,
@@ -32,12 +30,11 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { PulseGlow, SiriWave, useHaptics } from '@/components/effects';
+import { PulseGlow, useHaptics } from '@/components/effects';
 import { filterPrompts } from '@/lib/slash-commands';
 import { ModelSelector } from '@/components/model-selector';
 import type { ModelOption, ModelFavorite, RecentModel } from '@/components/model-selector';
 import { TOOL_CATALOG } from '@/lib/tool-catalog';
-import { useSpeechRecognition } from '@/lib/use-speech-recognition';
 import { useAnchoredPanel } from '@/lib/hooks/use-anchored-panel';
 import { Z_CLASS } from '@/lib/ui-z';
 
@@ -535,12 +532,6 @@ export const Composer = memo(function Composer({
       flushDraft(currentChatIdRef.current, draftRef.current);
     };
   }, [flushDraft]);
-
-  const speech = useSpeechRecognition({
-    onFinalText: (text) => {
-      setDraft((prev) => (prev ? `${prev} ${text}` : text));
-    },
-  });
 
   useImperativeHandle(
     composerApiRef,
@@ -1068,18 +1059,6 @@ export const Composer = memo(function Composer({
             }}
           />
 
-          {((speech.listening && speech.interim) || speech.error) && (
-            <div className="border-t border-subtle/40 px-4 py-1.5 font-mono text-[11px]">
-              {speech.error ? (
-                <span className="text-status-error">{speech.error}</span>
-              ) : (
-                <span className="flex items-center gap-2 truncate italic text-accent">
-                  <SiriWave active={true} />
-                  <span>Đang nghe: {speech.interim}</span>
-                </span>
-              )}
-            </div>
-          )}
 
           <div className="flex items-center justify-between gap-2 px-3 pb-3.5 pt-1.5">
             {/* Cụm TRÁI: đính kèm + thư mục + Voice STT */}
@@ -1102,22 +1081,6 @@ export const Composer = memo(function Composer({
                   }
                   onClick={handlePickWorkspace}
                 />
-              )}
-              {speech.supported && (
-                <div className="flex items-center gap-1.5">
-                  <ToolbarButton
-                    icon={speech.listening ? MicOff : Mic}
-                    active={speech.listening}
-                    className={`rounded-lg hover:bg-accent-mint/50 ${speech.listening ? 'animate-pulse text-status-error' : ''}`}
-                    label={
-                      speech.listening
-                        ? 'Dừng nhận diện giọng nói (đang nghe)'
-                        : 'Nhập bằng giọng nói'
-                    }
-                    onClick={speech.toggle}
-                  />
-                  {speech.listening && <SiriWave active={true} />}
-                </div>
               )}
             </div>
 

@@ -32,27 +32,6 @@ const SEARCH_FIXTURE =
   '<a class="result-link" href="https://example.com/a">Kết quả vàng</a>' +
   '<td class="result-snippet">giá vàng tăng</td>';
 
-const WEATHER_FETCH = async (url: string) =>
-  String(url).includes('geocoding')
-    ? jsonResponse({
-        results: [{ name: 'Hà Nội', country: 'Việt Nam', latitude: 21.03, longitude: 105.85 }],
-      })
-    : jsonResponse({
-        current: {
-          temperature_2m: 31.2,
-          apparent_temperature: 35,
-          relative_humidity_2m: 70,
-          weather_code: 61,
-          wind_speed_10m: 9.4,
-        },
-        daily: {
-          time: ['2026-08-25'],
-          temperature_2m_max: [33],
-          temperature_2m_min: [26],
-          precipitation_probability_max: [40],
-        },
-      });
-
 function makeModel() {
   const provider = createOpenAI({ apiKey: 'test-key', baseURL: 'https://gw.test/v1' });
   return provider('emu-model');
@@ -195,7 +174,7 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
         if (url.includes('/chat/completions')) {
           completionCount += 1;
           lastBody = String(init?.body ?? '');
-          return completion('<tool_call>{"name":"exchange_rates","arguments":{}}</tool_call>');
+          return completion('<tool_call>{"name":"web_search","arguments":{"query":"ty-gia"}}</tool_call>');
         }
         throw new Error(`unexpected url ${url}`);
       }),
@@ -207,7 +186,7 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
     expect(completionCount).toBe(3);
     // Prompt của round CUỐI chứa nudge ép prose và các TOOL_RESULT đã thu.
     expect(lastBody).toContain('Đã hết lượt sử dụng công cụ');
-    expect(lastBody).toContain('[TOOL_RESULT name=exchange_rates]');
+    expect(lastBody).toContain('[TOOL_RESULT name=web_search]');
     // Model cứng đầu chỉ nhả call → strip sạch nhưng KHÔNG rỗng tuyệt đối
     // (nguyên tắc never-empty: fallback nguyên văn).
     expect(events.text.length).toBeGreaterThan(0);
@@ -217,7 +196,7 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
     /*
      * Chứng cứ SONG SONG đo bằng ĐỘ CHỒNG LẤN, không bằng wall-clock.
      *
-     * Bản cũ chứng minh song song bằng cách so thứ tự `done`: weather sleep 5ms
+     * Bản cũ chứng minh song song bằng cách so thứ tự `done`: một tool sleep 5ms
      * phải xong trước web_search sleep 60ms. Cách đó PHỤ THUỘC THỜI GIAN THỰC —
      * khi máy tải nặng (chạy full suite) thứ tự về đích lệch đi và test đỏ dù
      * code đúng. Đã đo: 6/6 xanh khi chạy riêng, đỏ trong full suite. Comment cũ
@@ -228,8 +207,8 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
      * xong hẳn mới tới tool sau ⇒ maxInFlight luôn = 1. Tải máy chỉ làm việc
      * chồng lấn RÕ HƠN, không bao giờ làm mất tín hiệu — nên không flaky.
      *
-     * (Không đếm cứng số request: `weather` gọi fetch HAI lần — geocoding rồi
-     * open-meteo — nên tổng là 4, không phải 3.)
+     * (Không đếm cứng số request: một tool có thể gọi fetch nhiều lần nên tổng
+     * request không luôn bằng số tool.)
      */
     let inFlight = 0;
     let maxInFlight = 0;
@@ -255,22 +234,15 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
             () => new Response(SEARCH_FIXTURE, { headers: { 'content-type': 'text/html' } }),
           );
         }
-        if (url.includes('geocoding') || url.includes('open-meteo')) {
-          return tracked(() => WEATHER_FETCH(url));
-        }
-        if (url.includes('open.er-api') || url.includes('er-api')) {
-          return tracked(() => jsonResponse({ rates: { USD: 1, VND: 25000 } }));
-        }
         if (url.includes('/chat/completions')) {
           completionCount += 1;
           return completionCount === 1
             ? completion(
-              'Tra 3 nguồn.\n' +
+              'Tra 2 nguồn.\n' +
               '<tool_call>{"name":"web_search","arguments":{"query":"vàng"}}</tool_call>\n' +
-              '<tool_call>{"name":"weather","arguments":{"location":"Hà Nội"}}</tool_call>\n' +
-              '<tool_call>{"name":"exchange_rates","arguments":{}}</tool_call>',
+              '<tool_call>{"name":"web_search","arguments":{"query":"tỷ giá"}}</tool_call>',
             )
-            : completion('Xong: đã có đủ 3 nguồn.');
+            : completion('Xong: đã có đủ 2 nguồn.');
         }
         throw new Error(`unexpected url ${url}`);
       }),
@@ -282,21 +254,21 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
     const elapsed = Date.now() - started;
 
     expect(result.status).toBe('done');
-    expect(result.totalCalls).toBe(3);
+    expect(result.totalCalls).toBe(2);
     /* Bằng chứng song song: có ít nhất hai request cùng bay. */
     expect(maxInFlight).toBeGreaterThanOrEqual(2);
     // Preflight tuần tự theo source: start theo đúng thứ tự gọi.
     const starts = events.annotations
       .filter((a) => (a.tool as { phase?: string })?.phase === 'start')
       .map((a) => (a.tool as { name: string }).name);
-    expect(starts).toEqual(['web_search', 'weather', 'exchange_rates']);
+    expect(starts).toEqual(['web_search', 'web_search']);
     /* Thứ tự `done` KHÔNG còn được khẳng định: các request chồng lấn nên về đích
-       theo lịch trình event loop. Chỉ cần cả ba đều xong — tính song song đã
+       theo lịch trình event loop. Chỉ cần cả hai đều xong — tính song song đã
        được chứng minh bằng maxInFlight ở trên. */
     const done = events.annotations
       .filter((a) => (a.tool as { phase?: string })?.phase === 'done')
       .map((a) => (a.tool as { name: string }).name);
-    expect([...done].sort()).toEqual(['exchange_rates', 'weather', 'web_search']);
+    expect([...done]).toHaveLength(2);
     // Sanity chống treo.
     expect(elapsed).toBeLessThan(5000);
     // TOOL_RESULT gắn đúng tên, đúng thứ tự source trong transcript round sau.
@@ -369,6 +341,6 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
     expect(p).toContain('web_search');
     expect(p).toContain('fs_list');
     expect(p).not.toContain('memory_search');
-    expect(p).not.toContain('exchange_rates');
+    expect(p).not.toContain('memory_save');
   });
 });

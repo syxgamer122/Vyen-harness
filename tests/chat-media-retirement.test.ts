@@ -8,9 +8,6 @@ import { getReasoningCapability } from '@/lib/model-reasoning-cache';
 
 vi.mock('@/lib/security', () => ({
   checkSameOrigin: () => true,
-  getClientIp: () => 'test',
-  checkRateLimit: () => ({ ok: true }),
-  verifyAccessAuth: () => ({ ok: true }),
 }));
 vi.mock('@ai-sdk/openai', () => ({
   createOpenAI: vi.fn(() => (modelId: string) => ({ modelId })),

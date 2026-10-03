@@ -128,25 +128,3 @@ async function staleWhileRevalidate(req, cacheName, event) {
     .catch(() => cached);
   return cached || network;
 }
-
-async function cacheFirstSafe(req, cacheName) {
-  const cached = await caches.match(req);
-  if (cached) return cached;
-  const res = await fetch(req);
-  if (res.ok && (res.type === 'basic' || res.type === 'cors')) {
-    try {
-      const body = await res.blob();
-      const cloned = new Response(body, {
-        status: res.status,
-        statusText: res.statusText,
-        headers: res.headers,
-      });
-      const cache = await caches.open(cacheName);
-      await cache.put(req, cloned);
-      return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
-    } catch {
-      return new Response(null, { status: res.status });
-    }
-  }
-  return res;
-}

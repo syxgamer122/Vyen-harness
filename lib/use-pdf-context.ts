@@ -17,7 +17,6 @@ export const MAX_PDF_FILES = 2;
 function authHeaders(): Record<string, string> {
   const s = useAppStore.getState();
   const headers: Record<string, string> = {};
-  if (s.settings.accessCode) headers['x-access-code'] = s.settings.accessCode;
   const p = s.activeProvider;
   if (p?.baseUrl) {
     headers['x-api-base'] = p.baseUrl;

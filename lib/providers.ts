@@ -11,7 +11,7 @@ import { resolveProviderApiKey } from '@/lib/provider-secure-key';
 /**
  * Provider Presets — nhiều nhà cung cấp API chuẩn OpenAI-compatible.
  * Cấu hình lưu trong IndexedDB; snapshot nhà cung cấp đang dùng giữ trong
- * zustand (KHÔNG persist) để chat/title route gửi kèm header mỗi request.
+ * zustand (KHÔNG persist) để các route LLM gửi kèm header mỗi request.
  */
 
 export { SERVER_PROVIDER_ID };

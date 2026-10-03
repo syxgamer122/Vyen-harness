@@ -17,13 +17,7 @@ import { z } from 'zod';
 import { describeImageDataUrl } from '@/lib/vision-bridge';
 import { ACTIVE_MODEL_BODY_FIELD } from '@/lib/aux-llm-chain';
 import { validateProviderBaseUrl } from '@/lib/provider-url';
-import {
-  checkRateLimit,
-  rateLimitHeaders,
-  rateLimitIdentity,
-  verifySameOrigin,
-  verifyAccessAuth,
-} from '@/lib/security';
+import { verifySameOrigin } from '@/lib/security';
 
 export const runtime = 'nodejs';
 
@@ -79,13 +73,6 @@ function fail(error: string, status: number, extraHeaders?: Record<string, strin
 
 export async function POST(req: Request) {
   if (!verifySameOrigin(req)) return fail('forbidden', 403);
-
-  const limit = checkRateLimit(`vision:${rateLimitIdentity(req)}`, 20, 60_000);
-  if (!limit.ok) {
-    return fail('rate_limited', 429, rateLimitHeaders(limit));
-  }
-  const auth = verifyAccessAuth(req);
-  if (!auth.ok) return fail('unauthorized', 401);
 
   let json: unknown;
   try {
@@ -162,7 +149,7 @@ export async function POST(req: Request) {
     }
     return Response.json(
       { ok: true as const, description },
-      { headers: { ...NO_STORE, ...rateLimitHeaders(limit) } },
+      { headers: { ...NO_STORE } },
     );
   } catch {
     return fail('Lỗi khi gọi model vision của Nhà cung cấp.', 502);

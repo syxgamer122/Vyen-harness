@@ -108,7 +108,7 @@ export const PERMISSION_OPTIONS: ReadonlyArray<{ value: PermissionOverride; labe
 ];
 
 /**
- * Tên model có gửi được lên route LLM hay không. Mọi route (chat/title/compact/
+ * Tên model có gửi được lên route LLM hay không. Mọi route (chat/compact/
  * vision) validate field `model` bằng CÙNG ràng buộc: chữ-số cùng `. - : ~ /`,
  * tối đa 120 ký tự — vì tên đó được chuyển thẳng lên gateway.
  *
@@ -199,7 +199,6 @@ export interface Settings {
    */
   codeModeEnabled: boolean;
   apiKey?: string;
-  accessCode?: string;
   /** Mixture-of-models chains theo Category  */
   modelChains?: Record<CategoryId, ChainEntry[]>;
   /** Quy tắc can thiệp gọi tool do người dùng tự viết */
@@ -268,7 +267,6 @@ const DEFAULT_SETTINGS: Settings = {
   modelRouting: { ...DEFAULT_MODEL_ROUTING },
   codeModeEnabled: false,
   apiKey: '',
-  accessCode: '',
   modelChains: DEFAULT_CHAINS,
   toolcallRules: [],
   customSlashCommands: {},
@@ -472,8 +470,7 @@ export const useAppStore = create<AppState>()(
                   )
                 : current.settings.customSlashCommands,
             apiKey: '',
-            accessCode: '',
-          },
+                    },
           activeProvider: null,
         };
       },

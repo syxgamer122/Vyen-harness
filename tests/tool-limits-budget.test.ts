@@ -75,7 +75,21 @@ describe('ngân sách gọi tool sống xuyên request', () => {
     expect((other as any).results.length).toBeGreaterThan(0);
   });
 
-  it('lượt người dùng MỚI dọn lịch sử doom-loop nhưng GIỮ provenance host', () => {
+  /**
+   * Bucket ngân sách theo hội thoại vẫn tồn tại và vẫn rò provenance host —
+   * đây là thứ chống "gọi tool ở hội thoại khác để né trần", KHÔNG phải trần
+   * lượt. Sau khi bỏ MAX_TOOL_CALLS_PER_TURN, bucket chỉ còn phần lịch sử +
+   * provenance. Đảo điều kiện: xoá phần này là test ĐỎ.
+   */
+  it('bucket sống xuyên các request (cùng conversationId thấy cùng state)', () => {
+    const a = getToolCallBudget('prov-1');
+    a.recentSignatures.push('web_search:{}');
+    // Lần gọi sau: đây là CÙNG object — đây mới là "sống xuyên request".
+    const b = getToolCallBudget('prov-1');
+    expect(b.recentSignatures).toContain('web_search:{}');
+  });
+
+  it('lượt người dùng MỚI reset trần nhưng GIỮ provenance host', () => {
     const bucket = getToolCallBudget('c1');
     bucket.recentSignatures.push('web_search:{}');
     bucket.knownHosts.add('example.com');

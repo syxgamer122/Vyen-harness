@@ -238,7 +238,6 @@ Bảng dưới là **các biến mà code thật sự đọc** — kiểm chứn
 
 | Biến | Mô tả |
 |---|---|
-| `ACCESS_CODE` | Yêu cầu mã truy cập (Bearer) khi gọi route LLM/web |
 | `ALLOWED_ORIGIN_HOSTS` | Host origin phụ được chấp nhận, cách nhau `,` |
 | `TRUSTED_PROXY_HOPS` | Số hop proxy tin cậy khi đọc `x-forwarded-for`, mặc định `1`; chạy trực tiếp không qua proxy thì đặt `0` |
 | `TRUST_PROXY_IP_HEADERS` | `1` = tin thêm các header IP phụ do proxy gửi |

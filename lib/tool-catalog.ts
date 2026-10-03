@@ -54,8 +54,6 @@ export const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
   git_commit: 'git',
   web_search: 'web',
   web_fetch: 'web',
-  weather: 'web',
-  exchange_rates: 'web',
   chat_recall: 'memory',
   memory_search: 'memory',
   memory_save: 'memory',
@@ -336,24 +334,6 @@ export const TOOL_CATALOG: readonly ToolCatalogEntry[] = [
     desktopOnly: true,
   },
   // web
-  {
-    name: 'exchange_rates',
-    kind: 'server',
-    category: 'web',
-    shortLabel: 'tỷ giá',
-    description: 'Tra bảng tỷ giá hôm nay quy về gốc USD, không nhận tham số.',
-    aliases: [],
-    desktopOnly: false,
-  },
-  {
-    name: 'weather',
-    kind: 'server',
-    category: 'web',
-    shortLabel: 'thời tiết',
-    description: 'Tra thời tiết hiện tại và dự báo 2 ngày theo tên địa điểm.',
-    aliases: [],
-    desktopOnly: false,
-  },
   {
     name: 'web_fetch',
     kind: 'server',

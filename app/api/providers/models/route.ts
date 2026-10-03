@@ -1,5 +1,5 @@
 import { validateProviderBaseUrl, normalizeProviderModels } from '@/lib/provider-url';
-import { checkSameOrigin, verifyAccessAuth } from '@/lib/security';
+import { checkSameOrigin } from '@/lib/security';
 
 export const runtime = 'nodejs';
 
@@ -12,11 +12,6 @@ export async function POST(req: Request) {
   if (!checkSameOrigin(req as any)) {
     return Response.json({ error: 'Origin không được phép.' }, { status: 403 });
   }
-  const auth = verifyAccessAuth(req as any);
-  if (!auth.ok) {
-    return Response.json({ error: auth.error ?? 'Unauthorized' }, { status: auth.status ?? 401 });
-  }
-
   let body: { baseUrl?: unknown; apiKey?: unknown };
   try {
     body = await req.json();

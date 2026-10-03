@@ -7,7 +7,7 @@
  *   client (fold dấu tiếng Việt tái dùng foldText) chạy lúc submitTurn.
  * - Tầng 2 (body): CHỈ khi match, body của tối đa 2 skill được inject vào
  *   system prompt ĐÚNG LƯỢT đó — gửi qua body.skills của /api/chat, giống
- *   đường ống webContext/liveContext/pdfContexts.
+ *   đường ống webContext/pdfContexts.
  *
  * Prompt mode 'insert' (mặc định) không đi qua đây — vẫn là hành vi chèn ô
  * nhập cũ của menu "/".

@@ -1,108 +1,71 @@
 /**
- * Hợp đồng rate limit /api/chat sau khi bỏ throttle kiểu web-chat.
+ * Hợp đồng: /api/chat KHÔNG còn tự throttle request.
  *
  * Vyen là harness agent coding local-first: mỗi tool call client (fs_*, shell,
- * git) resubmit MỘT POST /api/chat, nên KHÔNG được throttle request HỢP LỆ
- * theo phút — mọi coding agent (Claude Code, Codex CLI, Cline, Aider…) đều
- * không tự rate-limit vòng lặp của mình. Chỉ còn bucket chống brute-force
- * ACCESS_CODE: request SAI/THIẾU mã bị đếm (mã đúng không tốn quota).
+ * git) resubmit MỘT POST /api/chat. Throttle request HỢP LỆ theo phút tức là tự
+ * chặn vòng lặp agent giữa task — mọi coding agent (Claude Code, Codex CLI,
+ * Cline, Aider…) đều không làm vậy, chúng tôn trọng 429 của nhà cung cấp rồi
+ * backoff.
+ *
+ * Lỗi từng có: trần 20/phút trong khi CLIENT_MAX_STEPS cho phép một lượt refactor
+ * 30-50 tool call ⇒ task hợp lệ bị chặn giữa chừng, client chỉ hiện toast "vui
+ * lòng đợi vài giây".
+ *
+ * File này viết theo hướNG ĐẢO: khẳng định KHÔNG có limiter. Dán lại
+ * `checkRateLimit` vào app/api/chat/route.ts là file này ĐỎ.
  */
+import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+const ROUTE = path.resolve(__dirname, '../app/api/chat/route.ts');
+const source = fs.readFileSync(ROUTE, 'utf8');
 
-vi.mock('@/lib/security', () => ({
-  checkSameOrigin: () => true,
-  getClientIp: () => '1.2.3.4',
-  checkRateLimit: vi.fn(),
-  verifyAccessAuth: vi.fn(),
-}));
-
-import { POST } from '@/app/api/chat/route';
-import { checkRateLimit, verifyAccessAuth } from '@/lib/security';
-
-const checkRateLimitMock = vi.mocked(checkRateLimit);
-const verifyAccessAuthMock = vi.mocked(verifyAccessAuth);
-
-const OK_LIMIT = {
-  ok: true,
-  allowed: true,
-  limit: 0,
-  remaining: 0,
-  resetAt: 0,
-  retryAfterSec: 0,
-} as never;
-
-/** Model đã ngừng → route trả 410 ngay sau parse, không chạm upstream. */
-const RETIRED_MODEL = 'flux-pro';
-
-function request(body: Record<string, unknown>, headers: Record<string, string> = {}) {
-  return new Request('http://localhost/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify({
-      messages: [{ role: 'user', content: 'xin chào' }],
-      agentTools: false,
-      ...body,
-    }),
+describe('/api/chat không tự throttle request hợp lệ', () => {
+  it('route không import checkRateLimit', () => {
+    // Điều kiện đảo: thêm lại import này là ĐỎ.
+    expect(source).not.toMatch(/import \{[^}]*checkRateLimit[^}]*\} from '@\/lib\/security'/);
   });
-}
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  verifyAccessAuthMock.mockReturnValue({ ok: true, authorized: true } as never);
-  checkRateLimitMock.mockReturnValue(OK_LIMIT);
+  it('route không gọi checkRateLimit', () => {
+    expect(source).not.toMatch(/checkRateLimit\s*\(/);
+  });
+
+  it('không còn mã lỗi RATE_LIMITED của ta', () => {
+    // 429 VẪN xuất hiện trong route — nhưng là 429 từ PROVIDER (nằm trong
+    // RETRYABLE_SAME_MODEL_STATUSES và nhánh diagnoseUpstreamError). Cái
+    // bị gỡ là mã lỗi do limiter CỦA TA phát ra.
+    expect(source).not.toMatch(/'RATE_LIMITED'/);
+  });
+
+  it('vẫn xử lý 429 từ provider (không mất failover)', () => {
+    // Điều kiện đảo: xoá nhánh này là ĐỎ — 429 upstream là lỗi TẠM, phải
+    // retry model khác chứ không phải lỗi của người dùng.
+    expect(source).toMatch(/RETRYABLE_SAME_MODEL_STATUSES/);
+    expect(source).toMatch(/UPSTREAM_RATE_LIMIT_429/);
+  });
+
+  it('vẫn còn guard thật: same-origin + body cap + schema', () => {
+    // Đảo điều kiện: xoá hết các guard này là ĐỎ.
+    expect(source).toMatch(/checkSameOrigin/);
+    expect(source).toMatch(/MAX_BODY_BYTES/);
+    expect(source).toMatch(/BodySchema\.safeParse/);
+  });
 });
 
-afterEach(() => vi.clearAllMocks());
+describe('bridge giữ bucket chống brute-force token', () => {
+  const bridge = fs.readFileSync(
+    path.resolve(__dirname, '../app/api/bridge/route.ts'),
+    'utf8',
+  );
 
-describe('rate limit /api/chat — không throttle vòng lặp agent', () => {
-  it('request HỢP LỆ không bị rate-limit (resubmit fs_*/shell chạy tự do)', async () => {
-    const res = await POST(request({ model: RETIRED_MODEL }));
-    // 410 nằm SAU tầng bảo vệ ⇒ request đã đi qua, không dính 429.
-    expect(res.status).toBe(410);
-    expect(checkRateLimitMock).not.toHaveBeenCalled();
+  it('/api/bridge vẫn đếm request sai token', () => {
+    // Điều kiện đảo: gỡ checkRateLimit khỏi bridge là ĐỎ — đây là chống đoán
+    // bridge-token 32 byte, KHÁC hẳn throttle request hợp lệ.
+    expect(bridge).toMatch(/checkRateLimit\s*\(/);
   });
 
-  it('request HỢP LỆ cũng không bị đếm khi có key BYOK', async () => {
-    const res = await POST(request({ model: RETIRED_MODEL }, { 'x-api-key': 'sk-test-key' }));
-    expect(res.status).toBe(410);
-    expect(checkRateLimitMock).not.toHaveBeenCalled();
-  });
-
-  it('mã SAI → đếm vào bucket chat-auth (chống brute-force)', async () => {
-    verifyAccessAuthMock.mockReturnValue({
-      ok: false,
-      authorized: false,
-      status: 401,
-      error: 'sai mã',
-    } as never);
-
-    const res = await POST(request({ model: RETIRED_MODEL }));
-    expect(res.status).toBe(401);
-
-    const [key, limit] = checkRateLimitMock.mock.calls[0];
-    expect(String(key).startsWith('chat-auth:')).toBe(true);
-    expect(Number(limit)).toBeGreaterThan(0);
-  });
-
-  it('mã SAI vượt trần → 429 kèm Retry-After', async () => {
-    verifyAccessAuthMock.mockReturnValue({
-      ok: false,
-      authorized: false,
-      status: 401,
-      error: 'sai mã',
-    } as never);
-    checkRateLimitMock.mockReturnValue({
-      ok: false,
-      allowed: false,
-      limit: 0,
-      remaining: 0,
-      resetAt: 0,
-      retryAfterSec: 7,
-    } as never);
-
-    const res = await POST(request({ model: RETIRED_MODEL }));
-    expect(res.status).toBe(429);
-    expect(res.headers.get('Retry-After')).toBe('7');
+  it('bridge so sánh token bằng timingSafeEqual', () => {
+    expect(bridge).toMatch(/verifyBridgeToken|timingSafeEqual/);
   });
 });

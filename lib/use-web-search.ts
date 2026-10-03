@@ -25,11 +25,10 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_PASTED_URLS = 2;
 const MAX_AUTO_FETCH = 2;
 
-/** Gom access-code/provider key giống useChat để đi qua cùng tầng xác thực. */
+/** Gom provider key giống useChat để đi qua cùng tầng xác thực. */
 function authHeaders(): Record<string, string> {
   const s = useAppStore.getState();
   const headers: Record<string, string> = {};
-  if (s.settings.accessCode) headers['x-access-code'] = s.settings.accessCode;
   const p = s.activeProvider;
   if (p?.baseUrl) {
     headers['x-api-base'] = p.baseUrl;

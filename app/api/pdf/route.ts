@@ -1,12 +1,6 @@
 import { z } from 'zod';
 import { extractText, getDocumentProxy } from 'unpdf';
-import {
-  checkSameOrigin,
-  checkRateLimit,
-  rateLimitIdentity,
-  timingSafeEqual,
-  verifyAccessAuth,
-} from '@/lib/security';
+import { checkSameOrigin } from '@/lib/security';
 
 /**
  * POST /api/pdf — trích text từ file PDF (data URL) cho tính năng "chat với
@@ -48,23 +42,6 @@ export async function POST(req: Request) {
   try {
     if (!checkSameOrigin(req)) {
       return jsonError(requestId, 403, 'ORIGIN_FORBIDDEN', 'Truy cập bị từ chối.');
-    }
-
-    const rl = checkRateLimit(`pdf:${rateLimitIdentity(req)}`, 20, 60_000);
-    if (!rl.ok) {
-      return Response.json(
-        { error: 'Bạn đang xử lý PDF quá nhanh.', code: 'RATE_LIMITED', requestId },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
-      );
-    }
-
-    const auth = verifyAccessAuth(req);
-    if (!auth.ok) {
-      const expected = (process.env.ACCESS_CODE ?? '').trim();
-      const alt = req.headers.get('x-access-code')?.trim() ?? '';
-      if (!(expected && alt && timingSafeEqual(alt, expected))) {
-        return jsonError(requestId, auth.status ?? 401, 'UNAUTHORIZED', auth.error ?? 'Unauthorized');
-      }
     }
 
     const contentLength = Number(req.headers.get('content-length') || '0');

@@ -63,7 +63,7 @@ import {
   buildSubRecipeServerTools,
   toResolvedSubRecipes,
 } from '@/lib/recipes/subrecipe-exec';
-import { MAX_TOOL_CALLS_PER_TURN, SERVER_MAX_STEPS, TOOL_RESULT_MAX_CHARS, truncateToolResult } from '@/lib/tool-limits';
+import { SERVER_MAX_STEPS, TOOL_RESULT_MAX_CHARS, truncateToolResult } from '@/lib/tool-limits';
 import { redactSecretText, redactSecretsDeep } from '@/lib/secret-registry';
 import { resolveRoute, DEFAULT_CHAINS, type CategoryId, type RouteReceipt, type ChainEntry } from '@/lib/routing/categories';
 import { scoreRequest } from '@/lib/routing/score-request';
@@ -87,7 +87,7 @@ import { resetToolCallBudget } from '@/lib/tool-call-budget';
 import { judgeInjection } from '@/lib/injection-guard';
 import { bridgeImagesInMessages, downgradeImagesToPlaceholders, shouldBridgeImages, type BridgeableMessage } from '@/lib/vision-bridge';
 import { ACTIVE_MODEL_BODY_FIELD } from '@/lib/aux-llm-chain';
-import { checkRateLimit, getClientIp, checkSameOrigin, verifyAccessAuth } from '@/lib/security';
+import { checkSameOrigin } from '@/lib/security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -104,21 +104,9 @@ const IDLE_TIMEOUT_MS = 90_000;
 const HEARTBEAT_MS = 10_000;
 const MAX_BODY_BYTES = 4.5 * 1024 * 1024;
 
-/* ------------------------------------------------------------------------- */
-/* Rate limit — chỉ còn bucket CHỐNG BRUTE-FORCE (request sai mã truy cập)    */
-/* ------------------------------------------------------------------------- */
-/* Vyen là harness agent coding local-first (BYOK), không còn là web chat:     */
-/* mỗi tool call client (fs_*, shell, git) resubmit một POST /api/chat, nên    */
-/* throttle request HỢP LỆ theo phút chính là tự chặn vòng lặp agent giữa     */
-/* task. Mọi coding agent (Claude Code, Codex CLI, Cline, Aider…) đều KHÔNG    */
-/* tự rate-limit vòng lặp của mình — chúng tôn trọng 429 của nhà cung cấp     */
-/* rồi backoff. Vì vậy bỏ hẳn trần request/phút cho request hợp lệ.            */
-/* Giữ ĐÚNG MỘT bucket: request SAI/THIẾU ACCESS_CODE bị đếm để chặn           */
-/* brute-force — lớp này không dính tới vòng lặp agent (mã đúng không tốn     */
-/* quota), cùng mô hình với /api/bridge.                                       */
-/** Trần request SAI mã/phút/IP — chống brute-force (bằng ngưỡng /api/bridge). */
-const CHAT_AUTH_RATE_LIMIT = 30;
-const CHAT_RATE_WINDOW_MS = 60_000;
+/** Trần KÍCH THƯỚC payload tool-result cho một lượt — không phải trần lượt agent. */
+const MAX_TOOL_INVOCATIONS_PER_REQUEST = 64;
+
 
 /* Port từ prime-agent (`isRetryableError`): lỗi TẠM THỜI của gateway thì thử
    lại ĐÚNG model đó một lần (kèm backoff ngắn) trước khi đốt model/key kế
@@ -633,11 +621,13 @@ const MessageSchema = z.object({
      KHÔNG được strip (zod mặc định) nếu không model không bao giờ thấy kết
      quả và lặp gọi tool vô hạn.
 
-     Trần PHẢI bằng MAX_TOOL_CALLS_PER_TURN (32). Trước đây để cứng 12 trong
-     khi budget cho phép 32 → model gọi thứ 13 là cả lượt tool rớt: server
-     trả 400 BAD_SCHEMA ("Array must contain at most 12 element(s)"), useChat
-     nhận lỗi nên vòng agent chết im lặng giữa chừng — đúng triệu chứng "chạy
-     được vài tool rồi đùng". Dùng chung hằng số để hai nơi không lệch nhau. */
+     Trần này KHÔNG phải trần lượt — budget theo lượt đã bỏ (xem
+     CLIENT_MAX_STEPS_UNBOUNDED: chống vòng lặp là việc của doom-loop guard +
+     run-lifecycle, không phải cắt ngang payload). Ở đây chỉ chặn MỘT lượt
+     resubmit gửi lên quá nhiều kết quả tool: trần cứng 12 từng làm server trả
+     400 BAD_SCHEMA ("Array must contain at most 12 element(s)") và useChat im
+     lặng — triệu chứng "chạy được vài tool rồi đùng". 64 là trần KÍCH THƯỚC
+     payload, đủ rộng cho một lượt dài mà vẫn chặn body phình vô lý. */
   toolInvocations: z
     .array(
       z.object({
@@ -648,7 +638,7 @@ const MessageSchema = z.object({
         result: z.unknown().optional(),
       }),
     )
-    .max(MAX_TOOL_CALLS_PER_TURN)
+    .max(MAX_TOOL_INVOCATIONS_PER_REQUEST)
     .optional(),
 });
 
@@ -733,13 +723,6 @@ const BodySchema = z.object({
         .max(2),
     })
     .optional(),
-  /* Dữ liệu realtime (thời tiết/tỷ giá) client tự tra theo ý định — lib/live-tools. */
-  liveContext: z
-    .object({
-      weather: z.string().max(1_500).optional(),
-      rates: z.string().max(1_200).optional(),
-    })
-    .optional(),
   /* Text trích từ file PDF đính kèm — route /api/pdf extract, client gửi kèm. */
   pdfContexts: z
     .array(
@@ -750,7 +733,7 @@ const BodySchema = z.object({
     )
     .max(2)
     .optional(),
-  /* Bật agentic tools (web_search/web_fetch/weather/exchange_rates) cho model.
+  /* Bật agentic tools (web_search/web_fetch) cho model.
      Mặc định BẬT; gateway không hỗ trợ function calling sẽ được route tự tắt
      và thử lại trong cùng request. Client gửi false để tắt hẳn. */
   agentTools: z.boolean().optional(),
@@ -983,32 +966,7 @@ export async function POST(req: Request) {
         ? rawCustomKey
         : undefined;
 
-    /* --- Tầng 2: Access code --- */
-    const auth = verifyAccessAuth(req as any);
 
-    /* --- Tầng 3: Rate limit — CHỈ chặn brute-force mã truy cập ---
-       Request HỢP LỆ không bị đếm phút nào: mỗi tool call client (fs_*, shell,
-       git) resubmit một POST /api/chat, nên throttle theo phút chính là tự
-       chặn vòng lặp agent giữa task. Mã SAI vẫn bị đếm để chống brute-force. */
-    if (!auth.ok) {
-      const rl = checkRateLimit(
-        `chat-auth:${getClientIp(req as any)}`,
-        CHAT_AUTH_RATE_LIMIT,
-        CHAT_RATE_WINDOW_MS,
-      );
-      if (!rl.ok) {
-        return jsonError(
-          requestId,
-          429,
-          'RATE_LIMITED',
-          `Bạn đang gửi tin nhắn quá nhanh. Vui lòng thử lại sau ${rl.retryAfterSec} giây.`,
-          undefined,
-          { 'Retry-After': String(rl.retryAfterSec) },
-        );
-      }
-      console.warn(`[req:${requestId}][AUTH_UNAUTHORIZED] ${auth.error}`);
-      return jsonError(requestId, auth.status ?? 401, 'UNAUTHORIZED', auth.error ?? 'Unauthorized');
-    }
 
     /* --- Body --- */
     const contentLength = Number(req.headers.get('content-length') || '0');
@@ -1044,7 +1002,6 @@ export async function POST(req: Request) {
       contextSummary,
       compactBoundaryId,
       webContext,
-      liveContext,
       pdfContexts,
       agentTools,
       memories,
@@ -1653,15 +1610,15 @@ export async function POST(req: Request) {
                    lời quảng bá trong prompt có thể lệch nhau.
 
                    KHÁC BIỆT QUAN TRỌNG: dữ liệu đã prefetch KHÔNG còn gỡ tool
-                   khỏi registry. Regex detectLiveIntent có thể trích sai địa
-                   điểm ("thời tiết Đà Lạt" → prefetch nhầm) và khi đó model
-                   không còn đường sửa. Nay tool vẫn còn, chỉ thêm ghi chú nói
-                   rằng dữ liệu đã có sẵn để model không gọi lại vô ích. */
+                   khỏi registry. Regex detect intent có thể trích sai địa
+                   điểm và khi đó model không còn đường sửa. Nay tool vẫn còn,
+                   chỉ thêm ghi chú nói rằng dữ liệu đã có sẵn để model không
+                   gọi lại vô ích. */
                  /* Sửa A3/A5: đường GIẢ LẬP (emulatedMode do negative-cache
                    tool-support, hoặc retryAsEmulated sau khi gateway chê
                    tools) vẫn chạy tool THẬT qua runEmulatedLoop — registry
-                   rỗng ở đây là tước mất web_search/web_fetch/weather/
-                   exchange_rates/memory_save của model chỉ vì gateway không
+                   rỗng ở đây là tước mất web_search/web_fetch/memory_save
+                   của model chỉ vì gateway không
                    nhận field `tools`. Chỉ đường "user tắt agentTools hẳn"
                    (emulatedMode=false) mới thực sự không build. */
                  const emulatedToolPath = emulatedMode || retryAsEmulated;
@@ -1839,12 +1796,6 @@ export async function POST(req: Request) {
                   webContext
                     ? 'Kết quả tìm kiếm web cho lượt này ĐÃ có sẵn ở trên — chỉ gọi web_search nếu cần truy vấn khác.'
                     : '',
-                  liveContext?.weather
-                    ? 'Dữ liệu thời tiết ĐÃ có sẵn ở trên — chỉ gọi weather nếu cần địa điểm khác với dữ liệu đó.'
-                    : '',
-                  liveContext?.rates
-                    ? 'Bảng tỷ giá ĐÃ có sẵn ở trên — không cần gọi exchange_rates nữa.'
-                    : '',
                 ]
                   .filter(Boolean)
                   .join(' ');
@@ -1882,8 +1833,6 @@ export async function POST(req: Request) {
                       ? `[Tóm tắt phần hội thoại đã nén trước đó]\n${contextSummary}`
                       : '',
                     webContext ? formatWebContextBlock(webContext as WebContextPayload) : '',
-                    liveContext?.weather ?? '',
-                    liveContext?.rates ?? '',
                     pdfContexts?.length
                       ? pdfContexts
                           .map(
@@ -2048,7 +1997,7 @@ export async function POST(req: Request) {
                           đọc description/parameters của chính object tool sẽ chạy).
                           Trước đây là chuỗi viết tay: nó vừa drift với schema, vừa
                           biến mất toàn bộ khi bất kỳ cờ prefetch nào bật — khiến
-                          model không được nhắc là có fs_* chỉ vì đã tra thời tiết. */
+                          model không được nhắc là có fs_* chỉ vì đã tra web. */
                       /* Chỉ liệt kê TÊN tool: mô tả đầy đủ đã đi qua trường
                          `tools` của API ở đường native (đường emulated tự
                          chèn manual đầy đủ trong buildProtocolHeader). Chèn

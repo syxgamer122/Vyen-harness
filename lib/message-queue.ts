@@ -47,26 +47,3 @@ export function enqueueMessage(queue: readonly string[], text: string): EnqueueR
   if (queue.length >= MESSAGE_QUEUE_CAP) return { queue: [...queue], dropped: true };
   return { queue: [...queue, text], dropped: false };
 }
-
-/**
- * Thứ tự poll trong onFinish (đúng chuẩn): hết tool call → steering? inject +
- * turn mới → không có thì goal-continue? → không thì follow-up? inject.
- * Hàm này chỉ quyết định giữa steering và follow-up khi caller đã biết turn
- * hiện tại KHÔNG phải tool-call resubmit.
- */
-export function pickQueuedPrompt(
-  steering: readonly string[],
-  followUp: readonly string[],
-  steeringMode: QueueMode,
-  followUpMode: QueueMode,
-): { kind: 'steering' | 'follow-up' | null; taken: string[]; steeringRest: string[]; followUpRest: string[] } {
-  const s = drainQueue(steering, steeringMode);
-  if (s.taken.length > 0) {
-    return { kind: 'steering', taken: s.taken, steeringRest: s.rest, followUpRest: [...followUp] };
-  }
-  const f = drainQueue(followUp, followUpMode);
-  if (f.taken.length > 0) {
-    return { kind: 'follow-up', taken: f.taken, steeringRest: [...steering], followUpRest: f.rest };
-  }
-  return { kind: null, taken: [], steeringRest: [...steering], followUpRest: [...followUp] };
-}

@@ -18,7 +18,7 @@
 import { z } from 'zod';
 
 /**
- * Field `model` cho body của route phụ (dùng ở /api/title).
+ * Field `model` cho body của route phụ (dùng ở /api/compact, /api/vision).
  * Chặn tên rác (khoảng trắng, ký tự lạ, chuỗi rỗng) trước khi tên được gửi
  * thẳng lên upstream dưới dạng model_id — tên vi phạm khiến request hỏng ngay
  * từ lượt đầu thay vì rơi vào failover vô nghĩa.
@@ -34,8 +34,8 @@ export const ACTIVE_MODEL_FIELD = z.string().min(1).max(120).regex(/^[\w.\-:~/@]
  * giết cả request.
  *
  * Lý do: `model` là field PHỤ. Không có `.catch()`, một tên model méo (client
- * cũ, người dùng dán tên có khoảng trắng) làm cả `safeParse` fail → /api/title
- * trả 'New Chat' và ghi đè tiêu đề heuristic, /api/compact trả `bad_schema` →
+ * cũ, người dùng dán tên có khoảng trắng) làm cả `safeParse` fail →
+ * /api/compact trả `bad_schema` →
  * hội thoại rơi về hard-trim, /api/orchestrate chết trước khi chạy, và
  * `visionModel` rác thì giết luôn lượt chat. Hạ cấp tính năng chính vì một
  * field phụ là sai đánh đổi: bỏ field đó đi thì route vẫn chạy đúng bằng
