@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CODE_MODE_MAX_OUTPUT_CHARS, executeCodeMode } from '@/lib/mcp/code-mode';
+import {
+  CODE_MODE_MAX_OUTPUT_CHARS,
+  CODE_MODE_MAX_TIMEOUT_MS,
+  CODE_MODE_DEFAULT_TIMEOUT_MS,
+  clampCodeModeTimeout,
+  executeCodeMode,
+} from '@/lib/mcp/code-mode';
 
 /**
  * Probe escape đo bằng chứng THẬT: code sandbox cố lấy `process.pid` của host.
@@ -410,5 +416,23 @@ describe('Code Mode — returnValue chịu trần 24k (A3)', () => {
     expect(res.ok).toBe(true);
     expect(res.truncated).toBeFalsy();
     expect(res.returnValue).toEqual({ sum: 30, list: [1, 2, 3] });
+  });
+});
+
+describe('Code Mode — trần timeout bị chặn cứng', () => {
+  /* Client (renderer) tự truyền `timeoutMs` qua bridge `vyen:code-run`, nên
+     không có chặn này thì client tăng tới bao lâu cũng được — trong khi mã model
+     chạy đồng bộ và chặn event loop của host (đo: spin 1.2s → 0 tick timer). */
+  it('client xin 5 phút vẫn bị cắt xuống trần 60s', () => {
+    expect(clampCodeModeTimeout(300_000)).toBe(CODE_MODE_MAX_TIMEOUT_MS);
+  });
+
+  it('client xin 50ms vẫn bị nâng lên sàn 1s (không cắt cụt việc hợp lệ)', () => {
+    expect(clampCodeModeTimeout(50)).toBe(1_000);
+  });
+
+  it('không truyền → dùng mặc định 30s; truyền trong khoảng → giữ nguyên', () => {
+    expect(clampCodeModeTimeout(undefined)).toBe(CODE_MODE_DEFAULT_TIMEOUT_MS);
+    expect(clampCodeModeTimeout(12_345)).toBe(12_345);
   });
 });

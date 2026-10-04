@@ -1,6 +1,6 @@
 import { useApprovalBridge, type UseApprovalBridgeReturn } from '@/react/use-approval-bridge';
 import { useAgentRuntime, type UseAgentRuntimeReturn } from '@/react/use-agent-runtime';
-import { ToolRunner, validateShellAllowlist } from '@/core/agent-runtime/tool-runner';
+import { validateShellAllowlist } from '@/core/agent-runtime/tool-runner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat, type Message } from 'ai/react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -6131,19 +6131,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   });
   const agentRuntime = options?.agentRuntime ?? defaultAgentRuntime;
 
-  const toolRunner = useMemo(
-    () =>
-      new ToolRunner({
-        chatId: chatKey,
-        activeLeafId: activeLeafId ?? undefined,
-        workspaceRoot: workspace?.name ?? undefined,
-        approvalPolicy,
-        toolPermissions,
-        recordAuditLog,
-      }),
-    [chatKey, activeLeafId, workspace?.name, approvalPolicy, toolPermissions],
-  );
-
   const lastMsg = messages[messages.length - 1];
   const isStreamingAssistant = isLoading && lastMsg?.role === 'assistant';
   const streamingContent = isStreamingAssistant ? lastMsg.content : '';
@@ -6154,7 +6141,6 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   return {
     approvalBridge,
     agentRuntime,
-    toolRunner,
     chatKey,
     currentChatId,
     activeLeafId,

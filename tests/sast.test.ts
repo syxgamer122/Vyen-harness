@@ -228,6 +228,37 @@ describe('Chaitin Security SAST Security Engine', () => {
     }
   });
 
+  it('bỏ qua file env CỤC BỘ nhưng vẫn quét file env được commit', () => {
+    /*
+     * `.env.local` là kho BYOK cục bộ: luôn gitignore, không bao giờ commit.
+     * Quét nó chỉ sinh false-positive "hardcoded API key" và làm đỏ
+     * `tests/web-bridge.test.ts` (vyen audit exit 1) mỗi lần dev dán key thật.
+     * `.env` / `.env.production` thường ĐƯỢC commit nên phải bắt lỗi như cũ —
+     * đây là ranh giới hành vi, không phải nới lỏng quét bí mật.
+     */
+    const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vyen-sast-env-'));
+    try {
+      const secret = 'OPENAI_API_KEY=sk-test0000000000000000000000000000\n';
+
+      // 1. File env CỤC BỘ bị bỏ qua
+      fs.writeFileSync(path.join(testDir, '.env.local'), secret, 'utf8');
+      const localReport = runSecuritySast(testDir);
+      expect(localReport.findings.filter((f) => f.file.endsWith('.env.local'))).toHaveLength(0);
+      expect(localReport.ok).toBe(true);
+
+      // 2. File env được commit vẫn phải bị bắt
+      fs.writeFileSync(path.join(testDir, '.env'), secret, 'utf8');
+      const committedReport = runSecuritySast(testDir);
+      const secretHits = committedReport.findings.filter(
+        (f) => f.file.endsWith('.env') && f.severity === 'high',
+      );
+      expect(secretHits.length).toBeGreaterThan(0);
+      expect(committedReport.ok).toBe(false);
+    } finally {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
   it('tạo text report chuẩn hóa với đầy đủ thông tin remediation', () => {
     const report = scanner.scan({ maxFiles: 10 });
     expect(report.textReport).toContain('Vyen Security & Code Audit (Security Standard)');

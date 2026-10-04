@@ -7,7 +7,7 @@
 >   MCP client nằm ở `lib/mcp/` và chạy trong **Node bridge** của desktop/CLI (`lib/bridge/`,
 >   `app/api/bridge/route.ts`), không phải main process của Electron.
 > - Tool MCP vẫn hiện diện với model dạng `mcp__<server>__<tool>`, phê duyệt 4 cấp, có whitelist
->   `available_tools`, grant gắn `schemaHash` (xem `lib/mcp/` và mục A6 của `CRITIQUE_RECONCILIATION.md`).
+>   `available_tools`, grant gắn `schemaHash` (xem `lib/mcp/` ; đối soát chi tiết đã gỡ cùng `CRITIQUE_RECONCILIATION.md` — lịch sử ở git).
 > - Exec-policy thực tế là `lib/shell-policy.cjs` (tokenizer argv + allowlist), không phải
 >   `electron/mcp/exec-policy.ts`.
 > - **Orchestrator sweep đã bị gỡ**: `lib/orchestrator/` nay chỉ còn `scheduler.ts` (pool giới hạn

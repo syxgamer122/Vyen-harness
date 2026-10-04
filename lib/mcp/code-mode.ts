@@ -25,6 +25,16 @@ import { tool } from 'ai';
 
 export const CODE_MODE_MAX_OUTPUT_CHARS = 24_000;
 export const CODE_MODE_DEFAULT_TIMEOUT_MS = 30_000;
+/** Trần cứng. Mã của model chạy đồng bộ trong `vm` nên nó CHẶN event loop của
+ *  host trong suốt thời gian chạy (đo: spin 1.2s → 0 tick timer host). Trần này
+ *  là thời gian UI có thể đứng trong trường hợp xấu nhất; hạ từ 120s xuống 60s
+ *  cắt một nửa rủi ro treo mà vẫn dư cho lượt code bình thường (mặc định 30s). */
+export const CODE_MODE_MAX_TIMEOUT_MS = 60_000;
+
+/** Ép `timeoutMs` (kể cả giá trị từ client qua bridge) vào khoảng [1s, 60s]. */
+export function clampCodeModeTimeout(ms: number | undefined): number {
+  return Math.min(Math.max(ms ?? CODE_MODE_DEFAULT_TIMEOUT_MS, 1_000), CODE_MODE_MAX_TIMEOUT_MS);
+}
 
 export interface CodeModeExecutionOptions {
   mcpCaller?: (serverId: string, toolName: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -123,7 +133,7 @@ export async function executeCodeMode(
   options: CodeModeExecutionOptions = {},
 ): Promise<CodeModeResult> {
   const startTime = Date.now();
-  const timeoutMs = Math.min(Math.max(options.timeoutMs ?? CODE_MODE_DEFAULT_TIMEOUT_MS, 1_000), 120_000);
+  const timeoutMs = clampCodeModeTimeout(options.timeoutMs);
   const maxChars = options.maxOutputChars ?? CODE_MODE_MAX_OUTPUT_CHARS;
 
   const logs: string[] = [];

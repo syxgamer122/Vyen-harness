@@ -5,10 +5,18 @@
  * tool có thuộc nhóm đang bị chặn không; tool lạ (mcp__*, tên chưa có trong
  * map) phải false vì không thuộc nhóm quyền nào.
  *
- * Phần 2: source-scan components/chat-interface.tsx theo precedent của
+ * Phần 2: source-scan react/use-chat-orchestration.ts theo precedent của
  * tests/staging-panel-keyboard.test.ts (repo chạy vitest environment 'node',
- * không có hạ tầng DOM). Funnel client tool PHẢI gọi isToolDenied trước khi
- * thực thi; ai bỏ cổng là test đỏ ngay.
+ * không có hạ tầng DOM). `rawHandleClientToolCall` — đường thực thi client
+ * tool DUY NHẤT — PHẢI gọi isToolDenied trước khi thực thi; ai bỏ cổng là
+ * test đỏ ngay.
+ *
+ * Trước đây phần này quét components/chat-interface.tsx (`executeClientToolGate`
+ * + `new ToolRunner`) — nhưng cả hai đã bị gỡ vì KHÔNG có call site nào gọi:
+ * cổng deny thật luôn nằm trong orchestration, nên test chỉ canh một bản sao
+ * chết. Nay quét đúng file đang chạy và yêu cầu MỌI cổng deny nằm trước
+ * desktop-only gate lẫn trước switch thực thi (chặt hơn bản cũ, vốn chỉ
+ * kiểm tra cổng đầu tiên).
  */
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -92,28 +100,44 @@ describe('isToolDenied - ma trận tool → nhóm → quyền deny', () => {
   });
 });
 
-describe('chat-interface - cổng deny trong funnel client tool (source-scan)', () => {
-  const code = fs.readFileSync(path.resolve(__dirname, '../components/chat-interface.tsx'), 'utf8');
+describe('rawHandleClientToolCall - cổng deny của đường thực thi client tool (source-scan)', () => {
+  const code = fs.readFileSync(path.resolve(__dirname, '../react/use-chat-orchestration.ts'), 'utf8');
+  /** Mọi vị trí cổng deny dạng per-tool/category trong file. */
+  const denyGates = [...code.matchAll(/isToolDenied\(\s*toolCall\.toolName,\s*toolPermissions\s*\)/g)].map(
+    (m) => m.index ?? -1,
+  );
 
-  it('funnel gọi isToolDenied(toolCall.toolName, toolPermissions)', () => {
+  it('gọi isToolDenied(toolCall.toolName, toolPermissions)', () => {
     // Đột biến bị chặn: bỏ cổng hoặc đổi tên biến → regex dưới không khớp.
     expect(code).toMatch(/isToolDenied\(\s*toolCall\.toolName,\s*toolPermissions\s*\)/);
   });
 
-  it('cổng nằm TRƯỚC nhánh desktop-only và switch thực thi tool', () => {
+  it('MỌI cổng deny nằm TRƯỚC nhánh desktop-only và switch thực thi tool', () => {
     // Đột biến bị chặn: dời cổng xuống sau switch (tool đã chạy xong mới
-    // chặn) → chỉ số cổng lớn hơn một trong hai chỉ số dưới là đỏ.
-    const gate = code.indexOf('isToolDenied(toolCall.toolName');
+    // chặn), hoặc thêm một cổng nằm sai chỗ → chỉ số dưới là đỏ.
     const desktopGate = code.indexOf('desktopOnly.has(toolCall.toolName)');
     const execSwitch = code.indexOf('switch (toolCall.toolName)');
-    expect(gate, 'không tìm thấy cổng deny trong funnel').toBeGreaterThanOrEqual(0);
-    expect(desktopGate, 'cổng phải đứng trước nhánh desktop-only').toBeGreaterThan(gate);
-    expect(execSwitch, 'cổng phải đứng trước switch thực thi').toBeGreaterThan(gate);
+    expect(denyGates.length, 'không tìm thấy cổng deny nào trong đường thực thi client tool').toBeGreaterThan(0);
+    expect(desktopGate, 'không tìm thấy nhánh desktop-only').toBeGreaterThan(denyGates[0]);
+    expect(execSwitch, 'không tìm thấy switch thực thi tool').toBeGreaterThan(denyGates[0]);
+    for (const gate of denyGates) {
+      expect(gate, 'cổng deny phải đứng trước nhánh desktop-only').toBeLessThan(desktopGate);
+      expect(gate, 'cổng deny phải đứng trước switch thực thi').toBeLessThan(execSwitch);
+    }
   });
 
   it('lỗi trả về nêu tên nhóm hiển thị đọc từ TOOL_CATEGORY_LABELS', () => {
     // Đột biến bị chặn: thông báo lỗi chỉ ghi tên tool, không ghi tên nhóm
     // hiển thị → regex dưới không khớp.
     expect(code).toMatch(/TOOL_CATEGORY_LABELS\[category\]/);
+  });
+
+  it('không còn bản sao funnel thứ hai (đường thực thi client tool là duy nhất)', () => {
+    // Đột biến bị chặn: dựng lại `executeClientToolGate` / `new ToolRunner`
+    // trong components/chat-interface.tsx → hai đường thực thi có thể lệch
+    // nhau, và chỉ một đường được test canh.
+    const chatInterface = fs.readFileSync(path.resolve(__dirname, '../components/chat-interface.tsx'), 'utf8');
+    expect(chatInterface).not.toMatch(/executeClientToolGate/);
+    expect(chatInterface).not.toMatch(/new ToolRunner\(/);
   });
 });

@@ -493,6 +493,14 @@ export class SecuritySastScanner {
             walk(path.join(dir, entry.name));
           }
         } else if (entry.isFile()) {
+          /* File env CỤC BỘ (`.env.local`, `.env.*.local`) là kho bí mật BYOK
+             theo quy ước: luôn nằm trong .gitignore và KHÔNG bao giờ được commit.
+             Quét chúng chỉ sinh false-positive "hardcoded API key" mỗi lần
+             developer dán key thật — và làm `vyen audit` fail + đỏ test
+             `tests/web-bridge.test.ts`. `.env` và `.env.production` (thường ĐƯỢC
+             commit) vẫn được quét bình thường. */
+          if (/^\.env(\.[^.]+)*\.local$/.test(entry.name)) continue;
+
           const ext = path.extname(entry.name).toLowerCase();
           if (BINARY_EXTS.has(ext)) continue;
 

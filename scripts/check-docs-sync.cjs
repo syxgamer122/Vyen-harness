@@ -32,16 +32,13 @@ const CONTRACT_DOCS = [
   'PROJECT.md',
 ];
 
-const RECORD_DOCS = [
-  'CRITIQUE_RECONCILIATION.md',
-  'ORIGINAL_REQUEST.md',
-  'TEST_READY.md',
-  'docs/MCP_INTEGRATION_DESIGN.md',
-  'docs/UI_REDESIGN_PLAN_V2.md',
-  'docs/UI_REDESIGN_REPORT.md',
-  'docs/UI_SETTINGS_REFACTOR_PLAN.md',
-  'docs/agent-memory-port-report.md',
-];
+/* Nhật ký/báo cáo đã gỡ 2026-10-04: CRITIQUE_RECONCILIATION.md,
+   ORIGINAL_REQUEST.md, TEST_READY.md, docs/UI_REDESIGN_PLAN_V2.md,
+   docs/UI_REDESIGN_REPORT.md, docs/UI_SETTINGS_REFACTOR_PLAN.md,
+   docs/agent-memory-port-report.md — lịch sử nằm trong git, không mô tả
+   code đang chạy nên gỡ khỏi cả danh sách lẫn repo (checker báo "doc không
+   tồn tại" nếu còn tên mà file đã mất). */
+const RECORD_DOCS = ['docs/MCP_INTEGRATION_DESIGN.md'];
 
 const DOCS = [...CONTRACT_DOCS, ...RECORD_DOCS];
 const CODE_EXT = /\.(ts|tsx|cjs|mjs|js|json)$/;

@@ -263,6 +263,16 @@ export interface ToolExecutionContext {
 /* 5. ToolRunner Engine                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Lớp thực thi công cụ của Tầng 1.
+ *
+ * **Trạng thái 2026-10-04: chỉ còn test dùng.** Nhánh app đã gỡ
+ * `executeClientToolGate` + 2 chỗ `new ToolRunner({...})` vì không có call site
+ * nào đọc (xem `tests/tool-deny.test.ts`), nên `executeTool` hiện chỉ chạy
+ * trong `tests/core-state-machine.test.ts`. Hàm `validateShellAllowlist` CÙNG
+ * file này thì vẫn chạy thật ở `rawHandleClientToolCall`
+ * (`react/use-chat-orchestration.ts`) — đừng xoá file này vì lý do "class chết".
+ */
 export class ToolRunner {
   private context: ToolExecutionContext;
 

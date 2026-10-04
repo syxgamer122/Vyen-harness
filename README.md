@@ -220,7 +220,7 @@ Bảng dưới là **các biến mà code thật sự đọc** — kiểm chứn
 | `VYEN_MODEL` | Ép model cho CLI |
 | `VYEN_MOCK_AGENT` | `1` = chạy agent giả, không gọi mạng |
 | `MODEL_ALIAS_MAP` | JSON map tên model nội bộ → tên thật trên gateway, không cần deploy lại |
-| `TITLE_MODEL_CHAIN` | Chuỗi model dự phòng sinh tiêu đề khi không có provider active, mặc định `gpt-5-4-nano,gpt-4o-mini,gpt-5-6-terra,deepseek-v4-flash`; có provider active thì model người dùng đang chọn được ưu tiên trước |
+
 | `COMPACT_MODEL_CHAIN` | Tương tự, cho `/api/compact` |
 | `CHAT_DEBUG_ERRORS` | `true` để kèm body lỗi upstream vào message |
 | `CHAT_STREAM_BUDGET_MS` | Ngân sách stream của `/api/chat`, mặc định `270000` (4,5 phút) |

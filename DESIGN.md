@@ -256,7 +256,7 @@ của mục này, nên nó được ghi bằng lý do chứ không phải bằng
 dùng đọc lâu nhất trong ứng dụng — đặt chữ khó đọc nhất lên đúng chỗ đó là đổi
 ngược. Nên: nhãn/nút/tiêu đề đi `.uic`, prose đi Inter.
 
-**Patrick Hand CHỈ có weight 400.** Xác minh trong `font-data.json` của
+**Patrick Hand CHỈ có weight 400.** Xác minh trong `font-data.json` của (docs-check:ignore — file do `next/font` SINH RA lúc build, không nằm trong repo)
 `next/font` (`weights: ["400"]`). Hệ quả trực tiếp: **phân cấp đậm/nhạt trong
 UI không đến từ `font-bold`** — không có nét nào đậm hơn để dùng — mà đến từ
 **CỠ CHỮ** và **độ đậm của nét mực**. `.uic` đặt `font-synthesis-weight: none`

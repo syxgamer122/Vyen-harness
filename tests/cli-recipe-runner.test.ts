@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emitResult, parseRecipeRunArgv, type RecipeRunArgs } from '@/lib/cli/recipe-runner';
+import { emitResult, parseRecipeRunArgv, withTurnTimeout, type RecipeRunArgs } from '@/lib/cli/recipe-runner';
 import { resolveDispatch, COMMANDS } from '@/lib/cli/cli-surface';
 
 describe('cli recipe-runner — parseRecipeRunArgv', () => {
@@ -51,6 +51,30 @@ describe('cli recipe-runner — parseRecipeRunArgv', () => {
   });
 });
 
+describe('cli recipe-runner — withTurnTimeout chặn promise treo', () => {
+  it('promise settle trong hạn → ok kèm giá trị', async () => {
+    const outcome = await withTurnTimeout(Promise.resolve('xong'), 1_000);
+    expect(outcome).toEqual({ status: 'ok', value: 'xong' });
+  });
+
+  it('promise KHÔNG settle (provider chết) → timeout thay vì treo mãi', async () => {
+    /* Đây là bài toán thật: `streamTurn` với endpoint chết không resolve cũng
+       không reject, tiến trình tự thoát exit 0 im lặng. */
+    const never = new Promise<string>(() => {});
+    const outcome = await withTurnTimeout(never, 20);
+    expect(outcome).toEqual({ status: 'timeout' });
+  });
+
+  it('promise reject → lỗi được ném nguyên vẹn, KHÔNG bị đổi thành timeout', async () => {
+    await expect(withTurnTimeout(Promise.reject(new Error('502 upstream')), 1_000)).rejects.toThrow('502 upstream');
+  });
+
+  it('hạn <= 0 vẫn lập tức timeout (không treo do setTimeout âm)', async () => {
+    const outcome = await withTurnTimeout(new Promise<string>(() => {}), 0);
+    expect(outcome).toEqual({ status: 'timeout' });
+  });
+});
+
 describe('cli recipe-runner — emitResult validate structured output theo json_schema', () => {
   const args: RecipeRunArgs = { recipePath: 'r.yaml', params: {}, output: 'json', noSession: true };
 
@@ -62,7 +86,7 @@ describe('cli recipe-runner — emitResult validate structured output theo json_
 
   it('có schema + output sai kiểu → ok:false kèm errors (không phát text thô ok:true)', () => {
     const { io, lines } = capture();
-    emitResult(io, args, 'demo', '{"count":"hai"}', 1, [], undefined, {
+    const ok = emitResult(io, args, 'demo', '{"count":"hai"}', 1, [], undefined, {
       type: 'object',
       required: ['count'],
       properties: { count: { type: 'number' } },
@@ -70,32 +94,48 @@ describe('cli recipe-runner — emitResult validate structured output theo json_
     const payload = JSON.parse(lines.join('').trim());
     expect(payload.ok).toBe(false);
     expect(payload.errors.length).toBeGreaterThan(0);
+    /* Giá trị trả về là thứ quyết định exit code: sai schema phải là fail. */
+    expect(ok).toBe(false);
   });
 
   it('có schema + output hợp lệ → ok:true với data đã parse', () => {
     const { io, lines } = capture();
-    emitResult(io, args, 'demo', '{"count":2}', 1, [], undefined, {
+    const ok = emitResult(io, args, 'demo', '{"count":2}', 1, [], undefined, {
       type: 'object',
       required: ['count'],
       properties: { count: { type: 'number' } },
     });
     const payload = JSON.parse(lines.join('').trim());
     expect(payload).toEqual({ recipe: 'demo', ok: true, data: { count: 2 } });
+    expect(ok).toBe(true);
   });
 
   it('không schema → giữ hành vi cũ: ok:true với text thô', () => {
     const { io, lines } = capture();
-    emitResult(io, args, 'demo', 'không phải JSON', 1, []);
+    const ok = emitResult(io, args, 'demo', 'không phải JSON', 1, []);
     const payload = JSON.parse(lines.join('').trim());
     expect(payload).toEqual({ recipe: 'demo', ok: true, data: 'không phải JSON' });
+    expect(ok).toBe(true);
   });
 
   it('checks fail → ok:false với errors như cũ', () => {
     const { io, lines } = capture();
-    emitResult(io, args, 'demo', 'x', 1, ['check exit=1'], 'checks');
+    const ok = emitResult(io, args, 'demo', 'x', 1, ['check exit=1'], 'checks');
     const payload = JSON.parse(lines.join('').trim());
     expect(payload.ok).toBe(false);
     expect(payload.errors).toContain('check exit=1');
+    expect(ok).toBe(false);
+  });
+
+  it('chế độ text: pass → true, checks fail → false (exit code theo kết quả này)', () => {
+    const textArgs: RecipeRunArgs = { recipePath: 'r.yaml', params: {}, output: 'text', noSession: true };
+    const pass = capture();
+    expect(emitResult(pass.io, textArgs, 'demo', 'xong', 1, [])).toBe(true);
+    expect(pass.lines.join('')).toContain('PASS');
+
+    const fail = capture();
+    expect(emitResult(fail.io, textArgs, 'demo', 'xong', 1, ['check exit=2'], 'checks')).toBe(false);
+    expect(fail.lines.join('')).toContain('FAIL');
   });
 });
 

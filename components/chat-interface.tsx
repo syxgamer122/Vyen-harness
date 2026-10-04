@@ -1,11 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
 import { ApprovalQueue } from '@/lib/approval-queue';
-import { recordAuditLog } from '@/lib/audit-log';
-import { isToolDenied, TOOL_CATEGORY_MAP, TOOL_CATEGORY_LABELS } from '@/lib/tool-catalog';
-import { isVyenDesktop } from '@/lib/desktop-bridge';
-import { ToolRunner } from '@/core/agent-runtime/tool-runner';
 import { useAgentRuntime } from '@/react/use-agent-runtime';
 import { useApprovalBridge } from '@/react/use-approval-bridge';
 import { useChatOrchestration } from '@/react/use-chat-orchestration';
@@ -28,43 +23,6 @@ import { stagingCount } from '@/lib/staging';
 import { shouldShowThinkingControl } from '@/lib/reasoning-capability';
 import { X } from 'lucide-react';
 
-/**
- * Funnel dispatch kiểm tra deny policy và chuyển giao thực thi cho ToolRunner (Tầng 1).
- */
-export async function executeClientToolGate(
-  toolCall: { toolName: string; args?: unknown },
-  toolPermissions: Record<string, string>,
-  toolRunner: ToolRunner,
-): Promise<string> {
-  /* Quyền "Chặn" per-tool & category: kiểm tra TRƯỚC mọi nhánh thực thi
-     để không modal nào hiện lên khi bị deny. Trả về đúng "denied by policy" */
-  if (isToolDenied(toolCall.toolName, toolPermissions)) {
-    const category = TOOL_CATEGORY_MAP[toolCall.toolName];
-    return JSON.stringify({
-      error:
-        `Tool "${toolCall.toolName}" is denied by policy: nhóm ` +
-        `"${category ? TOOL_CATEGORY_LABELS[category]?.label ?? String(category) : 'MCP'}" đang bị đặt quyền ` +
-        'Chặn. Hãy báo người dùng và chờ họ đổi quyền nếu cần dùng lại.',
-      denied: true,
-    });
-  }
-
-  const isDesktop = isVyenDesktop();
-  const desktopOnly = new Set([
-    'shell_run', 'git_status', 'git_diff', 'git_log', 'git_add', 'git_commit', 'bg_run', 'bg_status', 'bg_stop',
-  ]);
-  if (desktopOnly.has(toolCall.toolName) && !isDesktop) {
-    return JSON.stringify({
-      error: 'Tool này chỉ khả dụng trong Vyen desktop (Electron). Hãy chạy app bằng npm run app:dev / app:prod.',
-    });
-  }
-
-  switch (toolCall.toolName) {
-    default:
-      return await toolRunner.executeTool(toolCall.toolName, (toolCall.args ?? {}) as Record<string, unknown>);
-  }
-}
-
 export default function ChatInterface() {
   const orch = useChatOrchestration();
 
@@ -82,20 +40,6 @@ export default function ChatInterface() {
 
   // Layer 2: useAgentRuntime điều phối Web Locks đa tab
   const { isLeader, isAcquiring, isLeaderFrozen, forceStealLock, startTurn, stopTurn } = orch.agentRuntime;
-
-  // Layer 1: ToolRunner thực thi công cụ an toàn CWD jail + TOCTOU
-  const toolRunner = useMemo(
-    () =>
-      new ToolRunner({
-        chatId: orch.chatKey,
-        activeLeafId: orch.activeLeafId ?? undefined,
-        workspaceRoot: orch.workspaceRoot ?? undefined,
-        approvalPolicy: orch.approvalPolicy,
-        toolPermissions: orch.toolPermissions,
-        recordAuditLog,
-      }),
-    [orch.chatKey, orch.activeLeafId, orch.workspaceRoot, orch.approvalPolicy, orch.toolPermissions],
-  );
 
   const handleStop = () => {
     stopTurn();

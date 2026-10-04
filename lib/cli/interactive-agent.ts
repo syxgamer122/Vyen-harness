@@ -700,7 +700,7 @@ export class AutonomousCliAgent {
   public async streamTurn(
     userPrompt: string,
     callbacks?: AgentStreamCallbacks
-  ): Promise<{ text: string; toolCallsCount: number }> {
+  ): Promise<{ text: string; toolCallsCount: number; error?: string }> {
     const effectiveKey =
       this.apiKey !== null
         ? this.apiKey
@@ -986,7 +986,10 @@ Guidelines:
       const errMsg = `\n[Vyen Agent Error] ${err instanceof Error ? err.message : String(err)}\n`;
       if (callbacks?.onToken) callbacks.onToken(errMsg);
       else process.stdout.write(errMsg);
-      return { text: errMsg, toolCallsCount };
+      /* `error` để caller KHÔNG nhầm thông báo lỗi này với nội dung trả lời
+         của model: trước đây `text` là chuỗi lỗi, `vyen run` coi như kết quả
+         hợp lệ và in "✅ PASS" + exit 0 khi provider chết (đo được với HTTP 502). */
+      return { text: errMsg, toolCallsCount, error: errMsg };
     }
   }
 

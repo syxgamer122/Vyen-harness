@@ -9,9 +9,9 @@
 
 Bản ghi của cùng giai đoạn nằm ở các file sau:
 
-- `CRITIQUE_RECONCILIATION.md` — đối soát phản biện ↔ codebase (kèm bảng số liệu đã kiểm chứng).
+- ~~`CRITIQUE_RECONCILIATION.md`~~ — đối soát phản biện ↔ codebase (đã gỡ 2026-10-04). docs-check:ignore
 - `DOCS_TSX_ARCHITECTURE.md` §6 — hiện trạng gói P0/P2/P3 và lộ trình P1.
-- `docs/agent-memory-port-report.md` — nhật ký port recipes / sub-recipes / skills / memory theo commit.
-- `docs/UI_REDESIGN_REPORT.md` — nhật ký vòng tái thiết kế UI & Settings.
+- ~~`docs/agent-memory-port-report.md`~~ — nhật ký port recipes / sub-recipes / skills / memory theo commit (đã gỡ 2026-10-04, lịch sử commit giữ nguyên). docs-check:ignore
+- ~~`docs/UI_REDESIGN_REPORT.md`~~ — nhật ký vòng tái thiết kế UI & Settings (đã gỡ 2026-10-04). docs-check:ignore
 
 Ai còn bản handoff gốc (máy cá nhân, log chat cũ) thì ghi lại vào đây thay vì để placeholder.

@@ -2,8 +2,8 @@
  * RED TEAM — thân chip của tool chạy phía CLIENT.
  *
  * Đọc mạch thật, không đoán:
- *  components/chat-interface.tsx:64  → toolRunner.executeTool(...)  (Promise<string>)
- *  core/agent-runtime/tool-runner.ts:395/418/428 → JSON.stringify(data)
+ *  react/use-chat-orchestration.ts:1348  → rawHandleClientToolCall (Promise<string>)
+ *  react/use-chat-orchestration.ts:2100  → arm client trả JSON.stringify(data)
  *  react/use-chat-orchestration.ts  → addToolResult → message.toolInvocations[].result
  *  components/chat/tool-trace.tsx:139-141 → ev.body = inv.result (nguyên văn)
  *  components/chat/tool-trace.tsx:491  → <pre>{shown}</pre>
@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { collectToolEvents } from '@/components/chat/tool-trace';
 import { toolResultBody } from '@/lib/agent-tools';
 
-/** Đúng hình dạng ToolRunner trả về — JSON.stringify, không parse lại. */
+/** Đúng hình dạng tool client trả về — JSON.stringify, không parse lại. */
 function runnerOutput(data: unknown): string {
   return JSON.stringify(data);
 }
