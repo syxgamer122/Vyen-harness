@@ -126,10 +126,14 @@ export const StatusLine = memo(function StatusLine({
   }, [models, model]);
 
   /*
-   * Trạng thái chạy gộp chung với mode thành MỘT mảnh dẫn đầu: `plan · idle`
+   * Trạng thái chạy gộp chung với mode thành MỘT mảng dẫn đầu: `plan · rảnh`
    * đọc như một câu, thay vì hai pill rời rạc cạnh tranh sự chú ý.
+   *
+   * `tra cứu web` là lúc hook đang gom kết quả web TRƯỚC khi gửi, nên nó đứng
+   * riêng chứ không gộp vào `đang chạy`: người dùng đang chờ kết quả tra cứu,
+   * chưa phải chờ model.
    */
-  const runLabel = run.webBusy ? 'web' : run.streaming ? 'running' : 'idle';
+  const runLabel = run.webBusy ? 'tra cứu web' : run.streaming ? 'đang chạy' : 'rảnh';
   const running = run.webBusy || run.streaming;
 
   return (
@@ -218,7 +222,7 @@ export const StatusLine = memo(function StatusLine({
                   : 'Chưa kết nối thư mục làm việc, nút thư mục trong thanh nhập'
               }
             >
-              {workspace.connected ? workspace.name : 'no workspace'}
+              {workspace.connected ? workspace.name : 'chưa có workspace'}
               {workspace.connected && workspace.branch ? ` @${workspace.branch}` : ''}
             </span>
           </>

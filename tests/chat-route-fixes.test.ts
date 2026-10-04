@@ -16,7 +16,11 @@ import { describe, expect, it } from 'vitest';
 import { looksLikePseudoError } from '@/lib/pseudo-error-response';
 
 const ROUTE_PATH = path.resolve(__dirname, '../app/api/chat/route.ts');
-const source = fs.readFileSync(ROUTE_PATH, 'utf8');
+// CRLF → LF một lần: file trên đĩa là CRLF (core.autocrlf) và regex dưới đây
+// viết theo giả định nguồn là LF. Bản cũ không normalize, chỉ sống sót vì
+// các pattern của nó đều có `\s*\n` nên `\r` bị `\s*` nuốt — hễ một
+// assertion bám `\n` trực tiếp là đỏ trên máy khác.
+const source = fs.readFileSync(ROUTE_PATH, 'utf8').replace(/\r\n/g, '\n');
 
 /** Lỗi trá hình THẬT của gateway (HTTP 200 + finish 'stop' + nội dung lỗi). */
 const REAL_GATEWAY_ERROR =
@@ -56,7 +60,10 @@ describe('A3/A5 — đường emulated vẫn đủ server tools + MCP tools', ()
     expect(source).toMatch(
       /tools: { ...serverTools, ...subRecipeToolDefs } as ReturnType<typeof buildAgentTools>,/,
     );
-    expect(source).toMatch(/extraToolDocs: mcpTools\.defs,/);
+    // Meta-tools router cũng phải đi kèm: chúng không có trong registry tĩnh
+    // của formatToolProtocolManual nên thiếu là bị bỏ qua âm thầm (manual rỗng
+    // cho đúng 2 tool này). Khoá: schema MCP + schema meta cùng đi một lệnh.
+    expect(source).toMatch(/extraToolDocs: \{ \.\.\.mcpTools\.defs, \.\.\.routerMetaTools \},/);
     expect(source).toMatch(/clientTools: clientToolNames,/);
   });
 });
@@ -74,18 +81,40 @@ describe('media generation retirement', () => {
  * gán đè `usage = part.usage...` nên lượt agent nhiều step chỉ còn usage của
  * step cuối (undercount thống kê).
  *
- * Đảo điều kiện (đổi `+` cộng dồn về gán thẳng) → describe này ĐỎ.
+ * Sửa tiếp: `ai@4` gộp sẵn các step thành `finish` (combinedUsage), nên cộng
+ * THÊM `step-finish` vào phép cộng đếm mọi step trừ step cuối HAI LẦN — thống
+ * kê và cost phình 2× (lượt một step cũng ra đúng 2P). Nay `finish` giữ phép
+ * cộng dồn (tổng đã tính, đúng cho cost) còn `step-finish` chỉ gán vào
+ * `lastStepUsage` (kích thước request cuối, đúng cho ngưỡng nén ngữ cảnh).
+ *
+ * Đảo điều kiện (gộp lại `case 'step-finish'` vào `case 'finish'`) →
+ * describe này ĐỎ.
  */
-describe('A10 — usage native cộng dồn qua các step', () => {
-  it('nhánh finish/step-finish cộng dồn thay vì ghi đè', () => {
+describe('A10 — usage native: tổng để tính tiền, step cuối cho ngưỡng nén', () => {
+  it('chỉ `finish` cộng dồn; `step-finish` là nhánh riêng', () => {
     expect(source).toMatch(
-      /case 'finish':\s*\n\s*case 'step-finish':\s*\n\s*if \(part\.usage\) \{\s*\n[\s\S]*?usage = \{\s*\n\s*promptTokens: \(usage\?\.promptTokens \?\? 0\) \+ \(part\.usage\.promptTokens \?\? 0\),\s*\n\s*completionTokens: \(usage\?\.completionTokens \?\? 0\) \+ \(part\.usage\.completionTokens \?\? 0\),/,
+      /case 'finish':\s*\n[\s\S]*?usage = \{\s*\n\s*promptTokens: \(usage\?\.promptTokens \?\? 0\) \+ \(part\.usage\.promptTokens \?\? 0\),\s*\n\s*completionTokens: \(usage\?\.completionTokens \?\? 0\) \+ \(part\.usage\.completionTokens \?\? 0\),/,
+    );
+    // `step-finish` KHÔNG được nằm chung nhánh với `finish` nữa.
+    expect(source).not.toMatch(/case 'finish':\s*\n\s*case 'step-finish':/);
+  });
+
+  it('`step-finish` gán đè vào lastStepUsage (giữ step CUỐI)', () => {
+    expect(source).toMatch(
+      /case 'step-finish':\s*\n[\s\S]*?lastStepUsage = \{\s*\n\s*promptTokens: part\.usage\.promptTokens \?\? 0,/,
     );
   });
 
-  it('đường emulated cộng dồn cùng kiểu (onUsage các round)', () => {
+  it('lastStepUsage được gửi riêng cho client qua annotation', () => {
+    expect(source).toMatch(/writeAnnotation\(\{ lastStepUsage \}\)/);
+  });
+
+  it('đường emulated cộng dồn tổng VÀ gán lastStepUsage theo round', () => {
     expect(source).toMatch(
-      /onUsage: \(u\) => \{\s*\n[\s\S]*?promptTokens: \(usage\?\.promptTokens \?\? 0\) \+ \(u\.promptTokens \?\? 0\),/,
+      /onUsage: \(u\) => \{[\s\S]*?promptTokens: \(usage\?\.promptTokens \?\? 0\) \+ \(u\.promptTokens \?\? 0\),/,
+    );
+    expect(source).toMatch(
+      /onUsage: \(u\) => \{[\s\S]*?lastStepUsage = \{\s*\n\s*promptTokens: u\.promptTokens \?\? 0,/,
     );
   });
 });
@@ -192,9 +221,13 @@ describe('A16 — pool cạn giữ đúng mã UPSTREAM_POOL_EXHAUSTED', () => {
 
   it.skipIf(branchAt === -1)('chỉ failover khi còn ô; hết ô thì annotation + rethrow nguyên error', () => {
     const tail = source.slice(branchAt, branchAt + 2600);
-    // Còn model/key kế tiếp (và chưa phát token) → chuyển tiếp, không báo lỗi.
+    // Còn model/key kế tiếp (và lượt này chưa phát chữ nào) → chuyển tiếp,
+    // không báo lỗi. `textCharsThisRequest()` là bộ đếm kênh TEXT của riêng
+    // request này; `emittedChars` là offset TUYỐT ĐỐI trong message.content
+    // client (đã cộng phần mang từ vòng client-tool trước) nên không dùng để
+    // hỏi "lượt này có nói gì không".
     expect(tail).toMatch(
-      /if \(emittedChars === 0 && !\(isLastModelInChain && isLastKeyAttempt\)\) \{/,
+      /if \(textCharsThisRequest\(\) === 0 && !\(isLastModelInChain && isLastKeyAttempt\)\) \{/,
     );
     // Hết ô (hoặc pseudo-error lộ giữa luồng đã có token) → phát error part
     // rồi ném lại CHÍNH error gốc: giữ message "hết dung lượng" + mã.

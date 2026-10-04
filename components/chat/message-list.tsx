@@ -503,7 +503,10 @@ export const MessageList = memo(function MessageList({
                         )}
                       </div>
                     )}
-                    <ChatErrorBoundary onReset={() => rowVirtualizer.measure()}>
+                    <ChatErrorBoundary
+                      onReset={() => rowVirtualizer.measure()}
+                      resetKey={`${m.id}:${m.content.length}`}
+                    >
                       <MessageItem
                         m={m}
                         branchInfo={branchInfoByMessageId.get(m.id)}
@@ -542,7 +545,10 @@ export const MessageList = memo(function MessageList({
 
             {isStreamingAssistant && lastMsg && (
               <div className="mx-auto w-full max-w-thread pb-24">
-                <ChatErrorBoundary onReset={() => rowVirtualizer.measure()}>
+                <ChatErrorBoundary
+                  onReset={() => rowVirtualizer.measure()}
+                  resetKey={`${lastMsg.id}:${lastMsg.content.length}`}
+                >
                   <MessageItem
                     m={lastMsg}
                     branchInfo={branchInfoByMessageId.get(lastMsg.id)}

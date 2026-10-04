@@ -72,38 +72,44 @@ export const DEFAULT_CHAINS: Record<CategoryId, ChainEntry[]> = {
   ],
 };
 
-/** Nhãn hiển thị mô tả cho từng hạng mục trong UI */
+/**
+ * Nhãn hiển thị mô tả cho từng hạng mục trong UI.
+ *
+ * CHỈ `label`/`description` là copy và được dịch. Key hạng mục là hợp đồng đã
+ * lưu: `validateModelChains` và settings store tra theo đúng key này, nên
+ * đổi key là âm thầm xoá cấu hình của người dùng.
+ */
 export const CATEGORY_DESCRIPTIONS: Record<CategoryId, { label: string; description: string }> = {
   ultrabrain: {
     label: 'Ultrabrain',
     description: 'Bài toán hóc búa, suy luận tối đa, giải thuật phức tạp',
   },
   architect: {
-    label: 'Kiến trúc (Architect)',
-    description: 'Thiết kế hệ thống, refactor nhiều file, Plan Mode',
+    label: 'Kiến trúc',
+    description: 'Thiết kế hệ thống, sửa nhiều file, chế độ lập kế hoạch',
   },
   deep: {
-    label: 'Suy luận sâu (Deep)',
-    description: 'Debug nguyên nhân gốc rễ, logic & toán học, phân tích lỗi',
+    label: 'Suy luận sâu',
+    description: 'Tìm nguyên nhân gốc rễ, logic và toán học, phân tích lỗi',
   },
   capable: {
-    label: 'Năng lực chuẩn (Capable)',
+    label: 'Năng lực chuẩn',
     description: 'Lập trình thông thường, giải quyết tính năng cân bằng',
   },
   quick: {
-    label: 'Nhanh (Quick)',
+    label: 'Nhanh',
     description: 'Sửa lỗi nhỏ, đổi tên 1 file, phản hồi tức thì',
   },
   writing: {
-    label: 'Viết tài liệu (Writing)',
-    description: 'Viết README, tài liệu, dịch thuật, giải thích prose',
+    label: 'Viết tài liệu',
+    description: 'Viết README, tài liệu, dịch thuật, giải thích văn xuôi',
   },
   'visual-engineering': {
-    label: 'Giao diện & Mỹ thuật (Visual UI)',
-    description: 'CSS, Tailwind, layout, frontend component, visual inspection',
+    label: 'Giao diện & Mỹ thuật',
+    description: 'CSS, Tailwind, bố cục, component giao diện, soi bằng mắt',
   },
   'simple-work': {
-    label: 'Tác vụ đơn giản (Simple)',
+    label: 'Tác vụ đơn giản',
     description: 'Kiểm tra cú pháp, format văn bản, tác vụ phụ trợ nhẹ nhất',
   },
 };

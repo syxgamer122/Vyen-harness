@@ -24,8 +24,8 @@ import { capHits, fetchReadablePage, searchWeb } from '@/lib/web-backend';
 import { WEB_LIMITS } from '@/lib/web-context';
 import { judgeInjection } from '@/lib/injection-guard';
 import { getToolCallBudget, checkDoomLoop } from '@/lib/tool-call-budget';
-import { TOOL_RESULT_MAX_CHARS } from '@/lib/tool-limits';
-import { redactSecretsDeep } from '@/lib/secret-registry';
+import { TOOL_RESULT_MAX_CHARS, TOOL_PREVIEW_MAX_CHARS } from '@/lib/tool-limits';
+import { redactSecretText, redactSecretsDeep } from '@/lib/secret-registry';
 import { isMcpToolKey } from '@/lib/mcp/tool-mapper';
 import { TOOL_CATALOG } from '@/lib/tool-catalog';
 /*
@@ -127,8 +127,11 @@ export function summarizeToolArgs(name: string, args: unknown): string {
     case 'fs_edit':
     case 'fs_write':
       return String(a.path ?? '').slice(0, 80);
+    /* `||` chứ không `??`: model hay gửi `path: ''` để nói "gốc workspace"
+       (rỗng là hợp lệ với fs_list — xem zod schema), mà `??` không bắt được
+       chuỗi rỗng → chip rơi xuống `briefArgs` và in thô `{"path":""}`. */
     case 'fs_list':
-      return String(a.path ?? '.').slice(0, 80);
+      return String(a.path || '.').slice(0, 80);
     case 'fs_search':
       return String(a.query ?? '').slice(0, 60);
     /* Sarsed-Code dùng `file_path` (không phải `path` như nhóm fs_). */
@@ -210,6 +213,318 @@ export function summarizeToolResult(name: string, result: unknown): string {
       if (typeof r.note === 'string') return r.note.slice(0, 80);
       if (typeof r.error === 'string') return (r.error as string).slice(0, 80);
       return briefShape(r);
+  }
+}
+
+/**
+ * THÂN kết quả tool để người dùng mở ra đọc.
+ *
+ * KHÁC `summarizeToolResult` ở trên, và không thay thế được nó: hàm kia trả
+ * MỘT DÒNG nhãn để dán lên chip (rẻ, đi vào annotation nên phải ngắn); hàm
+ * này trả phần thân người dùng bấm vào mới đọc (đắt, phải có trần — không có
+ * ai mở khung 24.000 ký tự để dò một dòng log). Một hỏi khác nhau, hai hàm
+ * khác nhau; gộp làm thì hoặc chip bị nhão, hoặc khung xem trước không có trần.
+ *
+ * Không bao giờ ném: kết quả tool đến từ model và từ bridge Electron, có thể
+ * là object vòng (JSON.stringify ném TypeError), có thể có getter ném khi đọc —
+ * mà lời gọi này nằm trên đường render. Lỗi ở đây không được im lặng thành
+ * chuỗi rỗng (người dùng đọc rồi tưởng công cụ không trả gì), nên khi không
+ * rút được thân thì trả đúng một câu nói rõ là khung xem trước hỏng.
+ *
+ * THÂN ĐÃ REDACT trước khi cắt: kết quả được ghi vào annotation rồi lưu xuống
+ * IndexedDB và hiện cho người dùng, nên đây là chốt chặn cuối — xem
+ * lib/tool-limits.ts:62-65 cho lý do redact phải ĐỨNG TRƯỚC khi cắt (cắt trước
+ * sẽ chẻ đôi một khoá nằm vắt ranh giới cắt, nửa còn lại không khớp rule nào).
+ */
+export function toolResultBody(
+  name: string,
+  result: unknown,
+  maxChars: number = TOOL_PREVIEW_MAX_CHARS,
+): string {
+  const budget = previewBudget(maxChars);
+  if (budget === 0) return '';
+  let body: string;
+  try {
+    body = redactSecretText(extractToolBody(name, result));
+  } catch {
+    /* Getter/Proxy ném lúc đọc trường, hoặc chính lớp redact hỏng. KHÔNG trả
+       '' — nhãn trên chip (summarizeToolResult) vẫn còn, nên nói thẳng là
+       phần thân hỏng hơn là để người dùng tưởng công cụ chưa chạy. */
+    body = UNREADABLE_BODY;
+  }
+  if (body.length <= budget) return body;
+  /* Không dùng truncateToolResult: hàm đó giữ 70% đầu + 25% đuôi và CỘNG thêm
+     chuỗi báo cắt, nên kết quả dài hơn maxChars — ở đây maxChars là hợp đồng
+     với tầng render (UI giới hạn chiều cao khung), nên cắt cứng là đủ. */
+  return `${cutToGrapheme(body, budget - 1)}…`;
+}
+
+/**
+ * `maxChars` là HỢP ĐỒNG với tầng render, không phải lời gợi ý — mọi giá trị
+ * phải cho ra `length <= maxChars`.
+ */
+function previewBudget(maxChars: number): number {
+  /* +Infinity là "không trần" → trả nguyên thân. NaN/-Infinity/số âm là ngân
+     sách vô nghĩa; hiện rỗng còn hơn hiện sai (và giữ được bất biến trên). */
+  if (maxChars === Number.POSITIVE_INFINITY) return Number.MAX_SAFE_INTEGER;
+  if (!Number.isFinite(maxChars)) return 0;
+  return Math.max(0, Math.floor(maxChars));
+}
+
+/** Người dùng đọc được gì từ thân khi bị cắt — không phải "cắt im lặng". */
+const UNREADABLE_BODY =
+  'Không đọc được phần thân kết quả của công cụ này (dữ liệu lỗi khi mở khung xem trước).';
+
+/* ------------------------------------------------------------------ */
+/* Cắt chuỗi theo ranh giới grapheme                                   */
+/* ------------------------------------------------------------------ */
+
+/*
+ * `slice` của chuỗi JS cắt theo CODE UNIT: chém đôi surrogate pair (emoji thành
+ * ký tự lơ lửng, hiện thành �) và tách dấu thanh khỏi chữ của nó khi chuỗi ở
+ * dạng NFD. App này tiếng Việt nên đó là hỏng dữ liệu hiển thị, không phải xấu
+ * xí — dùng `Intl.Segmenter` là cách duy nhất cắt đúng cả chữ+dấu, emoji có
+ * skin tone/ZWJ, và cờ biểu quốc gia.
+ */
+const GRAPHEME_SEGMENTER =
+  typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter('vi', { granularity: 'grapheme' })
+    : null;
+
+/** Dấu tổ hợp (NFD) — regex KHÔNG có cờ `g` nên `.test` không giữ trạng thái. */
+const COMBINING_MARK = /\p{M}/u;
+
+function isLowSurrogate(code: number): boolean {
+  return code >= 0xdc00 && code <= 0xdfff;
+}
+
+/** Cắt `text` còn tối đa `limit` ký tự mà không chém rụng grapheme nào. */
+function cutToGrapheme(text: string, limit: number): string {
+  if (limit <= 0) return '';
+  if (text.length <= limit) return text;
+  if (GRAPHEME_SEGMENTER) {
+    let end = 0;
+    for (const { segment } of GRAPHEME_SEGMENTER.segment(text)) {
+      const next = end + segment.length;
+      if (next > limit) break;
+      end = next;
+    }
+    return text.slice(0, end);
+  }
+  /* Runtime không có Intl.Segmenter: lùi khỏi dấu tổ hợp và nửa surrogate. */
+  let end = limit;
+  while (end > 0 && COMBINING_MARK.test(text[end])) end -= 1;
+  if (end > 0 && isLowSurrogate(text.charCodeAt(end))) end -= 1;
+  return text.slice(0, end);
+}
+
+/** Rút phần thân đọc được theo hình dạng THẬT của từng tool (xem docblock). */
+function extractToolBody(name: string, result: unknown): string {
+  const value = parseMaybeJson(result);
+  const r = (value ?? {}) as Record<string, unknown>;
+
+  /* Nhóm fs_*: client tool JSON.stringify trước khi trả, nhưng đường native
+     (core/agent-runtime/tool-runner.ts) cũng vậy — object tới đây đã được
+     parse, trường bên dưới là hình dạng do fs-access.ts / use-chat-orchestration
+     dựng ra. */
+  if (name === 'fs_read') {
+    return (
+      contentText(r.content) ||
+      str(r.description) ||
+      /* Đường cũ / adapter tự dựng trả nội dung file thô, không bọc object. */
+      (typeof value === 'string' ? value : '')
+    );
+  }
+  /* fs_list và fs_search trả MẢNG ở gốc, không bọc object — khác fs_read. */
+  if (name === 'fs_list') {
+    return listLines(value);
+  }
+  if (name === 'fs_search') {
+    return searchMatches(value);
+  }
+
+  /* shell_run: VyenRunResult (lib/desktop-bridge.ts) — stdout + stderr là hai
+     luồng RIÊNG, lệnh fail thường chỉ đổ vào stderr. */
+  if (name === 'shell_run') {
+    return stdoutOf(r);
+  }
+
+  /* bg_status: KHÔNG có `stdout`. `bridge.shell.bgStatus` trả
+     `{ jobs: VyenBgJob[] }` và phần đuôi log nằm ở `outputTail` trên từng job
+     (lib/desktop-bridge.ts) — bảng trong đề bài ghi `r.stdout` là SAI với code
+     thật, đọc `stdout` sẽ ra chuỗi rỗng mọi lần gọi bg_status. */
+  if (name === 'bg_status') {
+    const jobs = r.jobs;
+    if (!Array.isArray(jobs)) return '';
+    return jobs
+      .map((j) => {
+        const job = (j ?? {}) as Record<string, unknown>;
+        const head = `${job.id ?? '?'} (${job.status ?? '?'})`;
+        const tail = str(job.outputTail);
+        return tail ? `${head}\n${tail}` : head;
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  /* git_diff/git_log: KHÔNG phải raw string. Cả hai đường đều bọc trong
+     object — `use-chat-orchestration.ts` trả `{ diff }` / `{ log }`,
+     `executeGit` (tool-runner.ts) JSON.stringify kết quả adapter nên cũng là
+     object. `summarizeToolResult` có nhánh `typeof r === 'string'` là dự phòng
+     cho đường cũ; ở đây ta chấp nhận cả hai để không phụ thuộc lịch sử. */
+  if (name === 'git_diff') {
+    return str(r.diff) || (typeof value === 'string' ? value : '');
+  }
+  if (name === 'git_log') {
+    return str(r.log) || (typeof value === 'string' ? value : '');
+  }
+
+  if (name === 'web_fetch') {
+    return contentText(r.content);
+  }
+  if (name === 'web_search') {
+    const results = r.results;
+    if (!Array.isArray(results)) return '';
+    return results
+      .map((hit) => {
+        const h = (hit ?? {}) as Record<string, unknown>;
+        return `${str(h.title)} - ${str(h.url)}`.trim();
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  /* Tool MCP: server bên ngoài tự quyết shape. `content` là dạng phổ biến
+     (MCP chuẩn, mảng khối text); không có thì JSON.stringify trong try/catch vì
+     payload tùy server có thể vòng. */
+  if (isMcpToolKey(name)) {
+    if (typeof r.content === 'string' || Array.isArray(r.content)) {
+      return contentText(r.content);
+    }
+    return safeStringify(r);
+  }
+
+  /* Tool chưa có nhánh riêng (memory_save, git_commit, git_status, plan_*,
+     skill_load, lesson_save, code_*, delegate...): mô TẢ HÌNH DẠNG thay vì
+     trả rỗng — chip "Hoàn tất" mà vùng output trống khiến người dùng tưởng
+     công cụ chưa chạy. Dùng lại đúng hàm mà `summarizeToolResult` đã dùng cho
+     nhánh default, nên chip và khung mở rộng không mâu thuẫn nhau. Rỗng THẬT
+     (null/undefined/object không field) vẫn ra '' — không bịa nội dung. */
+  return briefShape(value);
+}
+
+/**
+ * Đường CLIENT không trả object — mọi tool client đều `JSON.stringify(data)`
+ * trước khi trả (react/use-chat-orchestration.ts:1666 và
+ * core/agent-runtime/tool-runner.ts:395), nên `result` tới đây thường là
+ * CHUỖI JSON. Bóc lớp đó MỘT LẦN ở đầu thay vì mỗi nhánh tự parse.
+ *
+ * Không parse được (JSON hỏng, hoặc thân là chuỗi thô như nội dung file/diff)
+ * thì giữ nguyên chuỗi gốc làm thân — trả '' vì "parse lỗi" là mất dữ liệu.
+ */
+function parseMaybeJson(result: unknown): unknown {
+  if (typeof result !== 'string') return result;
+  const head = result.trimStart()[0];
+  /* Chỉ thử parse thứ trông như JSON; `fs_read` trả nội dung file thô có thể
+     dài chẳng hạn — parse thử vô nghĩa tốn thời gian trên mỗi khung xem trước. */
+  if (head !== '{' && head !== '[') return result;
+  try {
+    const parsed: unknown = JSON.parse(result);
+    /* Chỉ nhận object/array: `"42"`/`"null"` parse ra giá trị vô dụng, giữ
+       chuỗi gốc thành thân vẫn đọc được hơn. */
+    return parsed !== null && typeof parsed === 'object' ? parsed : result;
+  } catch {
+    return result;
+  }
+}
+
+/**
+ * `content` chuẩn của MCP là MẢNG khối `{type:'text', text}`; đường fs/web
+ * trả chuỗi thuần. Nhận cả hai — và cả trường không có gì để hiện thì để trống.
+ */
+function contentText(v: unknown): string {
+  if (typeof v === 'string') return v;
+  if (!Array.isArray(v)) return '';
+  return v
+    .map((block) => {
+      if (typeof block === 'string') return block;
+      if (!block || typeof block !== 'object') return '';
+      return str((block as Record<string, unknown>).text);
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** FsEntry[] (lib/fs-access.ts) → mỗi entry một dòng, thư mục hậu `/`. */
+function listLines(value: unknown): string {
+  if (!Array.isArray(value)) return '';
+  return value
+    .map((e) => {
+      /* Entry chuẩn là FsEntry {name, type:'file'|'dir'} (lib/fs-access.ts:289)
+         và desktopFsList dựng đúng shape đó — nhưng adapter khác (MCP fs,
+         bridge cũ) trả tên file THÔ. Một entry lạ không được làm cả danh
+         sách biến mất. */
+      if (typeof e === 'string') return e;
+      if (!e || typeof e !== 'object') return '';
+      const entry = e as Record<string, unknown>;
+      const name = scalar(entry.name) || scalar(entry.path);
+      if (!name) return '';
+      /* `kind: 'directory'` là tên của bridge Electron (VyenFsEntry), `type`
+         là tên của FSA. Chấp nhận cả hai để thư mục không lẫn với file. */
+      const isDir = entry.type === 'dir' || entry.kind === 'directory';
+      return `${name}${isDir ? '/' : ''}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** SearchMatch[] (lib/fs-access.ts) → `path:line: text` đúng kiểu grep. */
+function searchMatches(value: unknown): string {
+  if (!Array.isArray(value)) return '';
+  return (value as unknown[])
+    .map((m) => {
+      const hit = (m ?? {}) as Record<string, unknown>;
+      /* `line` là NUMBER trong SearchMatch, khác `text`/`path` là chuỗi — dùng
+         `str` cho cả ba thì số dòng ra thành rỗng, thành `src/a.ts:: code`. */
+      const line = typeof hit.line === 'number' ? String(hit.line) : str(hit.line);
+      return `${str(hit.path)}:${line}: ${str(hit.text)}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+function stdoutOf(r: Record<string, unknown>): string {
+  const out = str(r.stdout);
+  const err = str(r.stderr);
+  if (out && err) return `${out}\n${err}`;
+  /* `output` là tên trường phổ biến ở adapter khác (shellRunner của Sarsed,
+     runner của scheduler, `git_commit` của bridge) — nhận làm luồng dự phòng
+     khi stdout/stderr rỗng, thay vì trả '' cho một lệnh đã chạy xong. */
+  return out || err || str(r.output);
+}
+
+/** Chỉ nhận chuỗi thật — `null`/`undefined`/số đều là "không có thân". */
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
+/**
+ * Giá trị nguyên thuỷ để HIỂN THỊ — khác `str` ở chỗ số/boolean vẫn ra chữ
+ * thay vì biến mất. Dùng cho trường kiểu `name` của entry, nơi mất một ký tự
+ * là mất hẳn một dòng danh sách.
+ */
+function scalar(v: unknown): string {
+  return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'
+    ? String(v)
+    : '';
+}
+
+/** JSON.stringify không ném được; chỗ này là đường cuối trước khi render. */
+function safeStringify(v: unknown): string {
+  try {
+    return JSON.stringify(v, null, 2) ?? '';
+  } catch {
+    return '';
   }
 }
 

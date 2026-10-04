@@ -144,6 +144,55 @@ function createAttachmentUrl(attachment: StoredAttachment, urls: Set<string>): s
   return attachment.remoteUrl ?? '';
 }
 
+/**
+ * Trần ký tự cho reasoning ĐƯỢC GHI (không phải trần hiển thị).
+ *
+ * Vì sao vẫn phải có trần: reasoning là chuỗi không biên dịch dài nhất từng
+ * đi vào IndexedDB và nó NHÂN theo số lượt — `components/storage-quota-meter.tsx`
+ * tồn tại vì người dùng đã dính quota. Một model chạy lỗi (lặp thought, không
+ * chạm `finish_reason`) có thể đẩy hàng MB vào MỘT row.
+ *
+ * Vì sao trần rộng: reasoning CHÍNH LÀ nội dung mà tính năng này sinh ra để
+ * giữ. 150.000 ký tự ≈ 37k reasoning token — hơn trọn một trace high-effort
+ * của dòng o — và ~6× trần tool result (24k, xem STORED_TOOL_RESULT_CHARS).
+ * Cắt dứt ở con số nhỏ hơn sẽ phá đúng thứ tính năng sinh ra.
+ */
+export const STORED_REASONING_CHARS = 150_000;
+
+/** Chừa chỗ cho ghi chú cắt trần, kể cả khi con số ký tự bị mất dài thêm vài chữ số. */
+const REASONING_CUT_NOTE_RESERVE = 96;
+
+function reasoningCutNote(dropped: number): string {
+  return `\n\n[… ${dropped} ký tự reasoning cuối đã bị cắt khi lưu …]`;
+}
+
+/**
+ * Reasoning tới từ Message của useChat: có thể undefined (model không suy
+ * luận, hoặc row cũ chưa có trường này) và không phải string thì bỏ luôn.
+ *
+ * Vượt trần thì giữ ĐẦU và kèm ghi chú nói rõ đã bị cắt — không cắt trầm
+ * lặng, vì reasoning hiển thị thẳng cho người đọc trong ThinkingBlock và đoạn
+ * bị cắt phải trông như đoạn bị cắt, không như suy nghĩ kết thúc ở đó.
+ *
+ * Hàm này chạy ở CẢ HAI vế của hasStoredMessageChanged, nên nó idempotent:
+ * một reasoning dài bị cắt rồi thì so sánh với bản đã cắt vẫn ra kết quả
+ * giống nhau — không sinh lượt ghi mỗi lần reconcile vì lý do cắt trần.
+ */
+function toStoredReasoning(raw: unknown): string | undefined {
+  if (typeof raw !== 'string' || !raw.trim()) return undefined;
+  if (raw.length <= STORED_REASONING_CHARS) return raw;
+  let keep = STORED_REASONING_CHARS - REASONING_CUT_NOTE_RESERVE;
+  let note = reasoningCutNote(raw.length - keep);
+  /* Số ký tự bị mất nằm trong chính ghi chú nên độ dài ghi chú phụ thuộc nó:
+     chừa lại đúng bằng phần dư. Vòng lặp hội tụ (mỗi vòng thêm ít nhất 1 ký tự
+     vào `keep`, còn số chữ số chỉ dài thêm có hạn) → tổng luôn ≤ trần. */
+  while (note.length > REASONING_CUT_NOTE_RESERVE) {
+    keep -= note.length - REASONING_CUT_NOTE_RESERVE;
+    note = reasoningCutNote(raw.length - keep);
+  }
+  return raw.slice(0, keep) + note;
+}
+
 export function toChatMessage(
   row: StoredMessage,
   objectUrls: Set<string>,
@@ -155,6 +204,13 @@ export function toChatMessage(
     status: row.status,
     finishReason: row.finishReason,
     annotations: row.annotations as Message['annotations'],
+    /* Reasoning là của chính model này và chỉ phục vụ hiển thị lại, nhưng mất
+       nó thì khối ThinkingBlock biến mất sau khi tải trang. Chỉ gắn khi thật
+       sự có chữ: `reasoning: undefined` luôn hiện diện sẽ khiến so sánh
+       memo ở phía render tưởng message đổi mỗi vòng. */
+    ...(toStoredReasoning(row.reasoning)
+      ? { reasoning: row.reasoning as string }
+      : {}),
     /* Kết quả fs_* đã lưu: phải trả lại useChat để lượt gửi sau còn
        toolInvocations gửi lên route (attachToolResultParts dựng tool-call
        parts từ đây). Thiếu nó, sau khi tải lại trang model mất kết quả cũ
@@ -315,7 +371,14 @@ function hasStoredMessageChanged(
        content của assistant message thường không đổi ở step chỉ có tool
        call, nên reconcile sẽ coi row là "không thay đổi" và bỏ qua. */
     toolInvocationSignature(previous.toolInvocations) !==
-      toolInvocationSignature(next.toolInvocations)
+      toolInvocationSignature(next.toolInvocations) ||
+    /* Không so sánh reasoning thì nó KHÔNG BAO GIỜ được ghi: có những lượt
+       content không đổi trong lúc reasoning còn chảy tiếp (tool call, hoặc
+       model suy nghĩ xong mới bắt đầu trả lời) — reconcile coi row là "không
+       đổi" và bỏ qua, reasoning chết lặng. So qua toStoredReasoning để
+       undefined và chuỗi rỗng không sinh lượt ghi vô nghĩa. */
+    toStoredReasoning(previous.reasoning) !==
+      toStoredReasoning(next.reasoning)
   );
 }
 
@@ -444,6 +507,10 @@ export async function reconcileActiveMessages(
         toolInvocations:
           (message as { toolInvocations?: StoredMessage['toolInvocations'] })
             .toolInvocations ?? existing.toolInvocations,
+        /* Cùng quy tắc: lượt này không mang reasoning thì giữ bản đã lưu. */
+        reasoning:
+          toStoredReasoning(message.reasoning) ??
+          existing.reasoning,
       };
 
       if (
@@ -540,6 +607,8 @@ export async function reconcileActiveMessages(
       toolInvocations:
         (message as { toolInvocations?: StoredMessage['toolInvocations'] })
           .toolInvocations ?? undefined,
+
+      reasoning: toStoredReasoning(message.reasoning),
 
       finishReason:
         isStreamingAssistant

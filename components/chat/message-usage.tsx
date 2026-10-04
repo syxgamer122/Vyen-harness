@@ -5,6 +5,10 @@ import { extractMessageUsage, formatMessageUsage } from '@/lib/message-usage';
 /**
  * Dòng mờ dưới câu trả lời assistant: ↑token ↓token · thời lượng · chi phí
  * (chỉ khi là số thật). Ẩn hoàn toàn khi message không có usage annotation.
+ *
+ * Dấu `≈` đứng trướC CẢ DÒNG, không đứng trước một con số — vì `est` là cờ
+ * mức bản ghi: khi nó bật thì token RA là đoán (`ceil(ký tự / 4)`) còn token
+ * VÀO vẫn là số gateway báo. Gạch vào trước `↓` là nói dối về `↑`.
  */
 export function MessageUsage({ annotations }: { annotations?: unknown }) {
   const stats = extractMessageUsage(annotations);
@@ -16,7 +20,7 @@ export function MessageUsage({ annotations }: { annotations?: unknown }) {
       className="mt-1 font-mono text-[10px] tabular-nums text-text-muted"
       title={
         stats.estimated
-          ? 'Gateway không báo usage: token ước lượng từ độ dài trả lời'
+          ? 'Ước lượng: gateway không báo token ra, số ↓ suy từ độ dài trả lời'
           : 'Token thật do gateway báo'
       }
     >
@@ -29,8 +33,8 @@ export function MessageUsage({ annotations }: { annotations?: unknown }) {
             stats.routingRole === 'planner'
               ? 'Lượt chạy bằng planner model (lệnh /plan)'
               : stats.routingRole === 'lead'
-                ? 'Model mạnh (lead) — lập kế hoạch hoặc fallback sau thất bại'
-                : 'Model rẻ (worker) — pha thực thi'
+                ? 'Model mạnh (lead): lập kế hoạch hoặc fallback sau thất bại'
+                : 'Model rẻ (worker): pha thực thi'
           }
         >
           {stats.routingRole}

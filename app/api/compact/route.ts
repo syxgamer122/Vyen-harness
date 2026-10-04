@@ -7,6 +7,7 @@ import { validateProviderBaseUrl } from '@/lib/provider-url';
 import { filterSupportedModels, markModelUnsupported } from '@/lib/model-negative-cache';
 import { ACTIVE_MODEL_BODY_FIELD, buildActiveModelChain, isActiveProvider } from '@/lib/aux-llm-chain';
 import { redactSecretText } from '@/lib/secret-registry';
+import { verifySameOrigin } from '@/lib/security';
 
 /**
  * POST /api/compact — tóm tắt phần cũ của hội thoại dài (nền của compaction).
@@ -126,6 +127,12 @@ const SUMMARY_SYSTEM = [
 ].join(' ');
 
 export async function POST(req: Request) {
+  /* CSRF: route này cầm BYOK key ở header `x-api-key` rồi tiêu ở upstream, nên
+     phải chặn request xéo gốc y hệt /api/chat, /api/vision, /api/web — trước đây
+     nó là route LLM DUY NHẤT thiếu lớp này. */
+  if (!verifySameOrigin(req)) {
+    return Response.json({ summary: null, reason: 'forbidden' }, { status: 403, headers: NO_STORE });
+  }
   try {
     const rawCustomKey = req.headers.get('x-api-key')?.trim();
     const rawProviderBase = req.headers.get('x-api-base')?.trim() || undefined;

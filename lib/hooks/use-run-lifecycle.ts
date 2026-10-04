@@ -28,6 +28,7 @@ import {
   reconcile,
   recordRepair,
   requestStop,
+  resetRun,
   resumeFromUser,
   setCanRepair,
   touchProgress,
@@ -64,6 +65,23 @@ export interface RunLifecycleApi {
   current: () => RunLifecycle;
   /** Bắt đầu run (gửi request). */
   begin: () => void;
+  /**
+   * Đưa run về `idle` để lượt kế tiếp có thể `begin()` lại.
+   *
+   * Cần cho mọi lượt người dùng gửi tay: run đã kết thúc là terminal và bất
+   * biến, nên `begin()` trên run terminal bị bỏ qua im lặng — lượt thứ hai trở
+   * đi sẽ chạy mà không còn giám sát. Gọi `reset()` ngay trước `begin()`.
+   *
+   * KHÔNG gọi cho đường nào đang stream: `resetRun` không kiểm tra, nên sẽ cưỡng
+   * chế xoá run đang chạy.
+   *
+   * LƯU Ý: các đường tự tiếp tục (steering, goal-loop, follow-up drain) cố ý
+   * KHÔNG gọi reset — chúng nối tiếp cùng một run nên `startedAt` phải giữ.
+   * Đổi lại `succeedRun()` trong onFinish phải đứng sau cả ba drain, nếu không
+   * run thành terminal trước khi lượt kế tiếp mở ra và mất giám sát. Xem
+   * react/use-chat-orchestration.ts.
+   */
+  reset: () => void;
   /** Heartbeat — gọi mỗi khi nhận token hoặc tool xong. */
   touch: () => void;
   /** Người dùng bấm dừng. */
@@ -183,6 +201,16 @@ export function useRunLifecycle(options: UseRunLifecycleOptions = {}): RunLifecy
     publish(beginRun(stateRef.current));
   }, [publish]);
 
+  /**
+   * Đưa run về idle. Xem giải thích ở `RunLifecycleApi.reset`.
+   *
+   * Gọi ngay TRƯỚC `begin()`: hai lệnh liền kề trong cùng một tick nên React
+   * gộp, còn trạng thái trung gian 'idle' không bao giờ được vẽ ra.
+   */
+  const reset = useCallback(() => {
+    publish(resetRun(stateRef.current));
+  }, [publish]);
+
   const touch = useCallback(() => {
     // Không publish: chỉ đổi lastProgressAt, không ảnh hưởng giao diện.
     stateRef.current = touchProgress(stateRef.current);
@@ -231,6 +259,7 @@ export function useRunLifecycle(options: UseRunLifecycleOptions = {}): RunLifecy
     busy: view.busy,
     current,
     begin,
+    reset,
     touch,
     stop,
     succeed,

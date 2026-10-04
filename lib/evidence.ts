@@ -1,12 +1,16 @@
 /**
- * Evidence Ladder — bậc thang bằng chứng 4 cấp độ.
+ * Evidence Ladder: bậc thang bằng chứng 6 cấp độ.
  *
  * Phân biệt rạch ròi giữa lời nói của model và bằng chứng thực tế:
- * - prepared: "Plan · not run" — kế hoạch đã sẵn, chưa chạy gì
- * - running: "Code · running" — executor đang chạy và đang được quan sát
- * - reported_done: "Code · reported done" — model/lệnh nói xong, CHƯA AI KIỂM CHỨNG
- * - verified: "Test · verified" — test/CI thật sự pass (có VerificationReceipt exitCode=0 & qua completion gate)
+ * - prepared: "Kế hoạch · chưa chạy": kế hoạch đã sẵ, chưa chạy gì
+ * - running: "Code · đang chạy": executor đang chạy và đang được quan sát
+ * - reported_done: "Code · đã báo xong": model/lệnh nói xong, CHƯA AI KIỂM CHỨNG
+ * - verified: "Kiểm thử · đã xác minh": test/CI thật sự pass (có VerificationReceipt
+ *   exitCode=0 và qua completion gate)
  * - blocked / failed: bị chặn có lý do hoặc thất bại terminal.
+ *
+ * Nhãn trả về là COPY tiếng Việt, nên nó đổi theo giọng của app. `EvidenceLevel`
+ * thì không: đó là giá trị lưu trong history, đổi là mất dữ liệu đã ghi.
  */
 
 import type { VerificationReceipt } from '@/lib/verification';
@@ -179,44 +183,44 @@ export function describeEvidence(level: EvidenceLevel): {
   switch (level) {
     case 'prepared':
       return {
-        stage: 'Plan',
-        cert: 'not run',
-        badgeText: 'Plan · not run',
+        stage: 'Kế hoạch',
+        cert: 'chưa chạy',
+        badgeText: 'Kế hoạch · chưa chạy',
         variant: 'default',
       };
     case 'running':
       return {
         stage: 'Code',
-        cert: 'running',
-        badgeText: 'Code · running',
+        cert: 'đang chạy',
+        badgeText: 'Code · đang chạy',
         variant: 'running',
       };
     case 'reported_done':
       return {
         stage: 'Code',
-        cert: 'reported done',
-        badgeText: 'Code · reported done',
+        cert: 'đã báo xong',
+        badgeText: 'Code · đã báo xong',
         variant: 'warning',
       };
     case 'verified':
       return {
-        stage: 'Test',
-        cert: 'verified',
-        badgeText: 'Test · verified',
+        stage: 'Kiểm thử',
+        cert: 'đã xác minh',
+        badgeText: 'Kiểm thử · đã xác minh',
         variant: 'success',
       };
     case 'blocked':
       return {
-        stage: 'Blocked',
-        cert: 'blocked',
-        badgeText: 'Blocked',
+        stage: 'Bị chặn',
+        cert: 'bị chặn',
+        badgeText: 'Bị chặn',
         variant: 'danger',
       };
     case 'failed':
       return {
-        stage: 'Failed',
-        cert: 'failed',
-        badgeText: 'Failed',
+        stage: 'Thất bại',
+        cert: 'thất bại',
+        badgeText: 'Thất bại',
         variant: 'danger',
       };
   }

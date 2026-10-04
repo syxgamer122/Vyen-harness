@@ -13,7 +13,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Trash2 } from 'lucide-react';
 import { db, type RecipeRecord } from '@/lib/db';
 import { useAppStore } from '@/lib/store';
-import { BUILTIN_SLASH_COMMANDS } from '@/lib/slash-commands';
+import { BUILTIN_SLASH_COMMANDS, validateSlashCommandName } from '@/lib/slash-commands';
 
 export function CustomSlashCommandsSection() {
   const customSlashCommands = useAppStore((s) => s.settings.customSlashCommands ?? {});
@@ -30,25 +30,30 @@ export function CustomSlashCommandsSection() {
   const [selectedRecipeId, setSelectedRecipeId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * Chặn TRÙNG TÊN LÚC ĐẶT, không đợi tới lúc chạy.
+   *
+   * Palette dựng hàng cho lệnh built-in và lệnh tùy biến theo cùng một hình
+   * `/<tên>`, và `parseSlashCommand` luôn route về built-in. Một lệnh tùy biến
+   * tên `/plan` vì vậy cho ra hai hàng trông y hệt mà hàng custom không bao giờ
+   * được gọi tới. Báo ở đây là chỗ duy nhất người dùng còn định được tên
+   * của mình; sau khi lưu thì sửa được thì cũng đã mất.
+   *
+   * Luật tên thì dùng chung với tên skill (`validateSlashCommandName`), không
+   * chế riêng ở form — trước đây form có `^[a-zA-Z0-9_-]+$`, lệch với parser
+   * nên tên đặt được lại không chạy được.
+   */
   const handleAdd = () => {
-    const cleaned = cmdName.trim().replace(/^\//, '').toLowerCase();
-    if (!cleaned) {
-      setError('Vui lòng nhập tên lệnh slash (ví dụ: lint hoặc fix).');
-      return;
-    }
-    if (!/^[a-zA-Z0-9_-]+$/.test(cleaned)) {
-      setError('Tên lệnh chỉ được chứa chữ cái, số, gạch dưới (_) hoặc gạch ngang (-).');
-      return;
-    }
-    if (BUILTIN_SLASH_COMMANDS.some((b) => b.name === cleaned || b.aliases?.includes(cleaned))) {
-      setError(`Tên lệnh "/${cleaned}" đã trùng với lệnh mặc định của hệ thống.`);
+    const check = validateSlashCommandName(cmdName, Object.keys(customSlashCommands));
+    if (!check.ok) {
+      setError(check.error);
       return;
     }
     if (!selectedRecipeId) {
       setError('Vui lòng chọn một recipe để liên kết.');
       return;
     }
-    setCustomSlashCommand(cleaned, selectedRecipeId);
+    setCustomSlashCommand(check.name, selectedRecipeId);
     setCmdName('');
     setSelectedRecipeId('');
     setError(null);

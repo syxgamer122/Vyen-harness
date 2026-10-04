@@ -121,3 +121,14 @@ export const DOOM_LOOP_THRESHOLD = 3;
  * ContextMeter không báo thấp hơn lượng thực sự gửi đi.
  */
 export const TOOL_RESULT_ESTIMATE_CHARS = TOOL_RESULT_MAX_CHARS;
+
+/**
+ * Trần ký tự cho phần THÂN kết quả tool người dùng bấm vào xem (tool-trace
+ * mở khoảng 1 tool call/lượt, và người dùng đọc để kiểm chứng chứ không để
+ * nuôi model).
+ *
+ * Thấp hơn TOOL_RESULT_MAX_CHARS (24k) có chủ ý: TOOL_RESULT_MAX_CHARS bảo vệ
+ * ngân sách CONTEXT của model, con số này bảo vệ render — 4k là đủ đọc một
+ * stack trace hay một khối diff mà không làm khung chat nhảy layout.
+ */
+export const TOOL_PREVIEW_MAX_CHARS = 4_000;

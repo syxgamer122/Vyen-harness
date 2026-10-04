@@ -222,6 +222,25 @@ describe('evaluateUsageTrigger — trigger theo usage thật từ upstream', () 
     expect(evaluateUsageTrigger(base({ promptTokens: 10_000 })).kind).toBe('skip');
   });
 
+  /**
+   * Hồi quy: lượt agent nhiều vòng tool cộng dồn usage ra một con số lớn hơn
+   * window, nhưng request CUỐI thật ra vẫn vừa khung. Nếu caller đưa TỔNG vào
+   * đây thì mọi lượt dài đều thành nén oan — nên caller phải đưa step cuối.
+   * Test khoá đúng hợp đồng đó.
+   */
+  it('step cuối vừa khung thì skip, kể cả khi TỔNG cộng dồn vượt window', () => {
+    // Tổng cộng dồn 54,288 (nhiều vòng tool) — nhưng request cuối chỉ 21,000.
+    const totalCumulative = 54_288;
+    const lastStep = 21_000;
+    expect(lastStep).toBeLessThan(32_000);
+
+    // Đưa step cuối vào → không nén.
+    expect(evaluateUsageTrigger(base({ promptTokens: lastStep })).kind).toBe('skip');
+
+    // Đưa nhầm tổng vào → nén oan. Đây chính là lỗi đã gặp.
+    expect(evaluateUsageTrigger(base({ promptTokens: totalCumulative })).kind).not.toBe('skip');
+  });
+
   it('threshold: promptTokens > window − reserve → trigger', () => {
     // 32k − 6k = 26k; 27k > 26k
     const d = evaluateUsageTrigger(base({ promptTokens: 27_000 }));

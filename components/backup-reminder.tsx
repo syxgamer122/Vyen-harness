@@ -10,6 +10,20 @@ import {
 } from '@/lib/auto-backup';
 
 /**
+ * Số ngày "Để sau" giấu banner.
+ *
+ * Việc bỏ qua ĐÃ được ghi xuống localStorage (`vyen-backup-snoozed-at` qua
+ * `snoozeBackupReminder`) và sống sót qua reload — nhưng khoản thời gian đó
+ * trước đây chỉ nằm trong tham số mặc định của hàm, không ai đọc được. Nút
+ * "Để sau" trông như tắt hẳn, thực tế là quay lại sau một ngày.
+ *
+ * Giữ nguyên 1 ngày: đây là cảnh báo mất dữ liệu thật, và chu kỳ sao lưu mặc
+ * định là 7 ngày nên nhắc nhiều lần trước khi dữ liệu gặp rủi ro là đúng.
+ * Sửa là CHỌN lại con số này và đồng bộ với dòng chữ bên dưới.
+ */
+const SNOOZE_DAYS = 1;
+
+/**
  * Hiện banner nhắc sao lưu khi đến kỳ. Nếu người dùng đã cấu hình thư mục
  * tự động (desktop), việc ghi file chạy ngầm ngay khi mở app — banner chỉ
  * xuất hiện khi không ghi được.
@@ -36,6 +50,12 @@ export function BackupReminder({ chatCount }: { chatCount: number }) {
   }, [refresh]);
 
   if (!visible) return null;
+
+  /** Ẩn banner và ghi mốc hết hạn — chỉ chạy khi người dùng BẤM, không chạy mỗi render. */
+  const dismiss = () => {
+    snoozeBackupReminder(SNOOZE_DAYS);
+    setVisible(false);
+  };
 
   const handleBackup = async () => {
     setBusy(true);
@@ -66,23 +86,20 @@ export function BackupReminder({ chatCount }: { chatCount: number }) {
             </button>
             <button
               type="button"
-              onClick={() => {
-                snoozeBackupReminder();
-                setVisible(false);
-              }}
+              onClick={dismiss}
               className="rounded-lg px-2.5 py-1 text-status-warning transition hover:bg-warning/10"
             >
               Để sau
             </button>
           </div>
+          <p className="mt-1 text-meta text-text-muted">
+            Để sau chỉ ẩn thông báo này. Sau {SNOOZE_DAYS} ngày chưa sao lưu thì nó hiện lại.
+          </p>
         </div>
         <button
           type="button"
           aria-label="Đóng nhắc nhở"
-          onClick={() => {
-            snoozeBackupReminder();
-            setVisible(false);
-          }}
+          onClick={dismiss}
           className="-mr-1 -mt-0.5 flex-shrink-0 rounded-lg p-1 text-text-muted transition hover:bg-warning/10 hover:text-status-warning"
         >
           <X size={13} />

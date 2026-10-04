@@ -30,6 +30,7 @@ import {
   reconcileOnBoot,
   recordRepair,
   requestStop,
+  resetRun,
   resumeFromUser,
   serializeRunState,
   setCanRepair,
@@ -84,6 +85,15 @@ describe('reconcile — các nhánh điều khiển', () => {
   it('idle + muốn chạy → báo caller gửi request', () => {
     const { action } = reconcile(newRun('r1', T0), T0);
     expect(action).toEqual({ kind: 'start' });
+  });
+
+  it('run kẹt terminal thì reconcile thôi canh — kể cả sau deadline', () => {
+    // Nhánh này là lý do reset trước mỗi lượt là bắt buộc: run đã kết thúc
+    // thì `reconcile` trả về ngay, không tới bước kiểm tra RUN_DEADLINE_MS.
+    const done = markSucceeded(started(), T0 + 1_000);
+    const res = reconcile(done, T0 + RUN_DEADLINE_MS * 10);
+    expect(res.action).toEqual({ kind: 'none' });
+    expect(res.next).toBe(done);
   });
 
   it('người dùng bấm dừng thắng tuyệt đối', () => {
@@ -292,5 +302,101 @@ describe('khôi phục run mồ côi sau reload', () => {
     const res = reconcileOnBoot(done, T0 + 999_999);
     expect(res.action).toEqual({ kind: 'none' });
     expect(res.next).toBe(done);
+  });
+});
+
+/**
+ * Chuỗi nhiều lượt — hồi quy của đường `resetRun()` → `beginRun()` mà
+ * `submitTurn` gọi cho MỖI lượt người dùng gửi tay.
+ *
+ * Không có block này thì lượt thứ hai trở đi chạy mà không còn giám sát:
+ * `beginRun` bị bỏ qua trên run terminal, vòng reconcile dừng, stall detector
+ * và auto-repair không chạy, `startedAt` ghim vĩnh viễn vào lượt đầu.
+ */
+describe('nhiều lượt — reset trước mỗi lượt', () => {
+  /** Đúng chuỗi use-chat-orchestration gọi cho một lượt người dùng. */
+  function userTurn(state: RunLifecycle, at: number): RunLifecycle {
+    return beginRun(resetRun(state, at), at);
+  }
+
+  it('lượt 2 phải vào `starting` với startedAt mới', () => {
+    const turn1 = markSucceeded(touchProgress(started(), T0 + 1_000), T0 + 2_000);
+    expect(turn1.observed).toBe('succeeded');
+
+    const turn2 = userTurn(turn1, T0 + 60_000);
+    expect(turn2.observed).toBe('starting');
+    expect(turn2.startedAt).toBe(T0 + 60_000);
+  });
+
+  it('KHÔNG reset thì lượt 2 bị bỏ qua — đây là bug đang được chặn', () => {
+    // Khoá hành vi sai để lần refactor sau không vô tình bỏ mất `resetRun()`:
+    // beginRun trên run terminal là no-op và startedAt bị ghim vào lượt đầu.
+    const turn1 = markSucceeded(touchProgress(started(), T0 + 1_000), T0 + 2_000);
+    expect(beginRun(turn1, T0 + 60_000)).toBe(turn1);
+  });
+
+  it('reset giữ nguyên runId — run là một thực thể, lượt chỉ là một pha', () => {
+    const turn1 = markSucceeded(started(), T0 + 2_000);
+    const turn2 = userTurn(turn1, T0 + 60_000);
+    expect(turn2.runId).toBe(turn1.runId);
+  });
+
+  it('deadline tính lại theo từng lượt, không ghim vào lượt đầu', () => {
+    // Lượt 2 bắt đầu 11 phút sau lượt 1: quá hạn phải bắn, dù phiên trên
+    // đã dài hơn 10 phút. Không có reset thì trường hợp này không bao giờ
+    // tới vì deadline được kiểm SAU nhánh terminal.
+    const turn1 = markSucceeded(touchProgress(started(), T0 + 1_000), T0 + 2_000);
+    const turn2 = touchProgress(userTurn(turn1, T0 + 11 * 60_000), T0 + 11 * 60_000 + 1_000);
+
+    const ok = reconcile(turn2, T0 + 11 * 60_000 + 2_000);
+    expect(ok.action.kind).not.toEqual('terminate');
+
+    const late = reconcile(turn2, turn2.startedAt + RUN_DEADLINE_MS + 1);
+    expect(late.action).toEqual({ kind: 'terminate', reason: 'deadline' });
+    expect(late.next.terminalReason).toBe('deadline');
+  });
+
+  it('lượt 2 cũng được giám sát stall y hệt lượt 1', () => {
+    // Đây là hậu quả sát thương nhất: trước khi có reset, run đã terminal nên
+    // vòng reconcile dừng hẳn — lượt 2 im lặng bao lâu cũng không ai canh.
+    const turn1 = markSucceeded(touchProgress(started(), T0 + 1_000), T0 + 2_000);
+    const turn2 = touchProgress(userTurn(turn1, T0 + 60_000), T0 + 60_000 + 1_000);
+
+    const stalled = reconcile(turn2, T0 + 60_000 + 1_000 + STALL_TIMEOUT_MS + 1);
+    expect(stalled.next.observed).toBe('stalled');
+  });
+
+  it('đường tự tiếp tục (không reset) vẫn giữ nguyên startedAt của lượt', () => {
+    // Steering / goal-loop / follow-up drain gọi append() mà không begin lại:
+    // chúng cố ý thuộc CÙNG run, nên startedAt phải giữ.
+    const turn = touchProgress(started(), T0 + 1_000);
+    const continued = touchProgress(turn, T0 + 5_000);
+    expect(continued.startedAt).toBe(T0);
+    expect(continued.observed).toBe('running');
+  });
+
+  it('reset trên run đang chạy thì xoá quyền sửa cũ trước khi lượt mới bắt đầu', () => {
+    const running = setCanRepair(touchProgress(started(), T0 + 1_000), true, T0 + 1_000);
+    expect(running.canRepair).toBe(true);
+
+    // Không được mang quyền repair của lượt cũ sang lượt mới.
+    expect(resetRun(running, T0 + 60_000).canRepair).toBe(false);
+  });
+
+  it('lượt mới sau reset thì canRepair phải được bật lại, không thừa quyền', () => {
+    // `submitTurn` bật quyền sửa qua `if (observed === 'starting') setRepairable(true)`.
+    // Trước khi có reset, điều kiện này KHÔNG BAO GIỜ đúng ở lượt 2 (state
+    // là terminal, beginRun no-op) — tức auto-repair chết âm thầm.
+    const turn1 = markSucceeded(touchProgress(started(), T0 + 1_000), T0 + 2_000);
+    const turn2 = userTurn(turn1, T0 + 60_000);
+
+    expect(turn2.observed).toBe('starting');
+    expect(setCanRepair(turn2, true, T0 + 60_000).canRepair).toBe(true);
+  });
+
+  it('resetRun serialize/parse vẫn đọc lại được (không lệch shape)', () => {
+    const turn1 = markSucceeded(started(), T0 + 2_000);
+    const turn2 = userTurn(turn1, T0 + 60_000);
+    expect(parseRunState(serializeRunState(turn2))).toEqual(turn2);
   });
 });

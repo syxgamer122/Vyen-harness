@@ -278,6 +278,13 @@ export interface VyenBridge {
     /** Có thể thiếu nếu renderer mới hơn main (app chưa restart) — caller phải check. */
     readImage?(relPath: string): Promise<{ mimeType: string; base64: string; size: number }>;
     write(relPath: string, content: string, expectedBaseHash?: string, hasDiff?: boolean): Promise<{ size: number }>;
+    /**
+     * Append một dòng vào cuối file, không đọc trước.
+     *
+     * Có thể thiếu nếu main cũ hơn renderer (app chưa restart) — caller phải
+     * check và fallback sang read+write. Xem `desktopFsAppend` ở lib/desktop-fs.ts.
+     */
+    append?(relPath: string, line: string): Promise<{ size: number }>;
     delete(relPath: string): Promise<void>;
     stat(relPath: string): Promise<VyenFsStat>;
     search(opts: { query: string } & VyenSearchOptions): Promise<VyenSearchMatch[]>;
@@ -533,6 +540,7 @@ function createWebBridge(): VyenBridge {
           expectedBaseHash,
           hasDiff: hasDiff ?? Boolean(expectedBaseHash),
         }),
+      append: (relPath: string, line: string) => callWebBridge<{ size: number }>('vyen:fs-append', { relPath, line }),
       delete: (relPath: string) => callWebBridge<void>('vyen:fs-delete', { relPath }),
       stat: (relPath: string) => callWebBridge<VyenFsStat>('vyen:fs-stat', { relPath }),
       search: (opts) => callWebBridge<VyenSearchMatch[]>('vyen:fs-search', opts),

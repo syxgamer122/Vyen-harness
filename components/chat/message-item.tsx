@@ -9,7 +9,7 @@ import { MessageStatusBadge } from '@/components/message-status-badge';
 import { ChibiAvatar } from '@/components/chat/chibi-avatar';
 import { sanitizeContent, getFinishInfo } from '@/lib/chat-tree-persistence';
 import { stripEmulatedToolMarkup } from '@/lib/text-tool-guard';
-import { ToolTrace } from '@/components/chat/tool-trace';
+import { ToolTrace, buildToolTrace, displayText, type TimelineSegment } from '@/components/chat/tool-trace';
 import { MessageUsage } from '@/components/chat/message-usage';
 import { OrchestratorBadge, getOrchestratorAdoptedAnnotation } from '@/components/chat/orchestrator-badge';
 import { EvidenceBadge } from '@/components/evidence-badge';
@@ -55,6 +55,53 @@ function ThinkingBlock({ reasoning, isStreaming }: { reasoning: string; isStream
 export interface BranchInfo {
   currentIndex: number;
   total: number;
+}
+
+/**
+ * Nội dung bong bóng của lượt trả lời, và có vẽ ô tròn rỗng hay không.
+ *
+ * Tách ra khỏi thân component để TEST ĐƯỢC HÀNH VI thật, không chỉ đọc source:
+ * cả câu "dọn bằng `displayText`" lẫn điều kiện `showBubble` đều là loại quyết
+ * định mà người đọc source nhìn thấy hợp lý, nên đổi thành hỏng mà test kiểu
+ * regex vẫn xanh — đúng cái lỗ hổng đã bị reviewer chỉ ra ở file test này.
+ *
+ * `timeline === null` là tin nhắn CŨ: không event nào có offset `at`, nên
+ * không có timeline để cắt và bubble hiện nguyên `m.content`. Nhánh đó giữ ô
+ * tròn kể cả khi rỗng, đúng như trước — tin nhắn cũ không được đổi một chữ
+ * bố cục. Chỉ khi timeline BẬT thì đoạn lời đầu rỗng mới không vẽ ô tròn
+ * trắng (model gọi tool trước khi kịp nói gì), mở màn hình bằng chip tool.
+ *
+ * HAI NHÁNH DỌN KHÁC NHAU, và đó là cố ý — đừng gộp lại cho "đồng nhất":
+ *
+ *   • Nhánh timeline đi qua `displayText`, CÙNG hàm ToolTrace dùng cho mọi đoạn
+ *     xen kẽ. Ở đây `firstSegment` là lát CẮT, nên nó cần đủ ba việc:
+ *       - Vá fence hở. Offset `at` rơi vào GIỮA khối ``` thì lát đầu kết thúc
+ *         bằng fence chưa đóng; MarkdownRenderer coi phần còn lại của lượt là
+ *         code, nên kết luận của model hiện thành khối code.
+ *       - NFC hoá. Chuỗi gốc có thể ở dạng NFD; app nói tiếng Việt nên dấu tổ
+ *         hợp lơ lửng là hỏng dữ liệu hiển thị, không phải xấu xí.
+ *       - Bỏ đầu mảnh bị cắt đôi (`dropCutHead`), strip markup, rồi sanitize.
+ *     Ở nhánh này bubble và ToolTrace vẽ ĐÚNG CÙNG một chuỗi, nên lệch một chút
+ *     là hiện ra hai kiểu — đó là chỗ dễ trôi lệch nhất, và phải dùng chung hàm.
+ *
+ *   • Nhánh tin nhắn cũ giữ `stripEmulatedToolMarkup` + `sanitizeContent` như
+ *     trước, KHÔNG đi qua `displayText`. Lý do: `dropCutHead` sinh ra để đoán
+ *     "đoạn này bị `at` cắt đôi", mà ở đây không có lát cắt nào — cả tin nhắn
+ *     là nguyên vẹn. Hậu quả đo được: tin nhắn mở đầu bằng JSON (`{"r":1}`)
+ *     rồi kèm khối tool_call trọn vẹn, dấu đóng `</tool_call>` đứng riêng
+ *     dòng bị đọc thành "dấu đóng mồ côi" và nuốt MẤT cả mở đầu. Mất chữ thật
+ *     tệ hơn nhiều so với mất cân bằng fence, nên nhánh này giữ nguyên.
+ */
+export function bubbleOf(
+  content: string,
+  timeline: TimelineSegment[] | null,
+): { text: string; show: boolean } {
+  if (timeline === null) {
+    return { text: sanitizeContent(stripEmulatedToolMarkup(content).text), show: true };
+  }
+  const firstSegment = timeline[0];
+  const text = displayText(firstSegment?.kind === 'text' ? firstSegment.text : '');
+  return { text, show: text.trim() !== '' };
 }
 
 /*
@@ -307,6 +354,52 @@ export const MessageItem = memo(
       );
     }
 
+    /*
+     * TIMELINE: model nói, chạy tool, nói tiếp — dựng lại đúng thứ tự thời
+     * gian thay vì dồn hết tool xuống cuối.
+     *
+     * `timeline === null` là tin nhắn CŨ (không sự kiện nào có offset `at`):
+     * bubble hiện nguyên `m.content` đã dọn, đúng như trước, và ToolTrace tự
+     * vẽ lại bảng kê cũ. Đây là nhánh không được đổi một chữ.
+     *
+     * `buildTimeline` cắt trên `m.content` NGUYÊN BẢN, còn bubble luôn dọn
+     * trước khi hiện. Hai việc đó không mâu thuẫn: dọn chỉ áp dụng cho thứ
+     * đang vẽ ra, offset thì đã được server ghi sẵn theo bản gốc. Dọn sớm
+     * hơn một chữ là timeline cắt lệch, mà lệch thì ra vẫn có chữ, rất khó
+     * nhận ra bằng mắt (đo được: lệch 38 ký tự trên một đoạn markup 38 ký tự,
+     * kết luận của model bị đẩy lên TRÊN tool).
+     *
+     * Lý do dọn và lý do quyết định vẽ bubble nằm ở `bubbleOf` (đặt cùng file,
+     * xem chú thích ở đó) — giữ ngoài thân component để test được bằng hàm
+     * thật chứ không bằng regex trên source.
+     */
+    const annotations = (m as any).annotations as Array<Record<string, unknown>> | undefined;
+    const toolInvocations = (m as any).toolInvocations as Array<{
+      toolCallId?: string;
+      state?: string;
+    }> | undefined;
+    /*
+     * MỘT lần dựng cho cả lượt, dùng chung kết quả.
+     *
+     * `events` và `timeline` là hai mặt của một lần quét, và chỗ DUY NHẤT quyết
+     * định cờ `abandoned` bật khi nào là lệnh `isStreaming !== false` ngay dưới
+     * đây. Trước đây `ToolTrace` tự gọi `collectToolEvents` + `buildTimeline`
+     * lần nữa với đúng bộ đối số đó: mỗi token stream quét lại cả lượt hai
+     * lần (đo được 3,6 ms mỗi lượt ở content 8.000 ký tự), và lệch số đối số
+     * là bubble với chip list nói hai chuyện khác nhau về `abandoned`.
+     *
+     * `buildToolTrace` cắt trên `m.content` NGUYÊN BẢN: `at` là chỉ số ký tự
+     * trong bản gốc, mà hàm strip markup xoá các khối nên mọi vị trí sau khối
+     * bị xoá đều lệch.
+     */
+    const { events, timeline } = buildToolTrace(
+      m.content,
+      annotations,
+      toolInvocations,
+      isStreaming !== false,
+    );
+    const { text: bubbleContent, show: showBubble } = bubbleOf(m.content, timeline);
+
     return (
       <div className="group relative w-full py-5">
         {!isStreaming && (
@@ -371,22 +464,6 @@ export const MessageItem = memo(
             return adopted ? <OrchestratorBadge payload={adopted} /> : null;
           })()}
 
-          <ToolTrace
-            annotations={(m as any).annotations as Array<Record<string, unknown>> | undefined}
-            toolInvocations={(m as any).toolInvocations as Array<{
-              toolCallId?: string;
-              state?: string;
-            }> | undefined}
-          />
-
-          {(() => {
-            const reasoning = (m as any).reasoning;
-            if (typeof reasoning === 'string' && reasoning.trim()) {
-              return <ThinkingBlock reasoning={reasoning} isStreaming={isStreaming} />;
-            }
-            return null;
-          })()}
-
           {/*
            * Bong bóng của bot đảo chiều với bubble user: avatar bên trái, đuôi
            * chỉ xuống-trái, nền GIẤY TRẮNG (không phải mint) — vì đây là nội
@@ -395,7 +472,15 @@ export const MessageItem = memo(
            * Chỉ PHẦN LỜI nằm trong bubble. Tool trace, khối suy luận và tệp đính
            * kèm nằm ngoài: chúng là bảng kê công việc, không phải lời nói, và
            * bọc chúng vào bong bóng sẽ khiến một hàng dài trông như nói dối.
+           *
+           * Khi timeline bật (`timeline !== null`), model đã xen lẫn lời với
+           * tool, nên ở đây chỉ lấy ĐOẠN LỜI ĐẦU TIÊN. Các đoạn lời sau tool do
+           * ToolTrace vẽ ra ngoài bubble, đúng thứ tự thời gian: nói, chạy tool,
+           * nói tiếp. Bubble vẫn là chỗ sạch nhất cho câu mở đầu, vì đó là câu
+           * người đọc chờ. Không có đoạn lời đầu (model gọi tool trước khi nói
+           * gì) thì không vẽ bubble trắng rỗng, chỉ mở màn hình bằng chip tool.
            */}
+          {showBubble && (
           <div className="flex items-start gap-2">
             <ChibiAvatar side="bot" className="mt-1" />
             <div className="bubble-bot lift-sm min-w-0 flex-1 px-4 py-3.5">
@@ -405,7 +490,7 @@ export const MessageItem = memo(
           >
             <ErrorBoundary resetKey={`${m.id}:${m.content.length}`}>
               <MarkdownRenderer
-                content={sanitizeContent(stripEmulatedToolMarkup(m.content).text)}
+                content={bubbleContent}
                 isStreaming={isStreaming}
                 throttleMs={throttleMs}
               />
@@ -413,6 +498,43 @@ export const MessageItem = memo(
           </div>
             </div>
           </div>
+          )}
+
+          {/*
+           * ToolTrace đứng SAU bubble, không phải trên: lượt agent đọc được là
+           * câu trả lời trước, bảng kê công việc sau (xem PLAN.md 10.6).
+           *
+           * `content` phải là `m.content` NGUYÊN BẢN, tuyệt đối không phải
+           * `stripEmulatedToolMarkup(...).text`: offset `at` mà server ghi là
+           * chỉ số ký tự trong bản gốc, còn hàm strip xoá các khối markup nên
+           * mọi vị trí sau khối bị xoá đều lệch. Đưa chuỗi đã strip vào đây thì
+           * timeline cắt lệch chỗ, hiện tượng rất khó nhận ra vì vẫn ra chữ.
+           * `buildTimeline` trả null cho tin nhắn cũ không có `at`, khi đó
+           * ToolTrace tự vẽ lại đúng bố cục cũ.
+           *
+           * `isStreaming` là tín hiệu DUY NHẤT cho biết lượt đã hết stream, và
+           * `ToolTrace` mặc định là "chưa biết" (coi như còn chạy). Không truyền
+           * ở đây thì trạng thái "bị bỏ dở" của một tool bị dừng giữa chừng là
+           * code chết: chip quay mãi như thể việc đó còn đang chạy. Mặc định bịa
+           * ra chip "bị bỏ dở" oan còn tệ hơn, nên thiếu tín hiệu thì giữ hành vi
+           * cũ — ở đây có mặt đúng là lúc nói ra sự thật.
+           *
+           * `events` + `timeline` là KẾT QUẢ của lần dựng duy nhất ở trên,
+           * truyền xuống để `ToolTrace` không dựng lại lần nữa mỗi token
+           * (xem `buildToolTrace`). `isStreaming` vẫn phải truyền: đó là đường
+           * dựng dự phòng khi không có ai dựng sẵn.
+           *
+           * Comparator của `MessageItem` đã so `isStreaming` sẵn (dòng dưới),
+           * nên việc truyền thêm này không sinh thêm lần render nào.
+           */}
+          <ToolTrace
+            content={m.content}
+            annotations={annotations}
+            toolInvocations={toolInvocations}
+            isStreaming={isStreaming}
+            events={events}
+            timeline={timeline}
+          />
 
           {(() => {
             const { truncated, message: note } = getFinishInfo(m);
@@ -443,7 +565,20 @@ export const MessageItem = memo(
                   (a) => a && typeof a === 'object' && ('evidenceLevel' in a || 'routeReceipt' in a),
                 ) as { evidenceLevel?: string; routeReceipt?: unknown } | undefined;
                 if (!evidenceAnn) return null;
-                const level = evidenceAnn.evidenceLevel ?? (isStreaming ? 'running' : 'reported_done');
+                /*
+                 * Mặc định 'reported_done' chỉ đúng khi lượt thật sự chạy xong.
+                 * Lượt bị dừng giữa chừng thì không có gì để "đã báo xong": mặc định
+                 * hoá thành reported_done là in ra một khẳng định lượt đó chưa đạt,
+                 * và nó nằm ngay trên nhãn "aborted" ở ngay dưới. Server có ghi
+                 * evidenceLevel thì tin server, chỉ khi thiếu mới suy.
+                 */
+                const level =
+                  evidenceAnn.evidenceLevel ??
+                  (isStreaming
+                    ? 'running'
+                    : (m as any).status === 'aborted'
+                      ? 'blocked'
+                      : 'reported_done');
                 return <EvidenceBadge level={level} size="sm" />;
               })()}
             </div>
@@ -465,6 +600,21 @@ export const MessageItem = memo(
               </button>
             </div>
           )}
+
+          {/*
+           * Suy luận đứng CUỐI CÙNG, dưới cả bảng kê công việc. Nó là một chuỗi
+           * phẳng không chia đoạn được nên không đưa vào timeline được; đặt nó
+           * cuối là để thứ tự đọc là: câu trả lời, việc đã làm, rồi mới là lý do.
+           * Đặt nó trên bubble như trước đây là đẩy câu trả lời xuống dưới tầm
+           * mắt bằng hai khối viền liền nhau.
+           */}
+          {(() => {
+            const reasoning = (m as any).reasoning;
+            if (typeof reasoning === 'string' && reasoning.trim()) {
+              return <ThinkingBlock reasoning={reasoning} isStreaming={isStreaming} />;
+            }
+            return null;
+          })()}
         </div>
       </div>
     );

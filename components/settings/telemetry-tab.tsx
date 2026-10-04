@@ -1,15 +1,19 @@
 /**
  * TelemetryTab — Tab Đo đạc & Quan sát Phân tán (OpenTelemetry Tracing) trong Cài đặt.
  *
- * Hiển thị biểu đồ Waterfall trực quan độ trễ từng Agent Turn, LLM Stream, Tool execution
- * và Audit commit từ bộ nhớ đệm xoay vòng (Ring Buffer 500 Spans) của globalTracer.
+ * Đọc bộ đệm xoay vòng của `globalTracer` trong RAM trình duyệt.
+ *
+ * Sự thật phải nói thẳng ở đây: bản build này không có mã nào gọi
+ * `globalTracer.startSpan` khi bạn trò chuyện, nên bộ đệm LUÔN rỗng và
+ * Waterfall này luôn rỗng. Đó không phải dữ liệu "đang được tải", nên tab không
+ * vẽ bộ đếm span khi đệm rỗng. Xem ghi chú ở `core/telemetry/tracer.ts`.
  */
 
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, CheckCircle2, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
-import { globalTracer, type TelemetrySpan } from '@/core/telemetry/tracer';
+import { globalTracer, MAX_TELEMETRY_SPANS, type TelemetrySpan } from '@/core/telemetry/tracer';
 
 /** Nhịp vẽ lại. Chỉ chạy khi tab đang MỞ và cửa sổ còn nhìn thấy. */
 const POLL_MS = 2000;
@@ -86,6 +90,15 @@ export function TelemetryTab() {
     return activeTraceSpans.find((s) => s.id === selectedSpanId) || activeTraceSpans[0];
   }, [activeTraceSpans, selectedSpanId]);
 
+  /*
+   * Số span THẬT đang nằm trong ring buffer. `spans` chỉ là 100 gần nhất, nên
+   * dùng `spans.length` làm tử số sẽ khoe `100 / 500` trong khi đệm còn chỗ
+   * trống, tức là bịa một phép đo. Đọc thẳng từ tracer ở lúc render: mỗi lần
+   * poll đặt lại `spans` bằng mảng mới nên render chạy lại và đọc lại số này.
+   */
+  const bufferedSpans = globalTracer.size;
+  const instrumentationStarted = globalTracer.hasEverStartedSpan;
+
   const handleClear = () => {
     globalTracer.clear();
     setSpans([]);
@@ -100,34 +113,56 @@ export function TelemetryTab() {
         <div className="flex items-center gap-2">
           <Activity size={16} className="text-accent" />
           <span className="text-read font-semibold text-primary">OpenTelemetry Waterfall</span>
-          <span className="rounded-full border border-subtle bg-raised px-2 py-0.5 font-mono text-micro tabular-nums text-tertiary">
-            {spans.length} / 500 spans
-          </span>
+          {/*
+           * Bộ đếm chỉ hiện khi đệm CÓ span. Rỗng thì `0 / 500` đứng cạnh dòng
+           * "chưa có dữ liệu" trông như đang đếm, nhưng không có gì đếm được:
+           * số 0 ấy là hằng số, không phải phép đo. Mẫu số lấy từ hằng trần
+           * thật của ring buffer thay vì gõ `500` cứng.
+           */}
+          {bufferedSpans > 0 && (
+            <span className="rounded-full border border-subtle bg-raised px-2 py-0.5 font-mono text-micro tabular-nums text-tertiary">
+              {bufferedSpans} / {MAX_TELEMETRY_SPANS} spans
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={refreshSpans} className="btn-secondary" title="Làm mới">
-            <RefreshCw size={12} />
-            <span>Làm mới</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleClear}
-            className="btn-secondary hover:border-danger hover:text-danger"
-            title="Xóa bộ đệm telemetry"
-          >
-            <Trash2 size={12} />
-            <span>Xóa cache</span>
-          </button>
-        </div>
+        {/*
+         * Cụm nút cùng chốt với bộ đếm: chỉ hiện khi đệm CÓ span. Đệm rỗng
+         * thì "Làm mới" đọc lại đúng cái rỗng đó và "Xóa cache" xoá không
+         * có gì — hai nút bấm được mà không đổi được gì trên màn hình. Đó là
+         * loại nút giả: trông như có việc để làm. `refreshSpans` vẫn chạy
+         * nền (POLL_MS) nên khi span xuất hiện, cụm nút tự hiện theo.
+         */}
+        {bufferedSpans > 0 && (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={refreshSpans} className="btn-secondary" title="Làm mới">
+              <RefreshCw size={12} />
+              <span>Làm mới</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="btn-secondary hover:border-danger hover:text-danger"
+              title="Xóa bộ đệm telemetry"
+            >
+              <Trash2 size={12} />
+              <span>Xóa cache</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {traces.length === 0 ? (
         <div className="rounded-xl border border-dashed border-default bg-surface p-10 text-center text-tertiary">
           <Activity size={24} className="mx-auto mb-2 text-tertiary" />
-          <p>Chưa có dữ liệu đo đạc.</p>
+          <p className="text-primary">
+            {instrumentationStarted
+              ? 'Bộ đệm đo đạc đang rỗng.'
+              : 'Đo đạc chưa được bật trong bản này.'}
+          </p>
           <p className="mt-1 text-meta">
-            Khi bạn trò chuyện và AI thực thi các công cụ (fs_*, shell_run, mcp),
-            tiến trình sẽ xuất hiện dưới dạng biểu đồ Waterfall tại đây.
+            {instrumentationStarted
+              ? 'Không có span nào để hiện. Bảng này chỉ có dữ liệu khi có span kết thúc nằm trong đệm. Nếu bạn vừa xoá cache thì phải có thêm một lượt chat có đo đạc.'
+              : 'Khi bạn trò chuyện, không có mã nào ghi lại Turn, LLM stream hay tool, nên không có span nào để hiện. Bảng này chỉ có dữ liệu khi phần đo đạc được nối vào luồng chat ở phía trình duyệt.'}
           </p>
         </div>
       ) : (

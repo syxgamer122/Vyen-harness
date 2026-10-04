@@ -131,7 +131,15 @@ const ChatItem = memo(function ChatItem({
           </button>
           <button
             type="button" role="menuitem"
-            onClick={() => { window.open(`/?chatId=${chat.id}`, '_blank'); closeMenu(); }}
+            onClick={() => {
+              /* `noopener` bắt buộc: không có nó, tab mới mở ra nhận
+                 `window.opener` trỏ về app này và bất kỳ script nào chạy trong
+                 đó đều điều khiển được app (đọc IndexedDB chứa lịch sử chat,
+                 provider key). encodeURIComponent để id chứa ký tự lạ không
+                 phá URL. */
+              window.open(`/?chatId=${encodeURIComponent(chat.id)}`, '_blank', 'noopener,noreferrer');
+              closeMenu();
+            }}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-ui text-primary transition-colors duration-150 hover:bg-raised hover:text-primary"
           >
             <ExternalLink size={13} className="text-accent" />

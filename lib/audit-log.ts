@@ -184,18 +184,18 @@ export async function appendDiskAnchor(
   try {      if (typeof window !== 'undefined') {
         const { isVyenDesktop } = await import('@/lib/desktop-bridge');
         if (isVyenDesktop()) {
-          const { desktopFsWrite, desktopFsRead } = await import('@/lib/desktop-fs');
+          const { desktopFsAppend } = await import('@/lib/desktop-fs');
           // Desktop bridge bị jail trong workspace nên không ghi được ngoài root:
           // vẫn ghi anchor trong `.vyen/audit/` (kèm giới hạn đã ghi ở J.1/B3).
           const relativeLogPath = customPath || '.vyen/audit/anchor.log';
-          let existing = '';
-          try {
-            const r = await desktopFsRead(relativeLogPath);
-            if (r?.content) existing = r.content;
-          } catch {
-            // File does not exist yet
-          }
-          await desktopFsWrite(relativeLogPath, existing + JSON.stringify(anchor) + '\n');
+          /*
+           * APPEND, không phải read-rồi-ghi-đè. Bản cũ đọc qua desktopFsRead
+           * (cắt ở MAX_READ_CHARS=24k) rồi ghi lại `existing + line` — nên mỗi
+           * lần append đều xoá vĩnh viễn phần đuôi file vượt 24k. Append thật
+           * không cần đọc, không có TOCTOU, và nhiều lần ghi song song không mất
+           * dòng nào (O_APPEND ghi nhỏ là atomic ở tầng OS).
+           */
+          await desktopFsAppend(relativeLogPath, JSON.stringify(anchor) + '\n');
         }
       }
   } catch (err) {

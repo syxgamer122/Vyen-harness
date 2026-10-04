@@ -46,6 +46,7 @@ import {
   buildAgentTools,
   summarizeToolArgs,
   summarizeToolResult,
+  toolResultBody,
   formatToolNameList,
   CLIENT_TOOL_DEFS,
   CLIENT_TOOL_NAMES,
@@ -68,6 +69,7 @@ import { redactSecretText, redactSecretsDeep } from '@/lib/secret-registry';
 import { resolveRoute, DEFAULT_CHAINS, type CategoryId, type RouteReceipt, type ChainEntry } from '@/lib/routing/categories';
 import { scoreRequest } from '@/lib/routing/score-request';
 import { resolveContract, enforceContractEffort } from '@/lib/model-contracts';
+import { isToolFailure } from '@/lib/model-routing';
 import { SHARED_PREAMBLE, UNIVERSAL_BLOCKS, calibrationFor } from '@/lib/prompt/protocol';
 import { projectCapabilities, DEFAULT_TOOL_CANDIDATES, type ToolCandidate, type Projection } from '@/lib/capability-projection';
 import { matchSkillsForRequest, generateSkillsPrompt } from '@/lib/skills/catalog';
@@ -80,6 +82,12 @@ import { formatRecalledMemoriesBlock } from '@/lib/memory/recall';
  * cho phép delegate là mở cửa write lậu khỏi plan mode.
  */
 const PLAN_MODE_WRITE_TOOLS = new Set(['fs_write', 'fs_edit', 'delegate']);
+
+/**
+ * Set rỗng dùng chung cho "router không loại tool nào" — tránh cấp phát Set
+ * mới mỗi lượt chỉ để giữ một điều kiện không chạy.
+ */
+const NO_DROPPED_TOOLS: ReadonlySet<string> = new Set<string>();
 import { mergeSameRole, normalize, normalizeToolCallPairing, normalizeMessageToolInvocations } from '@/lib/message-normalize';
 import { nonStreamingFetch } from '@/lib/non-streaming-fetch';
 import { looksLikePseudoError, extractPseudoErrorMessage } from '@/lib/pseudo-error-response';
@@ -928,6 +936,27 @@ function attachToolResultParts(
   });
 }
 
+/**
+ * Số ký tự TEXT đã nằm sẵn trong message assistant mà client sẽ nối tiếp.
+ *
+ * `at` của tool call là CHỈ SỐ KÝ TỰ trong `message.content` phía client, mà
+ * content đó tự tăng: useChat thay CHÍNH message assistant cuối rồi nối text
+ * lượt mới vào nó (`processChatResponse`: `message.content += value` +
+ * `replaceLastMessage`). Mỗi vòng client-tool là một POST mới nên bộ đếm của
+ * request bắt đầu lại từ 0 — không cộng phần mang sẵn thì `at` của vòng sau
+ * rơi về 0, buildTimeline xếp chip NGƯỢC thứ tự và lời của vòng trước bị gán
+ * nhầm cho tool của vòng sau.
+ *
+ * Chỉ cộng khi content THỰC SỰ là chuỗi: schema cho phép content là mảng
+ * parts (vision/attachment) và độ dài mảng đó không phải độ dài chữ client sẽ
+ * hiển thị — cộng vào là bịa ra offset đo sai.
+ */
+function carriedTextCharsOf(messages: Array<z.infer<typeof MessageSchema>>): number {
+  const last = messages[messages.length - 1];
+  if (last?.role !== 'assistant') return 0;
+  return typeof last.content === 'string' ? last.content.length : 0;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Handler                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -1408,6 +1437,11 @@ export async function POST(req: Request) {
       `[req:${requestId}] start model=${selectedProviderModel} upstream=${providerBase ? hostOf(providerBase) ?? providerBase : upstreamHost} keys=${candidateKeys.length}`,
     );
 
+    /* Phần text đã có sẵn trong bubble assistant trước khi request này bắt
+       đầu — xem `carriedTextCharsOf`. 0 ở lượt user mới (message cuối là
+       'user'), khác 0 ở mọi lượt resubmit sau client-tool. */
+    const carriedTextChars = carriedTextCharsOf(parsed.data.messages);
+
     return createDataStreamResponse({
       headers: {
         'Cache-Control': 'no-store, no-transform',
@@ -1416,9 +1450,44 @@ export async function POST(req: Request) {
         Connection: 'keep-alive',
       },
       execute: async (dataStream) => {
+        /**
+         * Delta text đang bị GIỮ vì trông như artifact gateway (HARD_ARTIFACT).
+         * Chỉ kênh text mới giữ: xả nhầm kênh là rơi delta của bài trả lời vào
+         * khối Thinking VÀ làm lệch offset (xem writeText).
+         */
         let heldSuspect = '';
-        let emittedChars = 0;
+        /**
+         * OFFSET TUYỐT ĐỐI trong `message.content` phía client — đây đúng là
+         * nghĩa của `at` trong annotation tool. Bắt đầu từ phần text đã mang
+         * sẵn từ vòng client-tool trước (`carriedTextChars`) vì content phía
+         * client tự tăng qua mỗi vòng.
+         *
+         * CHỈ kênh text được cộng vào đây. Reasoning nằm ở part riêng, KHÔNG
+         * nằm trong content: cộng nó làm mọi `at` sau đó trượt sang phải, và
+         * khi reasoning dài hơn cả lời (đúng kiểu model suy luận) toàn bộ tool
+         * trace dồn hết xuống đuôi bong bóng.
+         */
+        let emittedChars = carriedTextChars;
+        /**
+         * Ký tự kênh TEXT của RIÊNG request này — trả lời câu hỏi "lượt này
+         * model có nói gì không" (failover, EMPTY_RESPONSE, chấm điểm model).
+         * Suy nghĩ không tính: một lượt CHỈ có suy nghĩ là một lượt rỗng, đúng
+         * thứ nhánh EMPTY_RESPONSE mô tả (gateway nuốt mất phần text).
+         */
+        const textCharsThisRequest = () => emittedChars - carriedTextChars;
+        /** Ký tự reasoning của request này — chỉ để hỏi "đã có byte ra chưa". */
+        let reasoningChars = 0;
         let usage: { promptTokens: number; completionTokens: number } | undefined;
+        /**
+         * Usage của BƯỚC CUỐI — tức kích thước ngữ cảnh thật của request
+         * gần nhất (đã gồm system + lịch sử + kết quả tool tích luỹ).
+         *
+         * Tách khỏi `usage` vì `usage` là TỔNG đã tính (dùng cho thống kê và
+         * cost), còn ngưỡng nén theo ngữ cảnh phải so với MỘT request.
+         * `ai@4` phát `step-finish` (per-step) rồi `finish` (combined) — nên
+         * chỉ `step-finish` mới là số thật của request cuối.
+         */
+        let lastStepUsage: { promptTokens: number; completionTokens: number } | undefined;
         let heartbeat: ReturnType<typeof setInterval> | null = null;
         // Các ô (key × model) đã dùng hết lượt retry-in-place — Set ngoài vòng
         // lặp vì retry quay lại CÙNG ô qua `modelIndex -= 1`, biến trong thân
@@ -1437,12 +1506,35 @@ export async function POST(req: Request) {
         // Ghi lại biên nhận route (RouteReceipt) theo tiêu chuẩn chung để client và HUD hiển thị
         writeAnnotation({ routeReceipt });
 
+        /**
+         * Tool CLIENT (fs_*, shell_run, git_*, mcp__*) không có part
+         * `tool-result` trong stream này — server chỉ forward lời gọi, kết quả
+         * quay lại ở request KẾ TIẾP dưới dạng `toolInvocations`. Không chỗ nào
+         * phát được cờ hỏng cho chúng, nên `shell_run` exit ≠ 0 hiện chip
+         * "xong" với icon trung tính và nhãn đọc cho trình đọc màn hình là
+         * "…xong" — app nói dối người dùng rằng lệnh đã chạy.
+         *
+         * Chỉ phát khi thật sự hỏng: client đã tự dựng summary/body từ
+         * `toolInvocations`, thêm annotation lúc thành công chỉ là nhiễu. Cờ
+         * gộp theo `toolCallId` nên không sinh chip thứ hai.
+         */
+        const inboundToolResults = parsed.data.messages[parsed.data.messages.length - 1];
+        if (inboundToolResults?.role === 'assistant' && inboundToolResults.toolInvocations?.length) {
+          for (const inv of inboundToolResults.toolInvocations) {
+            if (inv.state !== 'result' || !isToolFailure(inv)) continue;
+            writeAnnotation({
+              tool: { id: inv.toolCallId, name: inv.toolName, phase: 'done', isError: true },
+            });
+          }
+        }
+
         /* Sửa A3: heartbeat 10s, chỉ chạy trong giai đoạn chưa có token nào.
-           Tự tắt ngay khi byte text đầu tiên được gửi đi. */
+           Tự tắt ngay khi byte ĐẦU TIÊN (text hoặc reasoning) được gửi đi —
+           suy nghĩ cũng là byte thật, đợi nó cũng là để proxy đoán stream chết. */
         const startHeartbeat = () => {
           if (heartbeat) return;
           heartbeat = setInterval(() => {
-            if (emittedChars > 0) {
+            if (textCharsThisRequest() > 0 || reasoningChars > 0) {
               if (heartbeat) clearInterval(heartbeat);
               heartbeat = null;
               return;
@@ -1459,21 +1551,41 @@ export async function POST(req: Request) {
           const delta = extractDelta(raw);
           if (!delta) return;
 
+          /* Delta đang giữ luôn thuộc kênh TEXT, nên xả cũng về kênh text:
+             xả theo `channel` hiện tại là rơi delta của bài trả lời vào khối
+             Thinking, và cộng nó vào `emittedChars` khiến mọi `at` phía sau
+             lệch trái. */
           if (heldSuspect) {
-            dataStream.write(formatDataStreamPart(channel, heldSuspect));
-            emittedChars += heldSuspect.length;
-            heldSuspect = '';
+            dataStream.write(formatDataStreamPart('text', heldSuspect));
+            heldSuspect = ''; // đã cộng lúc giữ — không cộng lần hai
           }
 
           // Sửa A7: so khớp trên bản trim (bắt được " undefined"), chỉ với artifact thật.
-          if (HARD_ARTIFACT.test(delta.trim())) {
+          /* Chỉ kênh text mới giữ. Artifact trên kênh reasoning đi thẳng vào
+             khối Thinking: nó không nằm trong `message.content` nên không dính
+             vào offset, và cơ chế giữ chỉ tồn tại để bảo vệ câu trả lời. */
+          if (channel === 'text' && HARD_ARTIFACT.test(delta.trim())) {
             heldSuspect = delta;
+            /* Cộng NGAY lúc model sinh ra chứ không đợi xả: một tool call tới
+               giữa lúc đang giữ vẫn phải trỏ đúng chỗ trong content CUỐI. */
+            emittedChars += delta.length;
             return;
           }
 
           dataStream.write(formatDataStreamPart(channel, delta));
-          emittedChars += delta.length;
+          if (channel === 'text') emittedChars += delta.length;
           stopHeartbeat();
+        };
+
+        /**
+         * Reasoning đi qua đây chứ không gọi `writeText` thẳng, để giữ ký
+         * tự do (delta, kênh) của writeText: mọi chỗ ghi reasoning đều phải
+         * đếm `reasoningChars`, và con số đó TUYỆT ĐỐI không được chạm vào
+         * `emittedChars` — nó không nằm trong `message.content`.
+         */
+        const writeReasoning = (raw: unknown) => {
+          writeText(raw, 'reasoning');
+          reasoningChars += extractDelta(raw).length;
         };
 
         const writeFinish = (
@@ -1482,6 +1594,17 @@ export async function POST(req: Request) {
           // Stream khép lại — tháo mọi relay subagent còn treo của request này.
           cancelSubagentRelays(requestId);
           heldSuspect = ''; // artifact ở cuối stream: bỏ.
+          /**
+           * Usage của bước cuối, gửi RIÊNG cho client — Ở ĐÂY, lúc giá trị
+           * đã có. Gửi ở đầu `execute` thì `lastStepUsage` còn là undefined và
+           * `JSON.stringify` bỏ hẳn key: client đi tìm `'lastStepUsage' in a`
+           * mãi không thấy, `stepPromptTokens` luôn 0, ngưỡng nén theo ngữ cảnh
+           * lấy nhầm TỔNG của cả lượt nhiều vòng tool.
+           *
+           * `finish_message` mang `usage` là TỔNG đã tính (đúng cho cost/thống
+           * kê), nên phải có số này thì client mới không bị buộc dùng tổng.
+           */
+          writeAnnotation({ lastStepUsage });
           dataStream.write(
             formatDataStreamPart('finish_message', {
               finishReason,
@@ -1543,7 +1666,7 @@ export async function POST(req: Request) {
                 upstreamBase &&
                 isModelLockedOut(upstreamBase, keyLabel, targetModel) &&
                 !(
-                  emittedChars === 0 &&
+                  textCharsThisRequest() === 0 &&
                   attempt === candidateKeys.length - 1 &&
                   modelIndex === modelChain.length - 1
                 )
@@ -1712,6 +1835,13 @@ export async function POST(req: Request) {
 
                   let routerMetaTools: Record<string, ToolSet[string]> = {};
                   let isToolRouterActive = false;
+                  /**
+                   * Tên tool CLIENT bị router loại khỏi lượt này (rỗng = không lọc).
+                   * CHỈ CLIENT_TOOL_DEFS được router xếp hạng (index của nó), nên
+                   * set này cũng chỉ chứa tên client: tool MCP đã bị lọc riêng ở
+                   * dưới, còn run_code/delegate không nằm trong index và luôn giữ.
+                   */
+                  let routerDroppedClientToolNames: ReadonlySet<string> = NO_DROPPED_TOOLS;
 
                   if (shouldRouteTools && (allowAgentTools || forceEmulatedTools || emulatedToolPath)) {
                     const fullIndex = buildToolIndex(CLIENT_TOOL_DEFS, mcpToolList ?? []);
@@ -1724,6 +1854,18 @@ export async function POST(req: Request) {
                     // Lọc MCP tools theo router selection
                     if (mcpToolList) {
                       mcpToolList = mcpToolList.filter((t) => activeSet.has(`mcp__${t.serverId}__${t.name}`) || activeSet.has(t.name));
+                    }
+                    /* Router xếp hạng xong rồi bỏ đi: bản cũ chỉ dùng kết quả để
+                       lọc tool MCP, còn mọi tool CLIENT vẫn được khai báo trọn vào
+                       trường `tools:` (~26k ký tự schema mỗi lượt). Nay ghi lại
+                       phần bị loại để bộ lọc ở `tools:` cắt đúng nó.
+                       isRouted = false nghĩa là index không vượt ngưỡng, không có
+                       gì để lọc. Meta-tools không nằm trong CLIENT_TOOL_DEFS nên
+                       không bao giờ rơi vào set này. */
+                    if (selection.isRouted) {
+                      routerDroppedClientToolNames = new Set(
+                        Object.keys(CLIENT_TOOL_DEFS).filter((name) => !activeSet.has(name)),
+                      );
                     }
                     if (selection.hasMetaTools) {
                       routerMetaTools = ROUTER_META_TOOL_DEFS as unknown as Record<string, ToolSet[string]>;
@@ -1785,10 +1927,22 @@ export async function POST(req: Request) {
                     clientToolNames ngay từ đầu (chống subagent ghi file lậu). */
                  const delegateAvailable =
                    allowAgentTools && agentMode !== 'plan' && !recipeDeny.has('delegate');
+                 /* Router có thể loại tool mà recipe đã ghi tên tường minh vào
+                    allow-list (BM25 chỉ nhìn câu hỏi, không đọc ý tác giả
+                    recipe). Ý viết tay rõ ràng hơn heuristic nên bộ lọc router
+                    không đụng vào — nếu không, một recipe khoá sẵn shell_run
+                    lại mất đúng shell_run ở câu hỏi không nhắc tới nó.
+                    Dùng chung cho `tools:` và cho khối [Tools] để hai bên
+                    luôn khớp nhau. */
+                 const droppedByRouter = (name: string): boolean =>
+                   !recipeAllow?.has(name) && routerDroppedClientToolNames.has(name);
+                 /* Khối [Tools] phải khớp đúng phần trường `tools:` khai báo: liệt kê
+                    tên không kèm schema là mời model gọi một tool không tồn tại
+                    trong request. Cùng bộ lọc, cùng nguồn. */
                  const activeToolNames = allowAgentTools
                    ? [
                        ...Object.keys(serverTools),
-                       ...nativeClientToolNames,
+                       ...[...nativeClientToolNames].filter((n) => !droppedByRouter(n)),
                        ...(delegateAvailable ? ['delegate'] : []),
                      ]
                    : [];
@@ -2062,8 +2216,11 @@ export async function POST(req: Request) {
                     clientTools: clientToolNames,
                     /* Schema của tool MCP đi vào protocol text: đường emulated
                        không có kênh tool-call native nên mô tả + chữ ký args
-                       phải nằm ngay trong prompt. */
-                    extraToolDocs: mcpTools.defs,
+                       phải nằm ngay trong prompt. Meta-tools router cũng phải
+                       đi kèm: chúng không nằm trong registry tĩnh của
+                       formatToolProtocolManual nên thiếu là bị bỏ qua âm thầm
+                       (model được bảo có 2 tool này mà không có chữ ký args). */
+                    extraToolDocs: { ...mcpTools.defs, ...routerMetaTools },
                     onClientToolCall: (call) => {
                       /* Forward part 'tool_call' — useChat populates
                          toolInvocations + onToolCall chạy trên máy user. */
@@ -2076,7 +2233,7 @@ export async function POST(req: Request) {
                     ...(modelConfig.maxOutputTokens ? { maxTokens: modelConfig.maxOutputTokens } : {}),
                     abortSignal: link.signal,
                     onTextDelta: (delta) => writeText(delta, 'text'),
-                    onReasoningLine: (line) => writeText(`${line}\n`, 'reasoning'),
+                    onReasoningLine: (line) => writeReasoning(`${line}\n`),
                     onAnnotation: (payload) => writeAnnotation(payload),
                     onUsage: (u) => {
                       // Cộng dồn qua các round (gán = sẽ mất usage của
@@ -2084,6 +2241,14 @@ export async function POST(req: Request) {
                       usage = {
                         promptTokens: (usage?.promptTokens ?? 0) + (u.promptTokens ?? 0),
                         completionTokens: (usage?.completionTokens ?? 0) + (u.completionTokens ?? 0),
+                      };
+                      /* Đường emulated không có chunk `finish` mang tổng sẵn như
+                         native, nên mỗi `onUsage` đã là của RIÊNG một round —
+                         `u` ở đây chính là kích thước request vừa gửi. Gán đè
+                         giữ lại round cuối cho ngưỡng nén theo ngữ cảnh. */
+                      lastStepUsage = {
+                        promptTokens: u.promptTokens ?? 0,
+                        completionTokens: u.completionTokens ?? 0,
                       };
                     },
                     onMemoryProposal: (text) => writeAnnotation({ memoryProposal: { text } }),
@@ -2123,7 +2288,7 @@ export async function POST(req: Request) {
                     writeFinish('tool-calls');
                     return;
                   }
-                  if (emittedChars === 0) {
+                  if (textCharsThisRequest() === 0) {
                     recordModelOutcome(upstreamBase ?? '', targetModel, false);
                     markModelFailure(upstreamBase ?? '', keyLabel, targetModel);
                     writeAnnotation({ error: 'EMPTY_RESPONSE' });
@@ -2205,14 +2370,19 @@ export async function POST(req: Request) {
                         tools: {
                           ...serverTools,
                           ...subRecipeToolDefs,
-                          /* Tool client khai báo cho model. Hai bộ lọc:
+                          /* Tool client khai báo cho model. Ba bộ lọc:
                              1. Plan mode: loại write tools — agent chỉ được
                                 explore. Client-side onToolCall cũng chặn nhưng
                                 đây là lớp server để model không bao giờ thấy
                                 tool bị cấm.
                              2. Đường native: def CLIENT của delegate bị loại —
                                 delegate do route cung cấp bản SERVER (có
-                                execute) ở nativeDelegateTool bên dưới. */
+                                execute) ở nativeDelegateTool bên dưới.
+                             3. Router: chỉ khai báo tool đã được xếp hạng là
+                                liên quan (droppedByRouter). Meta-tools KHÔNG
+                                đi qua bộ lọc này — tools_search / tools_load
+                                là đường duy nhất để model lấy lại tool bị
+                                loại, cắt chúng là tắt luôn tính năng. */
                           ...Object.fromEntries(
                             Object.entries(CLIENT_TOOL_DEFS).filter(
                               ([name]) =>
@@ -2220,7 +2390,8 @@ export async function POST(req: Request) {
                                 (agentMode !== 'plan' || !PLAN_MODE_WRITE_TOOLS.has(name)) &&
                                 !recipeDeny.has(name) &&
                                 (!recipeAllow || recipeAllow.has(name)) &&
-                                (name !== 'skill_load' || hasSkillIndex),
+                                (name !== 'skill_load' || hasSkillIndex) &&
+                                !droppedByRouter(name),
                             ),
                           ),
                           ...nativeDelegateTool,
@@ -2302,10 +2473,21 @@ export async function POST(req: Request) {
                       }
                       case 'reasoning':
                       case 'reasoning-delta':
-                        writeText(part.textDelta ?? part.delta, 'reasoning');
+                        writeReasoning(part.textDelta ?? part.delta);
                         break;
                       case 'tool-call': {
                         toolCallCount += 1;
+                        /* Xả buffer sniff TRƯỚC khi ghi annotation: `at` đo
+                           trên content mà client dựng lại, mà những ký tự đang
+                           nằm trong buffer chưa vào content đó. Model nói
+                           "Để tôi xem file" (21 ký tự) rồi gọi fs_read sẽ ra
+                           `at: 0` và câu mở đầu rơi xuống SAU chip. Gateway
+                           báo pseudo-error thì không gọi tool, nên xả ở đây
+                           không lỗi cửa sổ sniff đầu stream. */
+                        if (!sniffReleased && sniffHead) {
+                          sniffReleased = true;
+                          writeText(sniffHead, 'text');
+                        }
                         /* fs_* = client-executed (agent coding): forward part
                            qua data-stream để useChat populates toolInvocations
                            + onToolCall chạy trên File System Access API của
@@ -2334,6 +2516,14 @@ export async function POST(req: Request) {
                             id: String((part as any).toolCallId ?? ''),
                             name: part.toolName,
                             phase: 'start',
+                            /* Vị trí trong dòng chữ: offset ký tự model ĐÃ phát ra
+                               trước tool call này — TUYỆT ĐỐI, đã cộng cả
+                               phần text các vòng client-tool trước (content
+                               phía client tự tăng). 0 là hợp lệ (model gọi tool
+                               ngay khi bắt đầu) — luôn có mặt, không bao giờ
+                               bỏ trống, client so theo số chứ không theo truthy
+                               nếu không muốn rơi mất tool đầu tiên. */
+                            at: emittedChars,
                             args: summarizeToolArgs(part.toolName, (part as any).args),
                           },
                         });
@@ -2345,7 +2535,24 @@ export async function POST(req: Request) {
                             id: String((part as any).toolCallId ?? ''),
                             name: part.toolName,
                             phase: 'done',
+                            /* Thân kết quả THẬT (đã cắt + đã redact bên trong
+                               toolResultBody) để client mở rộng được; `summary`
+                               ở dưới giữ nguyên là dòng metadata một dòng để
+                               chip trong timeline gọn. KHÔNG có `at` ở đây:
+                               offset thuộc về phase 'start'. */
+                            preview: toolResultBody(part.toolName, (part as any).result),
                             summary: summarizeToolResult(part.toolName, (part as any).result),
+                            /* Cờ THẬT BẠI, không phải đoán: `isToolFailure` là
+                               đúng cách phán đoán app đã dùng để đếm tool
+                               hỏng (lib/model-routing), đọc từ chính kết quả
+                               (isError / exit code ≠ 0 / ok:false / error).
+                               Thiếu nó thì chip render "xong" + icon trung
+                               tính cho một lệnh exit ≠ 0 — nhánh lỗi ở UI là
+                               code chết. Chỉ set khi thật sự hỏng; thành công
+                               thì không có key. */
+                            ...(isToolFailure({ state: 'result', result: (part as any).result })
+                              ? { isError: true }
+                              : {}),
                           },
                         });
                         /* memory_save được server CHẤP NHẬN → phát đề xuất
@@ -2369,17 +2576,32 @@ export async function POST(req: Request) {
                         streamError = normalizeGatewayStreamError(part.error);
                         break;
                     case 'finish':
-                    case 'step-finish':
                       if (part.usage) {
                         /* Sửa A10: lượt agent nhiều step phát finish/step-finish
                            MỖI vòng tool — gán đè sẽ chỉ còn usage của step cuối
-                           (undercount thống kê). Cộng dồn như đường emulated. */
+                           (undercount thống kê). Cộng dồn như đường emulated.
+
+                           KHÔNG đưa `step-finish` vào phép cộng này: `ai@4` đã
+                           gộp sẵn các step thành `finish` (combinedUsage), nên
+                           cộng thêm `step-finish` sẽ đếm mọi step trừ step
+                           cuối HAI LẦN — thống kê và cost phình đúng 2×. */
                         usage = {
                           promptTokens: (usage?.promptTokens ?? 0) + (part.usage.promptTokens ?? 0),
                           completionTokens: (usage?.completionTokens ?? 0) + (part.usage.completionTokens ?? 0),
                         };
                       }
                       if (typeof part.finishReason === 'string') finishReason = part.finishReason;
+                      break;
+                    case 'step-finish':
+                      /* Chỉ dùng cho ngưỡng nén theo ngữ cảnh (xem `lastStepUsage`).
+                         Gán đè là đúng: mỗi part là một step mới, giữ lại step
+                         CUỐI — tức request gần nhất thật sự đã gửi bao nhiêu token. */
+                      if (part.usage) {
+                        lastStepUsage = {
+                          promptTokens: part.usage.promptTokens ?? 0,
+                          completionTokens: part.usage.completionTokens ?? 0,
+                        };
+                      }
                       break;
                     default:
                       break;
@@ -2403,7 +2625,7 @@ export async function POST(req: Request) {
 
                 console.info(
                   `[req:${requestId}] native xong (finish=${hasPendingClientCalls ? 'tool-calls' : (finishReason ?? '?')}, ` +
-                    `chars=${emittedChars}, calls=${toolCallCount}, model=${targetModel}).`,
+                    `chars=${textCharsThisRequest()}, calls=${toolCallCount}, model=${targetModel}).`,
                 );
                 /**
                  * Gateway đôi khi trả 200 + stream KHÔNG có token nào (gateway
@@ -2416,7 +2638,7 @@ export async function POST(req: Request) {
                  * — text rỗng là hợp lệ, kết thúc bằng 'tool-calls' để useChat
                  * resubmit với kết quả thay vì báo lỗi rỗng.
                  */
-                if (emittedChars === 0 && !hasPendingClientCalls) {
+                if (textCharsThisRequest() === 0 && !hasPendingClientCalls) {
                   console.warn(`[req:${requestId}] Stream kết thúc không có nội dung (model=${targetModel}).`);
                   // Response rỗng là một lần lãng phí thật: trừ điểm quality +
                   // khóa mềm ô này để lượt sau ưu tiên hướng khác.
@@ -2438,7 +2660,7 @@ export async function POST(req: Request) {
                 clearTimeout(budgetTimer);
 
                 if (req.signal.aborted) {
-                  writeFinish(emittedChars > 0 ? 'stop' : 'other');
+                  writeFinish(textCharsThisRequest() > 0 ? 'stop' : 'other');
                   return;
                 }
 
@@ -2465,7 +2687,7 @@ export async function POST(req: Request) {
                 if (
                   allowAgentTools &&
                   !retriedWithoutTools &&
-                  emittedChars === 0 &&
+                  textCharsThisRequest() === 0 &&
                   /tool|function/i.test(msg)
                 ) {
                   allowAgentTools = false;
@@ -2488,7 +2710,7 @@ export async function POST(req: Request) {
                    vì báo lỗi. KHÔNG phạt key: lỗi thuộc về pool tài khoản của
                    gateway, không phải key của người dùng. */
                 if (e instanceof ChatUpstreamError && e.code === 'UPSTREAM_POOL_EXHAUSTED') {
-                  if (emittedChars === 0 && !(isLastModelInChain && isLastKeyAttempt)) {
+                  if (textCharsThisRequest() === 0 && !(isLastModelInChain && isLastKeyAttempt)) {
                     recordModelOutcome(upstreamBase ?? '', targetModel, false);
                     console.warn(
                       `[req:${requestId}] Pool của "${targetModel}" hết dung lượng -> thử model tiếp theo.`,
@@ -2501,21 +2723,21 @@ export async function POST(req: Request) {
                      thông điệp "hết dung lượng" thay vì để diagnoseUpstreamError
                      ghi đè bằng chẩn đoán chung (ChatUpstreamError không mang
                      status → nhầm thành "Không kết nối được tới AI Provider"). */
-                  if (emittedChars === 0) {
+                  if (textCharsThisRequest() === 0) {
                     recordModelOutcome(upstreamBase ?? '', targetModel, false);
                     console.warn(
                       `[req:${requestId}] Pool của "${targetModel}" hết dung lượng và đã hết key/model để thử.`,
                     );
                   } else {
                     console.warn(
-                      `[req:${requestId}] Pool của "${targetModel}" hết dung lượng giữa luồng (đã phát ${emittedChars} ký tự).`,
+                      `[req:${requestId}] Pool của "${targetModel}" hết dung lượng giữa luồng (đã phát ${textCharsThisRequest()} ký tự).`,
                     );
                   }
                   writeAnnotation({ error: 'UPSTREAM_POOL_EXHAUSTED' });
                   throw e;
                 }
 
-                if (is404 && emittedChars === 0 && !(isLastModelInChain && isLastKeyAttempt)) {
+                if (is404 && textCharsThisRequest() === 0 && !(isLastModelInChain && isLastKeyAttempt)) {
                   if (upstreamBase) markModelUnsupported(upstreamBase, targetModel);
                   console.warn(`[req:${requestId}] Model "${targetModel}" 404 trên ${upstreamHost} -> thử model tiếp theo trong chain.`);
                   continue;
@@ -2541,7 +2763,7 @@ export async function POST(req: Request) {
                        đây, nếu không agent turn đổ chỉ vì mạng hắt hơi. */
                     const idleSlotKey = `idle:${attempt}:${modelIndex}`;
                     if (
-                      emittedChars === 0 &&
+                      textCharsThisRequest() === 0 &&
                       !retriedSlotKeys.has(idleSlotKey) &&
                       !req.signal.aborted
                     ) {
@@ -2590,7 +2812,7 @@ export async function POST(req: Request) {
                   diagnosis.status !== undefined &&
                   RETRYABLE_SAME_MODEL_STATUSES.has(diagnosis.status) &&
                   !retriedSlotKeys.has(slotKey);
-                if (isRetryableSameModel && emittedChars === 0) {
+                if (isRetryableSameModel && textCharsThisRequest() === 0) {
                   retriedSlotKeys.add(slotKey);
                   console.warn(
                     `[req:${requestId}] Lỗi tạm thời ${diagnosis.status} trên ${targetModel} -> retry sau ${SAME_MODEL_RETRY_DELAY_MS}ms.`,
@@ -2603,7 +2825,7 @@ export async function POST(req: Request) {
                 // Chỉ dừng hẳn khi đã hết cả model lẫn key để thử.
                 const isLast =
                   attempt === candidateKeys.length - 1 && modelIndex === modelChain.length - 1;
-                if (emittedChars > 0 || diagnosis.stopFailover || isLast) {
+                if (textCharsThisRequest() > 0 || diagnosis.stopFailover || isLast) {
                   writeAnnotation({ error: diagnosis.code });
                   throw new ChatUpstreamError(diagnosis.userMessage, diagnosis.code, requestId);
                 }

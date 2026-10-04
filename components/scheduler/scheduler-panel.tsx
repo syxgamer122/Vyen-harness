@@ -40,6 +40,15 @@ const CRON_PRESETS = [
   { label: 'Thứ 2-6 09:00', cron: '0 9 * * 1-5' },
 ];
 
+/**
+ * Chữ hiện khi bản build này không có tiến trình scheduler.
+ *
+ * Nói thẳng là THIẾU TÍNH NĂNG, không phải lần chạy thất bại: không có gì chạy
+ * thì không được ghi 'failure', và tuyệt đối không được bịa 'success'.
+ */
+const NO_SCHEDULER_MESSAGE =
+  'Scheduler chạy trong Vyen desktop (Electron). Bản này không có tiến trình scheduler nên không có lịch nào được chạy.';
+
 async function toggleScheduleRecord(s: ScheduleRecord): Promise<void> {
   // (giữ nguyên phần thân hàm bên dưới)
   const updated: ScheduleRecord = {
@@ -51,41 +60,64 @@ async function toggleScheduleRecord(s: ScheduleRecord): Promise<void> {
   void vyenDesktop()?.scheduler?.toggle(s.id, updated.enabled);
 }
 
-async function executeScheduleTrigger(s: ScheduleRecord): Promise<void> {
+/**
+ * Chạy một lịch ngay. Trả về chữ lỗi để hiện, hoặc null nếu không có lỗi.
+ *
+ * KHÔNG có bridge scheduler thì KHÔNG đụng vào Dexie. Bản web trước đây rơi
+ * vào nhánh "mô phỏng": bịa một sessionId `sched-...` rồi đặt lastStatus
+ * 'success', tức là báo thành công cho một việc chưa từng chạy. Thiếu
+ * scheduler là thiếu tính năng, không phải lần chạy hỏng, nên cũng không ghi
+ * 'failure' và không sinh session id nào.
+ */
+async function executeScheduleTrigger(s: ScheduleRecord): Promise<string | null> {
+  const bridge = vyenDesktop();
+  if (!bridge?.scheduler?.runNow) {
+    return NO_SCHEDULER_MESSAGE;
+  }
+
   const now = Date.now();
   try {
     // 1. Cập nhật trạng thái running trên Dexie
     await db.schedules.update(s.id, { lastStatus: 'running', updatedAt: now });
 
-    // 2. Chạy qua desktop bridge nếu có
-    const bridge = vyenDesktop();
-    if (bridge?.scheduler?.runNow) {
-      const res = await bridge.scheduler.runNow(s.id);
-      if (res.sessionId) {
-        const sessions = s.sessions || [];
-        if (!sessions.includes(res.sessionId)) {
-          sessions.unshift(res.sessionId);
-        }
-        await db.schedules.update(s.id, {
-          lastStatus: res.ok ? 'success' : 'failure',
-          lastRunAt: Date.now(),
-          lastError: res.error,
-          sessions: sessions.slice(0, 50),
-          updatedAt: Date.now(),
-        });
-      }
-    } else {
-      // Mô phỏng / fallback trên Web
-      const simSessionId = `sched-${s.id.slice(0, 6)}-${Date.now()}`;
-      const sessions = s.sessions || [];
-      sessions.unshift(simSessionId);
+    // 2. Chạy qua desktop bridge
+    const res = await bridge.scheduler.runNow(s.id);
+
+    /*
+     * Bridge có thể trả `{ ok: false, error }` mà KHÔNG kèm sessionId (lịch
+     * không có trong daemon, bridge lỗi…). Trước đây mọi thứ nằm trong
+     * `if (res.sessionId)`, nên nhánh này bị bỏ qua: không gì ghi vào Dexie,
+     * `problem` vẫn null, `setErrorMessage` không chạy, và dòng đó mắc ở
+     * 'running' vĩnh viễn với không một dấu hiệu nào cho người dùng.
+     *
+     * Không có sessionId nghĩa là lần chạy đó KHÔNG tạo ra phiên nào, nên:
+     *   - ghi trạng thái CUỐI (không để treo ở 'running'), và
+     *   - trả lời lỗi về panel để nó hiện ra.
+     * Không bịa id: không có phiên thì không sinh id.
+     */
+    if (!res.sessionId) {
+      const reason = res.error || 'Bridge không trả về phiên cho lần chạy này.';
       await db.schedules.update(s.id, {
-        lastStatus: 'success',
+        lastStatus: 'failure',
+        lastError: reason,
         lastRunAt: Date.now(),
-        sessions: sessions.slice(0, 50),
         updatedAt: Date.now(),
       });
+      return `Chạy lịch "${s.recipeName || s.recipeId}" thất bại: ${reason}`;
     }
+
+    const sessions = s.sessions || [];
+    if (!sessions.includes(res.sessionId)) {
+      sessions.unshift(res.sessionId);
+    }
+    await db.schedules.update(s.id, {
+      lastStatus: res.ok ? 'success' : 'failure',
+      lastRunAt: Date.now(),
+      lastError: res.error,
+      sessions: sessions.slice(0, 50),
+      updatedAt: Date.now(),
+    });
+    return null;
   } catch (err: any) {
     await db.schedules.update(s.id, {
       lastStatus: 'failure',
@@ -93,6 +125,7 @@ async function executeScheduleTrigger(s: ScheduleRecord): Promise<void> {
       lastRunAt: Date.now(),
       updatedAt: Date.now(),
     });
+    return null;
   }
 }
 
@@ -100,6 +133,16 @@ export function SchedulerPanel() {
   const schedules = useLiveQuery(() => db.schedules.orderBy('updatedAt').reverse().toArray(), [], []);
   const recipes = useLiveQuery(() => db.recipes.toArray(), [], []);
   const setCurrentChatId = useAppStore((s) => s.setCurrentChatId);
+
+  /*
+   * `vyenDesktop() === null` KHÔNG có nghĩa là "đang chạy trên web". Web bridge
+   * cục bộ (mở localhost bằng launcher có token) cũng đi qua đường dẫn đó và
+   * bridge đó CÓ scheduler. Điều kiện đúng là bridge có mặt `scheduler` hay
+   * không, nên ở đây ta hỏi đúng chỗ đó thay vì hỏi bridge có tồn tại không.
+   */
+  const schedulerBridge = vyenDesktop()?.scheduler;
+  const canRunSchedule = Boolean(schedulerBridge?.runNow);
+  const canKillSwitch = Boolean(schedulerBridge?.setKillSwitch);
 
   const [isEditing, setIsEditing] = useState(false);
   /*
@@ -199,7 +242,8 @@ export function SchedulerPanel() {
   const handleRunNow = async (s: ScheduleRecord) => {
     setRunningId(s.id);
     try {
-      await executeScheduleTrigger(s);
+      const problem = await executeScheduleTrigger(s);
+      if (problem) setErrorMessage(problem);
     } finally {
       setRunningId(null);
     }
@@ -246,7 +290,9 @@ export function SchedulerPanel() {
         <div>
           <h3 className="text-read font-semibold text-primary">Lịch chạy Recipe (Scheduler)</h3>
           <p className="mt-0.5 text-meta text-tertiary">
-            Tự động thực thi các workflow recipe theo biểu thức cron định kỳ.
+            {canRunSchedule
+              ? 'Tự động thực thi các workflow recipe theo biểu thức cron định kỳ.'
+              : 'Lịch trình do tiến trình scheduler trong Vyen desktop đảm nhiệm. Bản này không có tiến trình đó, nên lịch bạn tạo ở đây sẽ không tự chạy.'}
           </p>
         </div>
         {!isEditing && (
@@ -264,61 +310,94 @@ export function SchedulerPanel() {
       <div className="settings-card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
           <div className="field-label flex items-center gap-1.5">
-            {killSwitch === false ? (
+            {!canKillSwitch ? (
+              <AlertCircle size={13} className="text-tertiary" />
+            ) : killSwitch === false ? (
               <CheckCircle2 size={13} className="text-success" />
             ) : (
               <AlertCircle size={13} className={killSwitch === true ? 'text-danger' : 'text-warning'} />
             )}
             <span>
-              {killSwitch === null
-                ? 'Scheduler: KHÔNG ĐỌC ĐƯỢC trạng thái'
-                : killSwitch
-                  ? 'Scheduler đang tạm dừng'
-                  : 'Scheduler đang hoạt động'}
+              {!canKillSwitch
+                ? 'Scheduler không có trong bản này'
+                : killSwitch === null
+                  ? 'Scheduler: KHÔNG ĐỌC ĐƯỢC trạng thái'
+                  : killSwitch
+                    ? 'Scheduler đang tạm dừng'
+                    : 'Scheduler đang hoạt động'}
             </span>
           </div>
           <p className="mt-0.5 text-meta leading-relaxed text-tertiary">
-            {killSwitch === null
-              ? 'Bridge không có lệnh đọc trạng thái kill-switch, nên lần mở Cài đặt này Vyen không biết scheduler đang chạy hay đã bị dừng từ trước. Bấm "Dừng khẩn cấp" để chắc chắn không lịch nào chạy.'
-              : killSwitch
-                ? 'Không lịch nào chạy, kể cả Run now. Bật lại để tiếp tục cron.'
-                : 'Có thể dừng khẩn cấp mọi lịch khi nghi một job đang chạy lỗi.'}
+            {!canKillSwitch
+              ? 'Cron và kill-switch do tiến trình scheduler trong Vyen desktop đảm nhiệm. Không có tiến trình đó thì không có gì để dừng và không có lịch nào chạy.'
+              : killSwitch === null
+                ? 'Bridge không có lệnh đọc trạng thái kill-switch, nên lần mở Cài đặt này Vyen không biết scheduler đang chạy hay đã bị dừng từ trước. Bấm "Dừng khẩn cấp" để chắc chắn không lịch nào chạy.'
+                : killSwitch
+                  ? 'Không lịch nào chạy, kể cả Run now. Bật lại để tiếp tục cron.'
+                  : 'Có thể dừng khẩn cấp mọi lịch khi nghi một job đang chạy lỗi.'}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={killSwitchBusy}
-          onClick={async () => {
-            const bridge = vyenDesktop();
-            if (!bridge?.scheduler?.setKillSwitch) {
-              setErrorMessage('Kill-switch chỉ hoạt động trong Vyen desktop (Electron).');
-              return;
-            }
-            setKillSwitchBusy(true);
-            // Chưa biết thì dừng — hành động mặc định phải là hướng an toàn.
-            const next = killSwitch !== true;
-            try {
-              const res = await bridge.scheduler.setKillSwitch(next);
-              setKillSwitch(Boolean(res?.paused ?? next));
-            } catch {
-              // Bridge lỗi: giữ trạng thái cũ, không giả vờ đã bật/tắt.
-              setErrorMessage('Không bật/tắt được kill-switch — bridge trả lỗi.');
-            } finally {
-              setKillSwitchBusy(false);
-            }
-          }}
-          className={`btn-secondary flex-shrink-0 ${killSwitch === true ? '' : 'border-danger text-danger'}`}
-        >
-          {killSwitchBusy ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : killSwitch === true ? (
-            <Play size={13} />
-          ) : (
-            <Pause size={13} />
-          )}
-          <span>{killSwitch === true ? 'Tiếp tục' : 'Dừng khẩn cấp'}</span>
-        </button>
+        {canKillSwitch ? (
+          <button
+            type="button"
+            disabled={killSwitchBusy}
+            onClick={async () => {
+              const bridge = vyenDesktop();
+              if (!bridge?.scheduler?.setKillSwitch) {
+                setErrorMessage(NO_SCHEDULER_MESSAGE);
+                return;
+              }
+              setKillSwitchBusy(true);
+              // Chưa biết thì dừng — hành động mặc định phải là hướng an toàn.
+              const next = killSwitch !== true;
+              try {
+                const res = await bridge.scheduler.setKillSwitch(next);
+                setKillSwitch(Boolean(res?.paused ?? next));
+              } catch {
+                // Bridge lỗi: giữ trạng thái cũ, không giả vờ đã bật/tắt.
+                setErrorMessage('Không bật/tắt được kill-switch: bridge trả lỗi.');
+              } finally {
+                setKillSwitchBusy(false);
+              }
+            }}
+            className={`btn-secondary flex-shrink-0 ${killSwitch === true ? '' : 'border-danger text-danger'}`}
+          >
+            {killSwitchBusy ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : killSwitch === true ? (
+              <Play size={13} />
+            ) : (
+              <Pause size={13} />
+            )}
+            <span>{killSwitch === true ? 'Tiếp tục' : 'Dừng khẩn cấp'}</span>
+          </button>
+        ) : (
+          /*
+           * Không có scheduler thì KHÔNG render nút. Nút bấm được mà bên trong
+           * chỉ setErrorMessage là một cái nút bấm giả: trông như có việc để làm.
+           * Dùng đúng mẫu của tools-panel / tool-permissions-table — span tĩnh,
+           * chỉ có title giải thích.
+           */
+          <span
+            className="flex-shrink-0 rounded-full border border-subtle bg-raised px-2.5 py-0.5 text-micro text-tertiary"
+            title="Chỉ khả dụng trong Vyen desktop, nơi có tiến trình scheduler"
+          >
+            chỉ bản desktop
+          </span>
+        )}
       </div>
+
+      {/*
+       * Lỗi hiện ở cấp panel chứ không nằm trong form: "Run now" chạy ngoài
+       * form, lỗi của nó mà chỉ hiện trong form thì người dùng không bao giờ
+       * thấy. Nhánh `resetForm` cũng xoá lỗi nên mở form mới không dính lỗi cũ.
+       */}
+      {errorMessage && (
+        <div className="notice-error flex items-center gap-1.5 text-meta" role="alert">
+          <AlertCircle size={13} className="flex-shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
 
       {isEditing && (
         <form onSubmit={handleSave} className="settings-card space-y-3 px-4 py-3.5">
@@ -405,20 +484,13 @@ export function SchedulerPanel() {
             </div>
           </div>
 
-          {isValidCron(cronExpr) && (
-            <div className="flex items-center gap-1.5 text-meta text-tertiary">
+{isValidCron(cronExpr) && (
+            <div className="flex items-center gap-1 text-meta text-tertiary">
               <Clock size={12} className="text-accent" />
               <span>
                 Lần chạy kế tiếp:{' '}
                 {getNextCronRun(cronExpr)?.toLocaleString('vi-VN') || 'Không tìm thấy mốc kế tiếp'}
               </span>
-            </div>
-          )}
-
-          {errorMessage && (
-            <div className="notice-error flex items-center gap-1.5 text-meta" role="alert">
-              <AlertCircle size={13} className="flex-shrink-0" />
-              <span>{errorMessage}</span>
             </div>
           )}
 
@@ -484,8 +556,12 @@ export function SchedulerPanel() {
                 <button
                   type="button"
                   onClick={() => handleRunNow(s)}
-                  disabled={runningId === s.id}
-                  title="Chạy ngay bây giờ"
+                  disabled={runningId === s.id || !canRunSchedule}
+                  title={
+                    canRunSchedule
+                      ? 'Chạy ngay bây giờ'
+                      : 'Cần Vyen desktop: bản này không có tiến trình scheduler để chạy lịch'
+                  }
                   aria-label={`Chạy ngay ${s.recipeName || s.recipeId}`}
                   className="icon-btn icon-btn-sm border border-subtle"
                 >

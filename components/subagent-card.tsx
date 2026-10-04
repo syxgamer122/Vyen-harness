@@ -75,7 +75,7 @@ export function SubagentCard({ annotation }: SubagentCardProps) {
         </span>
         <EvidenceBadge level={subagentEvidence} className="ml-1" />
         {mode === "scout" && (
-          <span className="text-[11px] text-text-muted">· scout</span>
+          <span className="text-[11px] text-text-muted">· khảo sát</span>
         )}
         {taskIndex != null && taskTotal != null && (
           <span className="text-[11px] text-text-muted">
@@ -86,8 +86,8 @@ export function SubagentCard({ annotation }: SubagentCardProps) {
           <span className="text-[11px] text-text-muted">#{runId.slice(0, 6)}</span>
         )}
         <span className="ml-auto text-[11px] text-text-muted">
-          {turn != null && maxTurns != null && `${turn}/${maxTurns} turns`}
-          {toolCalls != null && ` · ${toolCalls} tools`}
+          {turn != null && maxTurns != null && `${turn}/${maxTurns} lượt`}
+          {toolCalls != null && ` · ${toolCalls} công cụ`}
         </span>
       </button>
 
@@ -95,17 +95,17 @@ export function SubagentCard({ annotation }: SubagentCardProps) {
         <div className="border-t border-subtle bg-raised px-3.5 py-2.5 space-y-1.5">
           {task && (
             <p className="text-[11.5px] text-text-primary">
-              <span className="font-semibold text-accent-steel">Task:</span> {task}
+              <span className="font-semibold text-accent-steel">Nhiệm vụ:</span> {task}
             </p>
           )}
           {result && (
             <p className="text-[11.5px] text-text-muted whitespace-pre-wrap">
-              <span className="font-semibold text-status-success">Result:</span> {result}
+              <span className="font-semibold text-status-success">Kết quả:</span> {result}
             </p>
           )}
           {error && (
             <p className="text-[11.5px] text-status-error">
-              <span className="font-semibold">Error:</span> {error}
+              <span className="font-semibold">Lỗi:</span> {error}
             </p>
           )}
         </div>

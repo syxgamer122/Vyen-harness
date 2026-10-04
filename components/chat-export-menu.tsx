@@ -3,8 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { exportJson, exportMarkdown } from '@/lib/backup';
-import { Download, FileJson, FileText, Loader2 } from 'lucide-react';
-import { useAnchoredPanel } from '@/lib/hooks/use-anchored-panel';
+import { Download, FileJson, FileText, Loader2, X } from 'lucide-react';
+import { useAnchoredPanel, type PanelPos } from '@/lib/hooks/use-anchored-panel';
 import { Z_CLASS } from '@/lib/ui-z';
 
 /**
@@ -17,6 +17,13 @@ export function ChatExportMenu({ chatId }: { chatId: string | null }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  /* Vị trí neo phải SỐNG SÓT sau khi menu đóng: `useAnchoredPanel` chỉ tính
+     `pos` khi `open` nên effect setPos chạy lúc mở, còn hook bỏ listener khi
+     đóng. Không có bản sao này, nhánh render `{!open && exportError && pos}`
+     bên dưới gặp `pos === null` và dòng lỗi báo "xuất thất bại" — thứ mà
+     comment trên cùng file hứa sẽ đứng lại — KHÔNG BAO GIỜ hiện: người dùng
+     bấm xuất, hỏng, menu tự đóng, và im lặng mất dấu vết. */
+  const [lastPos, setLastPos] = useState<PanelPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const close = useCallback((returnFocus = true) => {
@@ -31,6 +38,12 @@ export function ChatExportMenu({ chatId }: { chatId: string | null }) {
     align: 'right',
     close,
   });
+
+  /* Ghi lại vị trí cuối cùng mỗi khi hook tính được — nguồn cho `lastPos`
+     bên dưới, dùng sau khi menu đóng. */
+  useEffect(() => {
+    if (pos) setLastPos(pos);
+  }, [pos]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,14 +125,29 @@ export function ChatExportMenu({ chatId }: { chatId: string | null }) {
 
       {!open &&
         exportError &&
-        pos &&
+        lastPos &&
         createPortal(
           <p
             role="alert"
-            style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-            className={`notice-error ${Z_CLASS.popover} px-2.5 py-2 text-meta leading-relaxed`}
+            style={{
+              position: 'fixed',
+              top: lastPos.top,
+              left: lastPos.left,
+              width: lastPos.width,
+            }}
+            className={`notice-error flex items-start gap-2 ${Z_CLASS.popover} px-2.5 py-2 text-meta leading-relaxed`}
           >
-            {exportError}
+            <span className="min-w-0 flex-1">{exportError}</span>
+            {/* Dòng lỗi giờ đã hiện được sau khi menu đóng (xem `lastPos`),
+                nên phải tự tắt được — nếu không nó đè vĩnh viễn lên vị trí neo. */}
+            <button
+              type="button"
+              onClick={() => setExportError(null)}
+              aria-label="Bỏ qua thông báo xuất thất bại"
+              className="flex-none text-tertiary transition-colors hover:text-primary"
+            >
+              <X size={12} />
+            </button>
           </p>,
           document.body,
         )}

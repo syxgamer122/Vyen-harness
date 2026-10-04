@@ -175,6 +175,37 @@ export async function desktopFsWrite(
   return { path: rawPath, bytes: r.size, created };
 }
 
+/**
+ * Append một dòng vào cuối file mà KHÔNG đọc trước.
+ *
+ * Dùng cho file chỉ ghi thêm (anchor log kiểm toán): đọc-rồi-ghi lại sẽ bị cắt
+ * ở `MAX_READ_CHARS` — `desktopFsRead` trả `truncated` nhưng nội dung đã bị cắt
+ * sẵn, nên mỗi lần append ghi đè là xoá vĩnh viễn phần đuôi file.
+ *
+ * Main cũ (app chưa restart) không có `vyen:fs-append` → fallback read+write,
+ * và báo warning vì đúng lúc đó dữ liệu vẫn có thể mất. Xem `lib/ipc.cjs`
+ * (`fsAppend`) và `lib/audit-log.ts` (`appendDiskAnchor`).
+ */
+export async function desktopFsAppend(rawPath: string, line: string): Promise<{ path: string; bytes: number }> {
+  const b = requireBridge();
+  if (typeof b.fs.append === 'function') {
+    const r = await b.fs.append(rawPath, line);
+    return { path: rawPath, bytes: r.size };
+  }
+
+  console.warn(
+    '[desktop-fs] Main chưa có vyen:fs-append — fallback read+write, nguy cơ mất dữ liệu ở file >24k. Hãy restart app.',
+  );
+  let existing = '';
+  try {
+    const r = await desktopFsRead(rawPath);
+    if (r?.content) existing = r.content;
+  } catch {
+    // File chưa tồn tại → append vào file mới.
+  }
+  return desktopFsWrite(rawPath, existing + line);
+}
+
 export async function desktopFsDelete(rawPath: string): Promise<{ path: string }> {
   const b = requireBridge();
   await b.fs.delete(rawPath);

@@ -1,8 +1,16 @@
 /**
  * OpenTelemetry-Compatible Lightweight Tracer (Layer 1: Zero External Dependencies).
  *
- * Quản lý bộ đệm xoay vòng (Ring Buffer) 500 spans gần nhất trong RAM,
- * đo đạc chính xác độ trễ từng Turn, LLM stream, và các Tool executions (fs_*, shell_run, mcp).
+ * Bộ đệm xoay vòng (Ring Buffer) 500 span gần nhất, nằm trong RAM của tiến
+ * trình đang chạy tracer.
+ *
+ * Sự thật phải nói thẳng ở đây vì nó quyết định cả UI: tracer này chạy ở
+ * TRÌNH DUYỆT. `app/api/chat/route.ts` chạy ở server, mà module state không
+ * chung giữa hai tiến trình, nên span tạo ở route đó không bao giờ tới được
+ * chỗ đọc. Bản build hiện tại cũng không gọi `startSpan` ở bất kỳ đâu trong mã
+ * chạy thật (chỉ `tests/telemetry-tracer.test.ts` gọi), nên `getRecentSpans()`
+ * luôn trả về mảng rỗng. Đó là lý do `components/settings/telemetry-tab.tsx`
+ * phải nói thẳng là đo đạc chưa bật, chứ không vẽ một bộ đếm như thể đang đếm.
  */
 
 export interface TelemetrySpanEvent {
@@ -32,6 +40,13 @@ export class LightweightTracer {
   private activeSpans = new Map<string, TelemetrySpan>();
   private readonly maxSpans: number;
   private seq = 0;
+  /*
+   * Đếm span ĐÃ start, cố ý không bị `clear()` xoá. Tab Đo đạc cần phân biệt
+   * "đo đạc chưa bật" (chưa từng start) với "đo đạc có nhưng đệm vừa bị xoá":
+   * đó hai chuyện khác nhau, gộp thành một câu "chưa có dữ liệu" thì một
+   * trong hai nói sai.
+   */
+  private startedSpans = 0;
 
   constructor(maxSpans = MAX_TELEMETRY_SPANS) {
     this.maxSpans = maxSpans;
@@ -60,6 +75,7 @@ export class LightweightTracer {
       events: [],
     };
 
+    this.startedSpans += 1;
     this.activeSpans.set(id, span);
     return span;
   }
@@ -127,6 +143,14 @@ export class LightweightTracer {
 
   public get size(): number {
     return this.spans.length;
+  }
+
+  /**
+   * true khi từng có span nào được start, kể cả sau `clear()`.
+   * Trên bản build này nó luôn false: không có mã chạy thật nào gọi `startSpan`.
+   */
+  public get hasEverStartedSpan(): boolean {
+    return this.startedSpans > 0;
   }
 }
 

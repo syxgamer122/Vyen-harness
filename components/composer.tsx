@@ -31,7 +31,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { PulseGlow, useHaptics } from '@/components/effects';
-import { filterPrompts } from '@/lib/slash-commands';
+import { filterPrompts, slashCommitTarget } from '@/lib/slash-commands';
 import { ModelSelector } from '@/components/model-selector';
 import type { ModelOption, ModelFavorite, RecentModel } from '@/components/model-selector';
 import { TOOL_CATALOG } from '@/lib/tool-catalog';
@@ -55,6 +55,161 @@ export interface SlashPrompt {
    * gửi thẳng cho ChatInterface xử lý.
    */
   kind?: 'prompt' | 'recipe' | 'command';
+  /**
+   * Mô tả một dòng dưới tên trong palette "/". Nguồn: `SlashCommandDef.description`
+   * (`lib/slash-commands.ts`). KHÔNG tự chế — trước đây composer in một chuỗi
+   * cứng cho MỌI lệnh, nên /cost và /memory cũng tự nhận là "lập kế hoạch bằng
+   * planner model". Lệnh tùy biến (settings) chưa có mô tả, nên trường này
+   * tuỳ chọn và bị thiếu thì palette rơi về câu nói trung tính.
+   */
+  description?: string;
+  /**
+   * Gợi ý tham số in MỜ cạnh tên trong palette "/" (mẫu của Claude Code):
+   * `/plan <mục tiêu>`. Nguồn: `SlashCommandDef.argumentHint`
+   * (`lib/slash-commands.ts`), ràng theo `syntax`.
+   *
+   * TUỲ CHỌN và có thể vắng: `use-chat-orchestration.ts` dựng hàng palette mà
+   * chưa gán trường này, recipe và prompt tự lưu cũng không có tham số nào để
+   * gợi ý. Thiếu thì palette chỉ không in gì cạnh tên, không vỡ.
+   */
+  argumentHint?: string;
+}
+
+export type ApprovalPolicy = 'always' | 'smart' | 'never' | 'chat_only';
+
+/**
+ * Trần mục hiện trong palette "/".
+ *
+ * `filterPrompts` mặc định `limit = 8`, còn lệnh built-in đã có 9 — /cost là
+ * lệnh thứ 9 nên `slice(0, 8)` cắt mất nó vĩnh viễn: phải gõ `/co` mới thấy,
+ * tức phải biết trước tên lệnh mới tìm được lệnh. 20 đủ chứa trọn 9 lệnh +
+ * lệnh tùy biến; phần dư bị cắt thì `hiddenSlashLine` báo bằng CON SỐ.
+ */
+export const SLASH_PALETTE_LIMIT = 20;
+
+/**
+ * Lấy HẾT mục khớp, không trần thật — cần biết tổng số để đếm chính xác bao
+ * nhiêu mục palette bị cắt. `10_000` là trần an toàn, không phải con số nghiệp vụ.
+ */
+const SLASH_MATCH_ALL = 10_000;
+
+/**
+ * Chia danh sách khớp thành phần hiện + số mục bị cắt.
+ *
+ * Palette trộn lẫn lệnh built-in, recipe và prompt đã lưu, nên số bị ẩn phải
+ * đếm trên TẤT CẢ mục khớp chứ không đoán theo loại.
+ */
+export function partitionSlashMatches<T>(
+  matches: T[],
+  limit: number = SLASH_PALETTE_LIMIT,
+): { shown: T[]; hidden: number } {
+  const cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 0;
+  return { shown: matches.slice(0, cap), hidden: Math.max(0, matches.length - cap) };
+}
+
+/**
+ * Dòng báo phần palette bị cắt. `null` = không có gì bị cắt, không vẽ.
+ *
+ * Con số cụ thể thay cho dấu "…": người đọc biết đúng bao nhiêu món đang bị giấu
+ * và biết cách lấy ra (gõ thêm chữ để thu hẹp). "…" chỉ cho biết có gì đó bị
+ * bỏ mà không cho biết bao nhiêu, nên không đảo ngược được.
+ */
+export function hiddenSlashLine(hidden: number): string | null {
+  if (!(hidden > 0)) return null;
+  return `còn ${hidden} mục nữa, gõ thêm chữ để lọc`;
+}
+
+/**
+ * MỘT nguồn cho cả bốn chế độ phê duyệt, cả ba chỗ hiển thị.
+ *
+ * Trước đây cùng một trạng thái có tới ba nhãn: pill in tiếng Việt ("Tự chạy
+ * tool, không hời"), menu "Tác vụ" in tiếng Anh ("Autonomous"), nút đổi chế độ
+ * lại in một bản sao của tiếng Anh đó. Ba nhãn cho bốn trạng thái, hai ngôn
+ * ngữ, ba cách viết — người dùng phải tự dò xem chúng có nói cùng một điều
+ * không, và không có cách nào kiểm bằng mắt trên một màn hình.
+ *
+ * `short` là bản rút gọn cho hai chỗ chật (nhãn hàng menu, nút trên dải
+ * công cụ); `long` là câu đầy đủ cho pill, nơi có chỗ và cần nói rõ chế độ đó
+ * LÀM GÌ chứ không chỉ TÊN nó. `hint` là dòng giải thích dưới nhãn trong menu.
+ *
+ * Cả ba trường đều tiếng Việt: `Autonomous`/`Manual`/`Smart`/`Chat Only` là tên
+ * tiếng Anh của chế độ, không phải tên tiếng Việt, và dải công cụ là nơi người
+ * dùng đọc nhanh nhất nên nó phải đọc được bằng tiếng của giao diện.
+ */
+const APPROVAL_COPY: Record<ApprovalPolicy, { short: string; long: string; hint: string }> = {
+  always: {
+    short: 'Luôn hỏi',
+    long: 'Hỏi trước mọi tool',
+    hint: 'Hỏi xác nhận trước khi chạy bất kỳ tool nào',
+  },
+  smart: {
+    short: 'Hỏi khi ghi',
+    long: 'Tự chạy lệnh đọc, hỏi trước khi ghi',
+    hint: 'Tự duyệt lệnh đọc, hời trước khi ghi hoặc xoá',
+  },
+  never: {
+    short: 'Tự chạy',
+    long: 'Tự chạy tool, không hỏi',
+    hint: 'Tự duyệt mọi tool an toàn, trừ lệnh phá hoại',
+  },
+  chat_only: {
+    short: 'Không tool',
+    long: 'Không dùng tool',
+    hint: 'Vô hiệu hoàn toàn tool, dùng cho phân tích và viết',
+  },
+};
+
+/**
+ * Suy ra policy đang chạy. `autoPilot` là đường cũ (bool) nên vẫn phải map
+ * về đúng policy, và map ở MỘT chỗ để menu, pill và nút không lệch nhau.
+ */
+export function resolveApprovalPolicy(
+  policy: ApprovalPolicy | undefined,
+  autoPilot: boolean | undefined,
+): ApprovalPolicy {
+  return policy ?? (autoPilot ? 'smart' : 'always');
+}
+
+/** Nhãn pill chế độ phê duyệt — câu đầy đủ, nói rõ chế độ đó làm gì. */
+export function approvalPillLabel(
+  policy: ApprovalPolicy | undefined,
+  autoPilot: boolean | undefined,
+): string {
+  return APPROVAL_COPY[resolveApprovalPolicy(policy, autoPilot)].long;
+}
+
+/** Nhãn gọn cho ô chật: hàng menu "Tác vụ" và nút đổi chế độ trên dải. */
+export function approvalShortLabel(
+  policy: ApprovalPolicy | undefined,
+  autoPilot: boolean | undefined,
+): string {
+  return APPROVAL_COPY[resolveApprovalPolicy(policy, autoPilot)].short;
+}
+
+/** Dòng giải thích một dòng dưới nhãn trong menu "Tác vụ". */
+export function approvalHint(
+  policy: ApprovalPolicy | undefined,
+  autoPilot: boolean | undefined,
+): string {
+  return APPROVAL_COPY[resolveApprovalPolicy(policy, autoPilot)].hint;
+}
+
+export interface StagedFilesChip {
+  label: string;
+  title: string;
+}
+
+/**
+ * Chip file đang chờ duyệt. `null` khi không có file nào — lúc đó KHÔNG vẽ
+ * chip, để "đang có gì chờ" luôn là một tín hiệu có ý nghĩa chứ không phải
+ * một vùng trống quen thuộc.
+ */
+export function stagedFilesChip(count: number): StagedFilesChip | null {
+  if (!(count > 0)) return null;
+  return {
+    label: `${count} tệp chờ duyệt`,
+    title: `${count} tệp đã thay đổi, chưa ghi vào đĩa`,
+  };
 }
 
 export interface ComposerApi {
@@ -558,14 +713,38 @@ export const Composer = memo(function Composer({
 
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashDismissed, setSlashDismissed] = useState(false);
+  /*
+   * Người dùng đã TỰ bấm phím mũi tên trong palette chưa, hay chưa.
+   *
+   * Palette mở ra luôn sáng mục đầu tiên, nên nếu Enter chỉ nhìn `slashIndex`
+   * thì nó không phân biệt được "mục đang sáng là thứ tôi chỉ định" với "mục
+   * đầu tiên hiện ra vì chưa ai chọn". Cờ này là ranh giới đó: Enter chỉ chạy
+   * mục đang sáng khi chữ đã gói chính là tên mục, HOẶC khi người dùng vừa
+   * điều hướng tới nó. Xem `slashCommitTarget`.
+   */
+  const [slashNavigated, setSlashNavigated] = useState(false);
 
   const slashQuery =
     draft.startsWith('/') && !draft.includes('\n') ? draft.slice(1) : null;
 
-  const slashMatches = useMemo(
-    () => (slashQuery === null ? [] : filterPrompts(slashPrompts ?? [], slashQuery)),
+  /*
+   * Lấy HẾT mục khớp rồi mới cắt ở `SLASH_PALETTE_LIMIT`: `filterPrompts` tự
+   * `slice(0, limit)` nên gọi thẳng với mặc định 8 là mất `/cost` (lệnh thứ 9)
+   * mà không hề có dấu hiệu gì bị bỏ. Cắt ở chỗ khác thì dòng "còn N mục"
+   * báo đúng số đang bị giấu.
+   */
+  const slashAllMatches = useMemo(
+    () =>
+      slashQuery === null ? [] : filterPrompts(slashPrompts ?? [], slashQuery, SLASH_MATCH_ALL),
     [slashPrompts, slashQuery],
   );
+
+  const { shown: slashMatches, hidden: slashHiddenCount } = useMemo(
+    () => partitionSlashMatches(slashAllMatches),
+    [slashAllMatches],
+  );
+
+  const slashHiddenLine = hiddenSlashLine(slashHiddenCount);
 
   const slashOpen =
     slashQuery !== null && !slashDismissed && slashMatches.length > 0;
@@ -573,6 +752,7 @@ export const Composer = memo(function Composer({
   useEffect(() => {
     setSlashIndex(0);
     setSlashDismissed(false);
+    setSlashNavigated(false);
   }, [slashQuery]);
 
   const applyPrompt = useCallback(
@@ -652,18 +832,37 @@ export const Composer = memo(function Composer({
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           setSlashIndex((i) => (i + 1) % slashMatches.length);
+          setSlashNavigated(true);
           return;
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault();
           setSlashIndex((i) => (i - 1 + slashMatches.length) % slashMatches.length);
+          setSlashNavigated(true);
           return;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
-          e.preventDefault();
-          e.stopPropagation();
-          applyPrompt(slashMatches[slashIndex]);
-          return;
+          /*
+           * Tab là phím "chấp nhận phần đã điền", nên nó LUÔN áp dụng mục đang
+           * sáng. Enter thì không: trước đây nó cũng áp dụng thẳng, nên gõ
+           * `/pl` xong bấm Enter là chạy `/plan` — người dùng xin một việc,
+           * nhận việc khác, không có dấu hiệu gì cả. Anthropic gỡ hẳn hành vi
+           * đó ở Claude Code v2.1.236.
+           *
+           * Không khớp thì Enter KHÔNG bị nuốt: rơi xuống đường gửi dưới đây,
+           * để chữ đã gõ đi tới `parseSlashCommand` và hiện lỗi "không nhận
+           * diện", thay vì im lặng chạy lệnh khác.
+           */
+          const target =
+            e.key === 'Enter'
+              ? slashCommitTarget(slashMatches, slashIndex, slashQuery ?? '', slashNavigated)
+              : slashMatches[slashIndex];
+          if (target) {
+            e.preventDefault();
+            e.stopPropagation();
+            applyPrompt(target);
+            return;
+          }
         }
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -693,7 +892,7 @@ export const Composer = memo(function Composer({
         void submitDraft();
       }
     },
-    [slashOpen, slashMatches, slashIndex, applyPrompt, onStop, isTouchDevice, sendOnEnter, submitDraft, onTakeBackQueued],
+    [slashOpen, slashMatches, slashIndex, slashQuery, slashNavigated, applyPrompt, onStop, isTouchDevice, sendOnEnter, submitDraft, onTakeBackQueued],
   );
 
   const handleFormSubmit = useCallback(
@@ -721,6 +920,10 @@ export const Composer = memo(function Composer({
   const sessionTasks: TaskSpec[] = [];
   const extensionTasks: TaskSpec[] = [];
 
+  /* Chip file đang chờ duyệt: null khi không có gì, để vùng trống luôn nghĩa là
+     "không có việc gì đang chờ" chứ không phải "chưa render xong". */
+  const stagedChip = stagedFilesChip(stagedFileCount ?? 0);
+
   if (onToggleAgentMode) {
     sessionTasks.push({
       key: 'agent-mode',
@@ -735,35 +938,15 @@ export const Composer = memo(function Composer({
   }
 
   if (onCycleAutoPilot) {
-    const currentPolicy = approvalPolicy ?? (autoPilot ? 'smart' : 'always');
-    const policyLabel =
-      currentPolicy === 'never'
-        ? 'Autonomous'
-        : currentPolicy === 'always'
-          ? 'Manual'
-          : currentPolicy === 'chat_only'
-            ? 'Chat Only'
-            : 'Smart';
-    const isChatOnly = currentPolicy === 'chat_only';
-    const isManual = currentPolicy === 'always';
+    const currentPolicy = resolveApprovalPolicy(approvalPolicy, autoPilot);
     sessionTasks.push({
       key: 'auto-pilot',
       icon: Zap,
       active: currentPolicy === 'smart' || currentPolicy === 'never',
       disabled: isStreaming,
-      label: isChatOnly
-        ? 'Chế độ: Chat Only (vô hiệu tools) · bấm để đổi'
-        : isManual
-          ? 'Chế độ: Manual (luôn hỏi duyệt) · bấm để đổi'
-          : `Chế độ: ${policyLabel} · bấm để đổi`,
-      shortLabel: policyLabel,
-      description: isChatOnly
-        ? 'Vô hiệu hoàn toàn tool, dùng cho phân tích & viết'
-        : isManual
-          ? 'Luôn hỏi xác nhận trước khi chạy bất kỳ tool nào'
-          : currentPolicy === 'never'
-            ? 'Tự động duyệt mọi tool an toàn, trừ lệnh phá hoại'
-            : 'Tự duyệt đọc & safe shell, hỏi ghi/destructive',
+      label: `Chế độ phê duyệt: ${approvalPillLabel(currentPolicy, autoPilot)} · bấm để đổi`,
+      shortLabel: approvalShortLabel(currentPolicy, autoPilot),
+      description: approvalHint(currentPolicy, autoPilot),
       onClick: onCycleAutoPilot,
     });
   }
@@ -796,17 +979,12 @@ export const Composer = memo(function Composer({
     });
   }
 
-  if (onOpenStaging && (stagedFileCount ?? 0) > 0) {
-    extensionTasks.push({
-      key: 'staging',
-      icon: FileText,
-      label: `${stagedFileCount} file đang staged`,
-      shortLabel: 'File đã staged',
-      badge: String(stagedFileCount),
-      description: 'Xem diff, Apply hoặc Reject trước khi ghi đĩa',
-      onClick: onOpenStaging,
-    });
-  }
+  /*
+   * File đang staged KHÔNG còn là một mục trong menu "Tác vụ": ở đó nó nằm
+   * sau nút icon 32×32, nên người dùng không biết có thay đổi đang chờ duyệt.
+   * Nay nó là một chip có chữ ở dải công cụ (render bên dưới), bấm vào gọi
+   * đúng `onOpenStaging` — MỘT đường vào duy nhất, không phải hai lối lệch nhau.
+   */
 
   if (onOpenToolsPanel) {
     extensionTasks.push({
@@ -874,7 +1052,15 @@ export const Composer = memo(function Composer({
         )}
 
         {fileError && (
-          <div role="status" className="notice-warn mb-2 px-3.5 py-2 rounded-lg border border-warning/40 bg-warning/10 text-amber-warn text-xs">
+          /*
+           * `notice-warn` mang sẵn `text-warning` trên `bg-raised` (4.38:1 —
+           * hụt AA). Bản ghi đè ở đây còn tệ hơn: nó đặt nền phủ
+           * `bg-warning/10` và chữ `text-amber-warn`, ra 4.01:1 trên
+           * `bg-sunken`. Cùng một lỗi như chip file chờ duyệt, nên dùng
+           * chung cách sửa: giữ nền phủ và viền làm dấu hiệu trạng thái,
+           * đổi chữ sang mực (13.97:1) và đặc viền lên (4.54:1).
+           */
+          <div role="status" className="notice-warn mb-2 px-3.5 py-2 rounded-lg border border-warning bg-warning/10 text-xs text-primary">
             {fileError}
           </div>
         )}
@@ -904,6 +1090,13 @@ export const Composer = memo(function Composer({
            * trong ba đường trang trí chồng lên nhau (đường kẻ này + viền ngoài
            * của form + nền khác) — bỏ đi, khoảng trống giữa dải và vùng gõ đã
            * đủ tách hai vùng. Giữ lại nền `bg-raised/40` để dải vẫn nổi nhẹ.
+           *
+           * Mép phải dải từng in "(Ctrl+K / / for Commands)". Không nơi nào
+           * trong repo bắt Ctrl+K (`grep ctrlKey` chỉ ra `use-branch-keyboard-
+           * shortcuts.ts` và `app/page.tsx`, đều là phím khác) — bấm ra không
+           * có gì, và dòng đó còn viết tiếng Anh trên giao diện tiếng Việt.
+           * Nay dùng chỗ trống đó cho chip file đang chờ duyệt. Gợi ý `/` còn
+           * ở dòng hướng dẫn phím dưới ô nhập.
            */}
           {/* Bo góc phải khớp `rounded-ink` của vỏ form, nếu không dải này bo
               kiểu control trong khi vỏ bo kiểu vẽ tay — thấy ngay mép lệch. */}
@@ -926,56 +1119,148 @@ export const Composer = memo(function Composer({
                   type="button"
                   onClick={onCycleAutoPilot}
                   title="Chế độ phê duyệt (bấm để đổi)"
-                  className="inline-flex items-center gap-1 rounded-full bg-raised transition-colors px-3 py-1 text-xs text-tertiary hover:text-primary"
+                  className="inline-flex items-center gap-1 rounded-full bg-raised px-3 py-1 text-xs text-tertiary transition-colors hover:text-primary"
                 >
-                  <Zap size={11} className={approvalPolicy === 'never' ? 'text-amber-warn' : 'text-accent'} />
-                  <span>{approvalPolicy === 'never' ? 'Autonomous' : approvalPolicy === 'always' ? 'Manual' : approvalPolicy === 'chat_only' ? 'Chat Only' : 'Smart'}</span>
+                  {/* Icon chỉ mang màu, không mang nghĩa: nhãn cạnh nó đã nói
+                      chế độ nào. Giữ nó cùng bậc chữ với nhãn để không thành
+                      một dấu hiệu riêng. */}
+                  <Zap size={11} className="text-accent" aria-hidden="true" />
+                  <span>{approvalShortLabel(approvalPolicy, autoPilot)}</span>
                 </button>
               )}
             </div>
-            <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-tertiary select-none">
-              <span>(Ctrl+K / / for Commands)</span>
-            </div>
+            {/*
+             * File đã staged nhưng chưa ghi đĩa: phải thấy được mà không cần
+             * mở menu nào, và phải thấy được KỂ CẢ khi dải công cụ bị cuộn —
+             * nên nó nằm NGOÀI cụm `overflow-x-auto` bên trái, không cuộn theo.
+             * Đây là lối vào DUY NHẤT của panel staging, cùng `onOpenStaging`
+             * với mục cũ trong menu "Tác vụ" (nay đã gỡ).
+             */}
+            {stagedChip && onOpenStaging && (
+              /*
+               * CHỮ là `text-primary`, không phải `text-warning`.
+               *
+               * Cặp cũ `text-warning` trên nền `bg-warning/10` chỉ đạt
+               * 4.10:1 ở trạng thái nghỉ và 3.61:1 khi hover — tức CHẾT độ ở
+               * đúng lúc người dùng đưa chuột lên đọc. Nền phủ càng đậm thì
+               * chữ càng nhạt, tức hover làm nó TỐT hơn, ngược với mọi control
+               * khác trong app.
+               *
+               * Giữ nền phủ và viền màu cảnh báo (chúng là dấu hiệu trạng
+               * thái, không phải chữ) nhưng đổi chữ sang mực: nhãn luôn đọc
+               * được, màu vẫn nói "đây là việc cần duyệt". Đây cũng là cách
+               * `chat-interface.tsx` vẽ băng cảnh báo.
+               *
+               * Viền đặc `border-warning` thay cho `/40`: ở mức /40 nó hòa
+               * vào dải công cụ còn 1.72:1, tức control không có ranh giới
+               * nhìn thấy được. Đặc lên là 4.67:1, qua ngưỡng 3:1 của WCAG
+               * 1.4.11 mà vẫn là một nét mảnh.
+               */
+              <button
+                type="button"
+                onClick={onOpenStaging}
+                title={`${stagedChip.title}. Bấm để xem thay đổi trước khi ghi đĩa`}
+                className="lift-sm ml-2 inline-flex flex-none items-center gap-1.5 rounded-wobble border border-warning bg-warning/10 px-2.5 py-1 text-ui font-medium text-primary transition-colors hover:border-strong hover:bg-warning/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              >
+                <FileText size={12} aria-hidden="true" className="flex-none" />
+                {stagedChip.label}
+              </button>
+            )}
           </div>
 
           {slashOpen && (
+            /*
+             * Vỏ ngoài KHÔNG mang role: `role="listbox"` chỉ được chứa `option`,
+             * nên dòng "còn N mục" phải là anh em của listbox chứ không phải
+             * con. Nhờ vậy dòng đó không cuộn mất: người đọc luôn thấy còn bao
+             * nhiêu món đang bị giấu, kể cả khi danh sách dài hơn khung.
+             */
             <div
-              role="listbox"
-              aria-label="Danh sách prompt"
-              className="absolute bottom-full left-0 right-0 z-30 mb-3 max-h-64 overflow-y-auto lift-lg rounded-2xl border border-default bg-overlay p-2 font-mono shadow-lift-lg"
+              className="absolute bottom-full left-0 right-0 z-30 mb-3 lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg"
               onMouseDown={(e) => e.preventDefault()}
             >
-              {slashMatches.map((p, i) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="option"
-                  aria-selected={i === slashIndex}
-                  id={`slash-opt-${p.id}`}
-                  onClick={() => applyPrompt(p)}
-                  onMouseEnter={() => setSlashIndex(i)}
-                  className={`flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
-                    i === slashIndex ? 'bg-panel-soft text-primary' : 'text-primary hover:bg-accent-mint/40'
-                  }`}
-                >
-                  <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
-                    {p.kind === 'recipe' ? (
-                      <ChefHat size={11} aria-hidden="true" className="flex-none text-accent" />
-                    ) : null}
-                    {p.kind === 'command' ? (
-                      <ListChecks size={11} aria-hidden="true" className="flex-none text-accent" />
-                    ) : null}
-                    /{p.title}
-                  </span>
-                  <span className="line-clamp-1 w-full text-[11px] text-tertiary">
-                    {p.kind === 'recipe'
-                      ? 'workflow · mở panel để chạy'
-                      : p.kind === 'command'
-                        ? 'lệnh · lập kế hoạch bằng planner model (PLAN mode)'
-                        : p.content.replace(/\n+/g, ' ').trim()}
-                  </span>
-                </button>
-              ))}
+              <div
+                role="listbox"
+                aria-label="Danh sách prompt"
+                /*
+                 * Cao theo viewport, không theo pixel cứng.
+                 *
+                 * `max-h-64` là hằng số 256px, nên nó chỉ đúng với đúng một
+                 * hình dạng hàng: hàng một dòng mô tả và tối đa 8 mục. Rồi cả
+                 * hai con số đó đều đổi — trần lên 20 (`:78`) và mô tả lên hai
+                 * dòng (`line-clamp-2`, vì câu dài nhất 60 ký tự mà điện thoại
+                 * chỉ chứa ~47 ký tự mỗi dòng ở 11px mono, nên `line-clamp-1`
+                 * cắt mất đúng vế "sửa file thật" của `/boost`).
+                 *
+                 * Hai thay đổi đó đều đúng; cái sai là container. Hàng cao
+                 * hơn 30% và danh sách dài hơn 2.5 lần thì 256px chỉ còn chỗ
+                 * 3.7 hàng, và `/summarize` — mục cuối — rơi tới 5 màn cuộn.
+                 *
+                 * `min(24rem, 55vh)` ràng theo viewport: trên điện thoại thấp
+                 * thì `55vh` thắng nên palette không nuốt quá nửa màn, trên
+                 * màn rộng thì `24rem` thắng nên nó không thành một tấm bảng
+                 * phủ cả cột hội thoại. Không sửa lại hai quyết định ở trên.
+                 */
+                className="max-h-[min(24rem,55vh)] overflow-y-auto p-2"
+              >
+                {slashMatches.map((p, i) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="option"
+                    aria-selected={i === slashIndex}
+                    id={`slash-opt-${p.id}`}
+                    onClick={() => applyPrompt(p)}
+                    onMouseEnter={() => setSlashIndex(i)}
+                    className={`flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
+                      i === slashIndex ? 'bg-panel-soft text-primary' : 'text-primary hover:bg-accent-mint/40'
+                    }`}
+                  >
+                    {/*
+                     * Tên lệnh + gợi ý tham số MỜ cạnh nhau (mẫu của Claude
+                     * Code). Trước đây `syntax` chỉ nằm trong danh mục, không ai
+                     * in ra: `/plan` mà không có `<mục tiêu>` thì người dùng
+                     * phải đoán rồi mới biết lệnh đó cần gì.
+                     *
+                     * Tên cắt bằng `truncate` còn gợi ý thì `flex-none`: màn hẹp
+                     * phải hy sinh chữ ở giữa, không phải phần nói lệnh cần
+                     * tham số gì. `p.argumentHint` là TUỲ CHỌN — thiếu thì
+                     * không vẽ gì, không để lại khoảng trống.
+                     */}
+                    <span className="flex w-full min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-primary">
+                      {p.kind === 'recipe' ? (
+                        <ChefHat size={11} aria-hidden="true" className="flex-none text-accent" />
+                      ) : null}
+                      {p.kind === 'command' ? (
+                        <ListChecks size={11} aria-hidden="true" className="flex-none text-accent" />
+                      ) : null}
+                      <span className="truncate">/{p.title}</span>
+                      {p.argumentHint ? (
+                        <span className="flex-none text-meta font-normal text-tertiary">
+                          {p.argumentHint}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="line-clamp-2 w-full text-[11px] leading-snug text-tertiary">
+                      {p.kind === 'recipe'
+                        ? 'workflow · mở panel để chạy'
+                        : p.kind === 'command'
+                          ? (p.description ?? 'lệnh · gõ tên rồi Enter để chạy')
+                          : p.content.replace(/\n+/g, ' ').trim()}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {/*
+               * Số mục bị cắt, đếm trên tập khớp đầy đủ. Chuỗi "…" không nói
+               * được còn bao nhiêu nên người đọc không biết mình đang bị giấu
+               * bao nhiêu; con số + gợi ý gõ thêm là cách tự lấy lại.
+               */}
+              {slashHiddenLine && (
+                <p className="border-t border-subtle px-4 py-2 text-[11px] text-tertiary">
+                  {slashHiddenLine}
+                </p>
+              )}
             </div>
           )}
 
@@ -1084,12 +1369,27 @@ export const Composer = memo(function Composer({
               )}
             </div>
 
-            {/* Cụm GIỮA: Autonomous / Smart Budget Badge */}
+            {/*
+             * Pill chế độ phê duyệt. Trước đây mọi policy khác `always` in
+             * "Autonomous Tools Active" — nhưng `smart` (mặc định) là chế độ
+             * HỎI trước khi ghi file, nên tên nói ngược hành vi: người dùng
+             * tưởng agent tự do ghi đĩa rồi mới phát hiện nó dừng hỏi.
+             * Nay nhãn nói đúng việc chế độ đó làm.
+             *
+             * `text-[11px]` → `text-meta`: cùng 11px nhưng có tên trong thang,
+             * nên đổi cỡ ở đây cũng đổi được cả app thay vì chỉ dòng này.
+             *
+             * Icon `Zap` đổi sang `text-accent`: nó là dấu "chế độ này đang bật",
+             * không phải dấu "có cảnh báo" — cảnh báo thật đã có ở chip file
+             * chờ duyệt. Giữ `text-warning` ở đây là 4.38:1 trên `bg-raised`,
+             * tức hụt ngưỡng AA của chữ trong khi vai trò của nó chỉ là trang
+             * trí, nên nó không được làm mất một ô chữ cho màu.
+             */}
             <div className="hidden md:flex items-center gap-2">
               {(approvalPolicy === 'never' || approvalPolicy === 'smart' || autoPilot) && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-raised border border-subtle px-2.5 py-0.5 font-mono text-[11px] text-tertiary">
-                  <Zap size={11} className="text-amber-warn" />
-                  <span>{goalLoopInfo || 'Autonomous Tools Active'}</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-raised border border-subtle px-2.5 py-0.5 font-mono text-meta text-tertiary">
+                  <Zap size={11} aria-hidden="true" className="text-accent" />
+                  <span>{goalLoopInfo || approvalPillLabel(approvalPolicy, autoPilot)}</span>
                 </span>
               )}
             </div>
@@ -1104,7 +1404,20 @@ export const Composer = memo(function Composer({
             </div>
           </div>
         </form>
-        <div className="mt-3 hidden sm:block text-center font-mono text-[10.5px] text-disabled">
+        {/*
+         * `text-tertiary`, KHÔNG phải `text-disabled`.
+         *
+         * `text-disabled` (#a1a1aa) nghĩa là "control này không dùng được"
+         * (DESIGN.md §2.2), còn năm gợi ý phím dưới đây là thông tin người
+         * dùng vẫn cần đọc. Ở mức cũ nó chỉ đạt 2.28:1 trên nền `bg-sunken` —
+         * dưới một nửa ngưỡng AA, và nằm NGAY TRÊN nền app nên nó là chữ mờ
+         * trên giấy trắng chứ không phải trên nền tối. `text-tertiary` đạt
+         * 4.71:1 và là đúng bậc cho gợi ý nhỏ.
+         *
+         * `text-meta` (11px) thay `text-[10.5px]`: cỡ tự chế không thuộc
+         * thang 6 bậc nào, nên không ai nhớ được có đúng một cỡ hay không.
+         */}
+        <div className="mt-3 hidden text-center font-mono text-meta text-tertiary sm:block">
           Enter để gửi · Shift+Enter xuống dòng · Enter/Alt+Enter khi AI chạy = xếp hàng · Alt+↑ lấy lại · / lệnh nhanh
         </div>
       </div>

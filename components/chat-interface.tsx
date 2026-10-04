@@ -81,7 +81,7 @@ export default function ChatInterface() {
   const closeShellModal = closeDiffModal;
 
   // Layer 2: useAgentRuntime điều phối Web Locks đa tab
-  const { isLeader, tabMode, isLeaderFrozen, forceStealLock, startTurn, stopTurn } = orch.agentRuntime;
+  const { isLeader, isAcquiring, isLeaderFrozen, forceStealLock, startTurn, stopTurn } = orch.agentRuntime;
 
   // Layer 1: ToolRunner thực thi công cụ an toàn CWD jail + TOCTOU
   const toolRunner = useMemo(
@@ -105,14 +105,55 @@ export default function ChatInterface() {
 
   return (
     <div {...orch.swipeHandlers} className="flex h-full flex-col overflow-hidden bg-transparent touch-pan-y">
+      {/*
+       * Băng khi tab này KHÔNG phải tab chính.
+       *
+       * Ba trạng thái, ba câu khác nhau, và CẢ BA đều phải để người dùng đi
+       * tiếp được:
+       *   - ACQUIRING: đang hỏi lock, chưa biết sẽ được hay không.
+       *   - Leader bị đóng băng: tab chính còn giữ lock nhưng người dùng đã
+       *     chuyển sang tab khác.
+       *   - Observer: hỏi xong, tab này không có quyền.
+       *
+       * Nút chiếm quyền hiện ở CẢ BA, kể cả Observer thuần — không ghim vào
+       * trạng thái nào. Trước đây nó chỉ hiện khi `isAcquiring ||
+       * isLeaderFrozen`, mà tab thứ hai mở lên là rơi thẳng về Observer
+       * (isAcquiring=false, isLeaderFrozen=false): băng hiện mà KHÔNG có nút,
+       * không gõ được, không bấm được, effect lúc mount không chạy lại nên
+       * phần đời còn lại của phiên cũng vậy. Một trạng thái không có hành
+       * động nào là ngõi cụt, và `reduceTabRuntimeState` đã ghi rõ OBSERVER là
+       * "trạng thái người dùng hành động được".
+       *
+       * Bấm ở Observer không sinh ra cuộc giành nhau: `forceStealLock` báo
+       * FORCE_YIELD cho tab chính (tab đó tự nhả lock rồi hạ xuống OBSERVER),
+       * sau đó mới xin lock với `steal: true`. Tab kia chỉ PHẢN ỨNG, không
+       * tự giành, nên phải có người bấm ở cả hai tab thì mới ping-pong — và
+       * `reduceTabRuntimeState` bỏ kết quả cũ nên lần bấm sau thắng, không kẹt.
+       */}
       {!isLeader && (
-        <div data-testid="observer-banner" className="bg-warning/10 border-b border-warning/40 px-3 py-1.5 text-center text-xs font-mono text-warning flex items-center justify-center gap-2">
-          <span>{isLeaderFrozen ? 'Tab chính (Leader) bị đóng băng ở nền.' : `Tab đang ở chế độ Chỉ đọc (Observer — TabRuntimeMode: ${tabMode}).`}</span>
-          {isLeaderFrozen && (
-            <button type="button" onClick={forceStealLock} className="px-2 py-0.5 bg-warning/20 hover:bg-warning/30 text-warning border border-warning/40 text-[10px] font-semibold transition-colors">
-              Chiếm quyền điều khiển
-            </button>
-          )}
+        <div
+          data-testid="observer-banner"
+          className="flex items-center justify-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-1.5 text-center font-mono text-xs text-primary"
+        >
+          <span>
+            {isAcquiring
+              ? 'Đang giành quyền điều khiển cho tab này...'
+              : isLeaderFrozen
+                ? 'Tab chính bị đóng băng ở nền.'
+                : 'Một tab khác đang giữ quyền điều khiển. Tab này chỉ đọc nên không gõ được.'}
+          </span>
+          {/*
+           * Nền đặc + `text-on-fill`: token này sinh ra là để chữ trên nền tô
+           * đậm. Cặp cũ `text-warning` trên `bg-warning/20` chỉ đạt 3.50:1 ở
+           * cỡ 10px, dưới ngưỡng 4.5:1 của WCAG AA cho chữ thường.
+           */}
+          <button
+            type="button"
+            onClick={forceStealLock}
+            className="rounded-sm bg-warning px-2 py-0.5 text-micro font-semibold text-on-fill transition-transform active:scale-[0.98]"
+          >
+            Chiếm quyền điều khiển
+          </button>
         </div>
       )}
 
@@ -245,7 +286,7 @@ export default function ChatInterface() {
                 aria-expanded={orch.showHints}
                 className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[accent]"
               >
-                <span className="text-accent">hints loaded</span>
+                <span className="text-accent">gợi ý đã nạp</span>
                 <span className="truncate">{orch.hintsChip.file}</span>
                 <span className="ml-auto flex-none text-[10.5px] text-secondary">{orch.showHints ? 'thu gọn' : 'xem nội dung'}</span>
               </button>
@@ -266,7 +307,7 @@ export default function ChatInterface() {
                 onClick={() => orch.setShowRecalledDetail((v) => !v)}
                 className="flex items-center gap-1.5 font-medium hover:underline text-[12px] text-primary"
               >
-                <span>🧠 Đã nhớ {orch.activeRecallPack.items.length} ghi chú</span>
+                <span>Đã nhớ {orch.activeRecallPack.items.length} ghi chú</span>
                 <span className="text-[10px] text-accent">({orch.showRecalledDetail ? 'thu gọn' : 'xem chi tiết'})</span>
               </button>
               <button

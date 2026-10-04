@@ -4,9 +4,47 @@ import React from 'react';
 import { useHudStore, type HudLane } from '@/lib/hud-store';
 import { CATEGORY_DESCRIPTIONS } from '@/lib/routing/categories';
 import { EvidenceBadge } from '@/components/evidence-badge';
+import { TOKEN_ARROW_IN, TOKEN_ARROW_OUT } from '@/lib/message-usage';
 
 interface AgentHudProps {
   className?: string;
+}
+
+/**
+ * Ô token của thanh trạng thái.
+ *
+ * Mũi tên lấy từ `lib/message-usage.ts` — cùng hằng số với dòng thống kê dưới
+ * tin nhắn. Trước đây chỗ này in `tokensIn↓ tokensOut↑`, ngược hẳn dòng kia
+ * (`↑prompt ↓completion`): cùng một lượt, hai bề mặt mang hai nghĩa, và bề mặt
+ * sai là bề mặt khiến người dùng tưởng mình đã trả ra token ra.
+ *
+ * Số 0 bị BỎ HẲN, giống hệt `formatMessageUsage`. `hud-store` mặc định
+ * `tokensIn`/`tokensOut` về 0, nên một lane vừa tạo mà chưa có lượt nào chạy
+ * sẽ in ra `0↓ 0↑` — hai con số không có nguồn đo mà trông như phép đo.
+ */
+export function hudTokenText(lane: HudLane): string | null {
+  const parts: string[] = [];
+  if (lane.tokensIn > 0) parts.push(`${TOKEN_ARROW_IN}${lane.tokensIn}`);
+  if (lane.tokensOut > 0) parts.push(`${TOKEN_ARROW_OUT}${lane.tokensOut}`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * Ô chi phí. `hud-store` để `'unknown'` khi model chưa có hợp đồng giá — ô đó
+ * bị bỏ hẳn thay vì in một ký tự thay chữ, vì dòng dưới tin nhắn cũng bỏ hẳn
+ * phần không tính được.
+ */
+export function hudCostText(lane: HudLane): string | null {
+  if (lane.costUsd === 'unknown') return null;
+  /*
+   * Cả hai số token đều 0 nghĩa là CHƯA ĐO ĐƯỢC (gateway không báo usage),
+   * không phải "lượt này miễn phí": `calculateModelCost` nhân 0 với bảng giá
+   * ra đúng 0. In `$0.0000` ở đó là con số không có phép đo nào đứng sau, và
+   * nó trái đúng luật store đã ghi: "TUYỆT ĐỐI không $0".
+   * Ô giá chỉ có nghĩa khi đứng cạnh một phép đo token.
+   */
+  if (lane.tokensIn <= 0 && lane.tokensOut <= 0) return null;
+  return `$${lane.costUsd.toFixed(4)}`;
 }
 
 /**
@@ -17,11 +55,12 @@ interface AgentHudProps {
  * Vì vậy ở thời điểm render, store chỉ có thể trả lời chính xác cho: model +
  * effort, category, số token, và cost. Các trường còn lại trong `HudLane`
  * (`turn`, `elapsedSec`, `parallelShots`) không có call site nào ghi vào, nên
- * chúng LUÔN bằng 0 — hiện chúng sẽ là những con số không bao giờ đúng.
+ * chúng LUÔN bằng 0 — và strip này không in chúng. Số 0 giả còn tệ hơn số
+ * thật sai: nó không báo cho người đọc biết mình đang đoán.
  *
- * Vì vậy strip này không hiện chúng, và cũng không giả vờ làm nguồn số liệu
- * trực tiếp. Muốn nó sống trở lại thì phải có call site ghi ở đầu lượt —
- * xem ghi chú trong `lib/hud-store.ts`.
+ * Vì vậy strip này cũng không giả vờ làm nguồn số liệu trực tiếp. Muốn
+ * `turn`/`elapsedSec`/`parallelShots` sống trở lại thì phải có call site ghi ở
+ * đầu lượt — xem ghi chú trong `lib/hud-store.ts`.
  */
 export function AgentHud({ className = '' }: AgentHudProps) {
   const lanes = useHudStore((s) => s.lanes);
@@ -34,7 +73,7 @@ export function AgentHud({ className = '' }: AgentHudProps) {
   return (
     <div
       role="status"
-      aria-label="Last run receipt"
+      aria-label="Phiếu lượt chạy gần nhất"
       className={`border-b border-subtle bg-surface px-3 py-1.5 text-meta font-mono text-tertiary ${className}`}
     >
       {laneList.map((lane) => (
@@ -50,6 +89,8 @@ export function AgentHud({ className = '' }: AgentHudProps) {
  */
 function HudRow({ lane }: { lane: HudLane }) {
   const catInfo = CATEGORY_DESCRIPTIONS[lane.category] ?? { label: lane.category };
+  const tokens = hudTokenText(lane);
+  const cost = hudCostText(lane);
 
   return (
     <div className="flex items-center gap-1.5">
@@ -64,18 +105,17 @@ function HudRow({ lane }: { lane: HudLane }) {
           <span className="shrink-0 uppercase tracking-wider">{lane.kind}</span>
         </>
       )}
-      <Dot />
-      <span className="shrink-0 tabular-nums">
-        {lane.tokensIn}↓ {lane.tokensOut}↑
-      </span>
-      <Dot />
-      {/* Model chưa có hợp đồng giá → `calculateModelCost` trả 'unknown'. Gạch
-          đầu dòng nói "không biết", không phải con số 0 và không phải chữ
-          "unknown" đọc như một số đo hỏng. */}
-      {lane.costUsd === 'unknown' ? (
-        <span className="shrink-0 text-disabled">—</span>
-      ) : (
-        <span className="shrink-0 tabular-nums text-secondary">${lane.costUsd.toFixed(4)}</span>
+      {tokens !== null && (
+        <>
+          <Dot />
+          <span className="shrink-0 tabular-nums">{tokens}</span>
+        </>
+      )}
+      {cost !== null && (
+        <>
+          <Dot />
+          <span className="shrink-0 tabular-nums text-secondary">{cost}</span>
+        </>
       )}
       <Dot />
       <EvidenceBadge level={lane.evidence} size="md" className="shrink-0" />

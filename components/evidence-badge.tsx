@@ -49,7 +49,7 @@ export function EvidenceBadge({ level = 'prepared', className = '', size = 'sm' 
   return (
     <span
       className={`inline-flex items-center gap-1 font-mono ${toneClass} ${sizeClass} ${className}`}
-      title={`Evidence status: ${info.badgeText}`}
+      title={`Mức bằng chứng: ${info.badgeText}`}
     >
       {safeLevel === 'verified' && <CheckCircle2 className="h-3 w-3 flex-shrink-0" />}
       {safeLevel === 'running' && <Play className="h-3 w-3 flex-shrink-0" />}

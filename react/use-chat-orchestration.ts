@@ -376,6 +376,37 @@ async function collectWorkspaceSources(): Promise<Array<{ path: string; content:
   return out;
 }
 
+/**
+ * Dài tối đa của phần "Mục tiêu" trong thông báo `/boost`.
+ *
+ * Thông báo nằm trong vùng `role="status"` (components/toast.tsx) nên trình đọc
+ * màn hình đọc TOÀN BỘ chuỗi ra thành tiếng. Mục tiêu là chuỗi người dùng gõ
+ * tay — dán nguyên văn một mục tiêu 200.000 ký tự là bắt ai đó ngồi nghe 200.000
+ * ký tự. 120 ký tự đọc mất chừng mười giây, đủ để biết đang làm gì.
+ */
+export const BOOST_TARGET_MAX = 120;
+
+/**
+ * Dàn phẳng chuỗi NGƯỜI DÙNG gõ trước khi nhúng vào thông báo ngắn.
+ *
+ * Không phải vệ đao kiểm XSS — `showNotice` render bằng text node, không có
+ * `dangerouslySetInnerHTML`. Vì sao vẫn phải làm:
+ *  - Dấu nháy của người dùng phá vỡ câu của app. `/boost nói "xin chào" nhé` dán
+ *    thẳng sẽ ra hai câu rác, đọc lên như phần mềm bị hỏng.
+ *  - Dấu xuống dòng đẩy phần còn lại của thông báo ra khỏi tầm nhìn và, tệ hơn,
+ *    là đội dọc khoảng trắng trong CSS.
+ *
+ * Nhảy mọi nháy (thẳng và cong) và ký tự điều khiển ra khoảng trắng, rồi gộp
+ * khoảng trắng. KHÔNG cắt ở đây: chỗ cắt phải mang dấu `…`, và chỗ biết mình
+ * cắt là nơi biết độ dài gốc — xem chỗ gọi trong nhánh `/boost`.
+ */
+export function noticeSafeLine(raw: string): string {
+  return raw
+    .replace(/["'“”‘’`]+/g, ' ')
+    /* \s không bắt \0 hay ESC (mục tiêu dán từ clipboard có thể chứa cả hai). */
+    .replace(/[\s\u0000-\u001f\u007f]+/g, ' ')
+    .trim();
+}
 
 export interface UseChatOrchestrationOptions {
   approvalBridge?: UseApprovalBridgeReturn;
@@ -477,6 +508,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       title: cmd.name,
       content: `/${cmd.name} `,
       kind: 'command',
+      description: cmd.description,
     }));
 
     /* Lệnh tùy biến người dùng cấu hình: /<tên> -> recipe */
@@ -2704,6 +2736,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   const {
     snapshot: runSnapshot,
     begin: beginRun,
+    reset: resetRun,
     touch: touchRun,
     stop: stopRun,
     succeed: succeedRun,
@@ -2741,6 +2774,47 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       showNotice(text, 6000);
     },
   });
+
+  /**
+   * Bắt đầu một lượt trả lời MỚI — dùng cho mọi cổng mà NGƯỜI DÙNG chủ động
+   * mở ra một lượt: gửi tin, bấm Tiếp tục, duyệt kế hoạch, kickoff goal loop,
+   * Tạo lại, Lưu chỉnh sửa.
+   *
+   * Vì sao cần `resetRun()` đứng trước: run đã kết thúc là terminal và bất
+   * biến, còn `beginRun()` chỉ có tác dụng khi state là `idle` (run-lifecycle.ts
+   * :144) — gọi nó trên run terminal là no-op im lặng. Hậu quả nếu thiếu
+   * `resetRun()`: từ lượt hai trở đi, lượt trả lời chạy mà KHÔNG còn giám sát
+   * (vòng reconcile dừng ngay ở `isTerminal`), stall detector 20s và auto-repair
+   * không chạy, còn `startedAt` bị ghim vào lượt đầu nên RUN_DEADLINE_MS không
+   * bao giờ bắn. `setRepairable(true)` cũng im lặng hỏng theo.
+   *
+   * `reset()` + `begin()` liền kề nên React gộp: trạng thái trung gian 'idle'
+   * không bao giờ được vẽ ra.
+   *
+   * KHÔNG gọi giữa lúc đang stream — `resetRun()` không kiểm tra, nên sẽ cưỡng
+   * chế reset run đang chạy. Mọi call site bên dưới đều chặn trước bằng
+   * `isLoading`/`isStreaming`.
+   *
+   * Đường tự tiếp tục (steering drain, goal-loop continue, follow-up drain)
+   * cố ý KHÔNG gọi hàm này: chúng nối tiếp đúng run đang chạy, nên `startedAt`
+   * phải giữ nguyên để RUN_DEADLINE_MS canh trọn một câu trả lời dài. Bù lại,
+   * `succeedRun()` trong onFinish phải đứng SAU cả ba drain — xem khối
+   * `finishReason !== 'tool-calls'` trong onFinish.
+   */
+  const startFreshRun = useCallback(() => {
+    resetRun();
+    beginRun();
+    /* Bật quyền tự sửa CHO RUN MỚI. `canRepair=false` làm run bị kẹt thì đi
+       thẳng tới terminate (run-lifecycle.ts:356) — tức tính năng tự gửi lại
+       không bao giờ chạy nếu thiếu dòng này.
+       `resetRun()` luôn đặt `observed:'idle'` nên `beginRun()` ở trên LUÔN có
+       tác dụng và `observed` LUÔN là 'starting' — nhánh if bên dưới chỉ là
+       chốt an toàn, không phải điều kiện có thể false.
+       LƯU Ý: vì vậy gọi hàm này GIỮA lúc đang stream sẽ cưỡng chế reset run
+       đang chạy. Mọi call site đều phải chặn bằng isLoading/isStreaming trước
+       khi gọi — xem từng chỗ. */
+    if (currentRun().observed === 'starting') setRepairable(true);
+  }, [resetRun, beginRun, currentRun, setRepairable]);
 
   /* Recipe checks : onFinish ủy quyền sang callback được gán sau
      (runRecipeChecks định nghĩa ở dưới submitTurn) qua ref để giữ thứ tự hook
@@ -2856,6 +2930,13 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
           | undefined;
         if (receiptAnn?.routeReceipt) {
           const rr = receiptAnn.routeReceipt;
+          /* Lượt bị dừng giữa chừng không có gì để "đã báo xong". `onFinish` cũng
+             chạy khi abort, nên để vô điều kiện là in ra một khẳng định lượt đó
+             chưa đạt — và status strip sẽ mâu thuẫn với badge "Bị chặn" ngay
+             trên message của CÙNG lượt đó (message-item.tsx).
+             Cùng một tín hiệu với badge kia: `finishRef` chính là cái mà persist
+             đọc để đóng dấu `status:'aborted'` (getFinalStoredStatus), nên hai
+             badge luôn cùng kết luận. 'blocked' đã có sẵn trong EvidenceLevel. */
           useHudStore.getState().upsertLane({
             laneId: 'main',
             kind: 'main',
@@ -2864,7 +2945,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
             effort: rr.selected?.effort ?? 'medium',
             tokensIn: usage.promptTokens ?? 0,
             tokensOut: usage.completionTokens ?? 0,
-            evidence: 'reported_done',
+            evidence: finishRef.current === 'abort' ? 'blocked' : 'reported_done',
           });
         }
       }
@@ -2938,15 +3019,39 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       const completionTokens =
         Number(usage?.completionTokens ?? 0) || Math.ceil(clean.length / 4);
 
+      /**
+       * Ngưỡng nén phải so với kích thước MỘT request, không phải TỔNG cộng
+       * dồn của cả lượt.
+       *
+       * `usage` ở đây là tổng đã tính (đúng cho cost/thống kê, giữ nguyên phần
+       * ghi annotation bên dưới) — nhưng một lượt agent nhiều vòng tool sẽ cộng
+       * dồn mọi vòng lại, luôn vượt window và nén oan. Route gửi kèm
+       * `lastStepUsage` cho đúng nghĩa này.
+       */
+      const annsForStep = (message.annotations ?? []) as Array<Record<string, unknown>>;
+      const lastStepAnn = [...annsForStep]
+        .reverse()
+        .find((a) => a && typeof a === 'object' && 'lastStepUsage' in a) as
+        | { lastStepUsage?: { promptTokens?: number; completionTokens?: number } }
+        | undefined;
+      const stepPromptTokens = Number(lastStepAnn?.lastStepUsage?.promptTokens ?? 0) || 0;
+
       /* Lưu usage thật cho auto-compact trigger — chỉ ghi khi có số liệu thật
          từ upstream (promptTokens > 0). Ước lượng fallback KHÔNG được dùng ở
-         đây vì nó sẽ khiến evaluateUsageTrigger đọc sai silent overflow. */
-      if (promptTokens > 0) {
-        lastUsageRef.current = { promptTokens, completionTokens, finishReason };
+         đây vì nó sẽ khiến evaluateUsageTrigger đọc sai silent overflow.
+         Ưu tiên `lastStepUsage` (kích thước request cuối); thiếu thì mới dùng
+         tổng — lạc phải hơn là nén nhầm. */
+      const triggerPromptTokens = stepPromptTokens > 0 ? stepPromptTokens : promptTokens;
+      if (triggerPromptTokens > 0) {
+        lastUsageRef.current = {
+          promptTokens: triggerPromptTokens,
+          completionTokens,
+          finishReason,
+        };
       }
       if (promptTokens > 0 || completionTokens > 0) {
         // Ghi usage vào annotation để thống kê token có dữ liệu trong DB.
-        const anns = (message.annotations ?? []) as Array<Record<string, unknown>>;
+        const anns = annsForStep;
         const lastModel = [...anns].reverse().find((a) => typeof a?.model === 'string')?.model;
         /* durationMs + est cho dòng thống kê dưới câu trả lời (mượn ý
            UI): est = true khi completion là ước lượng chars/4 chứ
@@ -2995,16 +3100,21 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
        * Kết thúc thật sự: chỉ khi bước cuối KHÔNG phải 'tool-calls'. Trường hợp
        * còn lại là useChat đang resubmit để model đọc kết quả tool — run vẫn
        * sống, tuyệt đối không chốt succeeded ở đây.
+       *
+       * `succeedRun()` nằm ở CUỐI khối, SAU cả ba drain — mọi nhánh `return`
+       * bên dưới đều mở một lượt MỚI, và run phải còn sống qua ranh giới đó.
        */
       if (finishReason !== 'tool-calls' && finishRef.current !== 'error') {
-        succeedRun();
-
         /* Recipe active : agent vừa xong một attempt → chạy shell
            checks, quyết pass/retry/stop. Chiếu quyền flow (queue drains bỏ
            qua) để vòng retry không đua với steering queued. */
         {
           const rr = useRecipeUiStore.getState().activeRun;
           if (rr && (rr.status === 'running' || rr.status === 'retrying') && runRecipeChecksRef.current) {
+            /* Recipe KHÔNG drain: pass/stop thì lượt đã xong, retry thì gọi
+               `submitTurn` (tự `startFreshRun`). Cả hai đều không mở lượt
+               dưới lượt này nên chốt succeeded tại đây. */
+            succeedRun();
             void runRecipeChecksRef.current(clean);
             return;
           }
@@ -3013,7 +3123,11 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         /* P3.1 — Drain queue đúng thứ tự Pi: steering trước, rồi goal-continue,
            rồi follow-up. Mỗi drain chỉ append MỘT lượt (one-at-a-time mặc
            định); useChat resubmit xong onFinish kế tiếp drain tiếp. Steering
-           đi thẳng (không qua goal-stop như tin thủ công). */
+           đi thẳng (không qua goal-stop như tin thủ công).
+           Cả ba KHÔNG gọi `startFreshRun()`: chúng nối tiếp ĐÚNG run này
+           (cùng một câu trả lời còn đang diễn ra), nên run phải giữ nguyên
+           `startedAt` để RUN_DEADLINE_MS canh trọn vòng. Đó là lý do
+           `succeedRun()` phải đứng SAU chúng. */
         const steerDrained = drainQueue(steeringRef.current, steeringModeRef.current);
         if (steerDrained.taken.length > 0) {
           steeringRef.current = steerDrained.rest;
@@ -3049,7 +3163,11 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
           setFollowUpCount(followDrained.rest.length);
           const followText = followDrained.taken.join('\n\n');
           void append({ role: 'user', content: followText }, { body: routingBodyFor(messages, followText) });
+          return;
         }
+
+        /* Không còn lượt nào đứng sau → lượt này thật sự xong. */
+        succeedRun();
       }
     },
     onError: (err) => {
@@ -3624,21 +3742,45 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         );
         return;
       }
+      /* `resetRun()` trong `startFreshRun()` không kiểm tra, nên gọi giữa lúc
+         stream sẽ cưỡng chế reset run đang chạy (vòng canh dừng ở terminal,
+         stall detector im, deadline không bao giờ bắn). Nút Goal loop trong
+         composer đã tự tắt theo `isLoading` nên đây là lưới an toàn thứ hai —
+         bỏ im, cùng kiểu `handleApprovePlan`. Đặt SAU nhánh "đang chạy → dừng":
+         khi loop active nút mang nghĩa dừng, và dừng giữa lượt là đúng ý người
+         dùng. Trước `startGoalLoop()` để chặn sớm — start rồi mới return thì
+         loop thành 'active' mà không có lượt nào chạy. */
+      if (isLoading) return;
       const started = startGoalLoop(chatId, { instruction: goal });
       setGoalLoop(started);
       composerApiRef.current?.clear();
       const goalKickoff = buildGoalKickoff(started);
+      startFreshRun();
       void append({ role: 'user', content: goalKickoff }, { body: routingBodyFor(messages, goalKickoff) });
     },
-    [goalLoop, append, composerApiRef, messages, routingBodyFor],
+    [goalLoop, append, composerApiRef, isLoading, messages, routingBodyFor, startFreshRun],
   );
 
   const continueGenerating = useCallback(() => {
+    /* Nút "Tiếp tục" là người dùng chủ động mở một lượt mới → run mới. KHÔNG
+       gọi `startFreshRun()` thì lượt này chạy không có giám sát.
+       PHẢI chặn `isLoading`: nút này nằm trên tin nhắn CŨ bị cắt, mà
+       message-list chỉ tắt ở TIN CUỐI — nên nó vẫn sáng và bấm được giữa lúc
+       một lượt khác đang stream. `resetRun()` không kiểm tra: bấm lúc đó sẽ
+       cưỡng chế reset run ĐANG CHẠY (vòng canh dừng ở terminal, stall detector
+       im, `canRepair` bị xoá, deadline không bao giờ bắn) rồi nối prompt vào
+       giữa lượt đó. Vì nút không tự tắt theo `isLoading`, im lặng sẽ thành
+       "bấm không ăn" — báo một câu, cùng cách `webBusyRef` báo ở submitTurn. */
+    if (isLoading) {
+      showNotice('Đang trả lời — dừng lượt hiện tại trước khi viết tiếp nhé.', 4000);
+      return;
+    }
+    startFreshRun();
     void append(
       { role: 'user', content: CONTINUE_PROMPT },
       { body: routingBodyFor(messages, CONTINUE_PROMPT) },
     );
-  }, [append, messages, routingBodyFor]);
+  }, [append, isLoading, messages, routingBodyFor, startFreshRun]);
 
   /**
    * Duyệt kế hoạch (P1-5): chuyển ACT + gửi lượt kick-off thực thi. Plan đã
@@ -3651,9 +3793,10 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
     if (!isLoading) {
       const kick =
         'Người dùng đã duyệt kế hoạch. Hãy bắt đầu thực hiện theo đúng thứ tự subtask, dùng plan_update để đánh dấu tiến độ (in_progress → done/failed).';
+      startFreshRun();
       void append({ role: 'user', content: kick }, { body: routingBodyFor(messages, kick) });
     }
-  }, [updateSettings, isLoading, append, messages, routingBodyFor]);
+  }, [updateSettings, isLoading, append, messages, routingBodyFor, startFreshRun]);
 
   const { isAtBottom, isAtBottomRef, onScroll, pin, scrollToBottom } = useStickToBottom(scrollRef, {
     streaming: isLoading,
@@ -4791,6 +4934,11 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
 
         notifyChatUpdated(chatId);
 
+        /* Tạo lại = người dùng mở một lượt trả lời MỚI. `reload()` đi thẳng
+           qua useChat nên không chạm run-lifecycle; không `startFreshRun()`
+           thì lượt này thừa hưởng state terminal của lượt cũ. */
+        startFreshRun();
+
         triggerReload();
       } catch (error) {
         pendingAssistantForkRef.current =
@@ -4814,6 +4962,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       setMessages,
 
       triggerReload,
+      startFreshRun,
     ],
   );
 
@@ -5028,7 +5177,12 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
         /**
          * Active thread hiện kết thúc bằng User message,
          * nên reload() sẽ yêu cầu AI tạo Assistant mới.
+         *
+         * Lưu chỉnh sửa cũng là một lượt trả lời MỚI, nên cần run mới — xem
+         * `startFreshRun()`.
          */
+        startFreshRun();
+
         triggerReload();
       } catch (error) {
         pendingAssistantForkRef.current = null;
@@ -5049,6 +5203,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       setMessages,
 
       triggerReload,
+      startFreshRun,
     ],
   );
 
@@ -5165,7 +5320,9 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       finishRef.current = 'stop';
       /* Ref đồng hồ lượt trả lời: submitTurn và handleRegenerate là hai đường
          submit khác nhau nên không dùng được startedAt của run-lifecycle
-         (chỉ beginRun ở submitTurn ghi). Ghi ref trong callback là cố ý —
+         (startFreshRun ở cả hai đều đặt startedAt mới trong ref của
+         run-lifecycle, còn ref này đo riêng cho footer đồng hồ).
+         Ghi ref trong callback là cố ý —
          rule immutability của react-hooks v7 phân tích tĩnh không phân biệt
          callback chạy-lâu-sau-render với code render. */
       // eslint-disable-next-line react-hooks/immutability
@@ -5390,23 +5547,11 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
 
       attachGenRef.current += 1;
       setAttachments([]);
-      /* Bắt đầu một run MỚI: reconciler chuyển idle → starting và bắt đầu đếm
-         STARTUP_GRACE_MS. Phải gọi TRƯỚC handleSubmit — nếu gọi sau, request
-         có thể đã xong trước khi bộ đếm kịp đặt. */
-      beginRun();
-      /**
-       * Bật quyền tự sửa CHO RUN NÀY. `canRepair=false` sẽ làm run bị kẹt đi
-       * thẳng tới terminate (run-lifecycle.ts:356) — tức là tính năng tự gửi
-       * lại không bao giờ chạy nếu thiếu dòng này.
-       *
-       * Chỉ bật khi `beginRun()` thật sự tạo run mới: nó là no-op nếu run trước
-       * chưa kết thúc, mà lúc đó thì không được phép gắn quyền sửa vào run cũ.
-       * `currentRun()` đọc state đồng bộ từ ref, nên thấy ngay kết quả.
-       *
-       * Khi run kết thúc, `settle()` tự trả `canRepair` về false — không cần
-       * tắt thủ công.
-       */
-      if (currentRun().observed === 'starting') setRepairable(true);
+      /* Đây là lượt người dùng gửi TAY → một run MỚI. `startFreshRun()` đưa
+         run cũ về idle rồi begin, nên lượt này có `startedAt` riêng và được
+         giám sát từ đầu. Phải gọi TRƯỚC handleSubmit — nếu gọi sau, request có
+         thể đã xong trước khi bộ đếm kịp đặt. */
+      startFreshRun();
       /* append thay handleSubmit: draft nằm ở composer nên SDK không còn state
          `input` để đọc — append nhận nội dung tường minh, cùng ChatRequestOptions
          (experimental_attachments + per-call body) như handleSubmit cũ. */
@@ -5426,7 +5571,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       console.error('[onSubmit]', err);
       return false;
     }
-  }, [attachments, isLoading, currentChat, currentChatId, draftId, setCurrentChatId, append, pin, generateTitle, messages, webSearchEnabled, agentToolsEnabled, forceEmulatedTools, agentMode, stagingEnabled, beginRun, currentRun, setRepairable, MODELS, isRoutableModel, routingBodyFor, approvalPolicy, autoPilot]);
+  }, [attachments, isLoading, currentChat, currentChatId, draftId, setCurrentChatId, append, pin, generateTitle, messages, webSearchEnabled, agentToolsEnabled, forceEmulatedTools, agentMode, stagingEnabled, startFreshRun, MODELS, isRoutableModel, routingBodyFor, approvalPolicy, autoPilot]);
 
   /* ---------------------------------------------------------------- */
   /* Recipe runner : attempt → checks → retry/pass/stop.   */
@@ -5724,8 +5869,24 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
               showNotice('Gõ theo mẫu: /boost <mục tiêu tác vụ>', 5000);
               return false;
             }
-            showNotice(`Đã kích hoạt chế độ Boost trong Git Worktree cô lập: "${slash.target}"`, 4000);
-            return submitTurn(`[Chế độ Boost Worktree] Hãy thực thi tác vụ sau trong Git Worktree cô lập:\n\n${slash.target}`);
+            /* /boost KHÔNG tạo workspace riêng: agent chạy thẳng với bộ công cụ
+               fs/shell trên chính workspace đang mở, nên phải nói là "sửa file
+               thật". Trước đây notice và tiền tố tin nhắn đều hứa có workspace Git
+               riêng, nhưng không có gì được tạo ra: người dùng tưởng thư mục gốc
+               được bảo vệ, còn agent thì ghi thẳng vào thư mục gốc.
+               `slash.target` là chuỗi NGƯỜI DÙNG gõ tay nên không dán thẳng:
+               `noticeSafeLine()` dàn nháy + ký tự điều khiển ra khoảng trắng để
+               nó không phá vỡ câu này, `slice` + `…` chặn mục tiêu dài lê thê
+               trong vùng `role="status"` (xem BOOST_TARGET_MAX). Tin nhắn gửi
+               đi vẫn NGUYÊN VĂN — chỉ phần trích trong thông báo bị cắt. */
+            showNotice(
+              `Boost: chạy ngay trong workspace hiện tại, agent có thể sửa file thật. Mục tiêu: "${noticeSafeLine(slash.target.slice(0, BOOST_TARGET_MAX))}${slash.target.length > BOOST_TARGET_MAX ? '…' : ''}"`,
+              5000,
+            );
+            /* Gửi nguyên văn mục tiêu, không gắn tiền tố: tiền tố mô tả chế độ
+               chạy cũng là câu đầu tiên mà trình sinh tiêu đề phiên đọc, nên nó
+               làm tên phiên thành "Chế độ Boost ... Hãy". */
+            return submitTurn(slash.target);
           }
 
           if (slash.kind === 'plan') {

@@ -4,6 +4,7 @@ import type { MemoryRecord, MemoryReviewEntry } from '@/lib/memory/types';
 import type { AgentMemoryRecord } from '@/lib/memory/agent-memory';
 import type { ZeroMemTrace, ZeroMemEntity, ZeroMemRelation } from '@/lib/zeromem/types';
 import { resetTurnTaint } from '@/lib/taint-tracker';
+import { redactSecretText } from '@/lib/secret-registry';
 
 /**
  * IndexedDB KHÔNG index được `null`. Message gốc phải mang sentinel này,
@@ -88,7 +89,12 @@ export interface StoredMessage {
   finishReason?: StoredMessageFinishReason;
   status?: StoredMessageStatus;
   tokens?: string[];
-  /** Annotation từ data stream (requestId, attempt, key, model...). */
+  /**
+   * Annotation từ data stream (requestId, attempt, key, model...).
+   * Kênh đa dạng: tool trace, biên nhận route, usage, subagent, đề xuất ghi
+   * nhớ. Chỉ phần `tool.preview` bị cắt trần khi ghi (xem sanitizeAnnotations) —
+   * các loại annotation khác giữ nguyên vẹn.
+   */
   annotations?: Array<Record<string, unknown>>;
   /**
    * Kết quả tool client-executed (fs_*) do useChat gắn vào assistant message.
@@ -98,6 +104,14 @@ export interface StoredMessage {
    * Trường không index → không cần bump version Dexie.
    */
   toolInvocations?: StoredToolInvocation[];
+  /**
+   * Reasoning của model, do useChat gắn vào assistant message lúc stream và
+   * ThinkingBlock hiển thị ngay. PHẢI persist: thiếu nó thì mở lại hội thoại cũ
+   * là mất sạch khối suy nghĩ mà không có lỗi nào báo.
+   * Không ai truy vấn reasoning → không index → không cần bump version Dexie.
+   * Row cũ đọc ra là undefined, phía đọc đã tự chịu (xem toChatMessage).
+   */
+  reasoning?: string;
 }
 
 /**
@@ -287,10 +301,30 @@ export const STORED_TOOL_RESULT_CHARS = 24_000;
 export const STORED_TOOL_INVOCATIONS_MAX = 12;
 
 /**
+ * Trần ký tự cho `preview` của MỘT annotation tool (phase 'done') khi persist.
+ * Khớp TOOL_PREVIEW_MAX_CHARS ở lib/tool-limits.ts — giữ số ở đây độc lập vì
+ * lý do cũ: db.ts không phụ thuộc module runtime của agent. Server đã cắt sẵn
+ * ở con số này; trần ở đây là lưới an toàn cho đường ghi khác.
+ */
+export const STORED_ANNOTATION_PREVIEW_CHARS = 4_000;
+
+/**
+ * Số annotation tool CÓ `preview` tối đa giữ lại trên MỘT message.
+ * Bằng STORED_TOOL_INVOCATIONS_MAX có chủ ý: hai danh sách phải nhìn thấy cùng
+ * một tập tool call gần nhất, nếu không timeline trong UI và tập kết quả gửi
+ * lại cho model sẽ lệch nhau (một bên có, một bên không).
+ */
+export const STORED_ANNOTATION_PREVIEWS_MAX = STORED_TOOL_INVOCATIONS_MAX;
+
+/**
  * Chuẩn hoá tool invocation trước khi ghi: chỉ giữ invocation đã có kết quả
- * (state 'result' — pending không tái tạo được part hợp lệ), cắt trần result
- * quá lớn thành ghi chú, và giới hạn số lượng để một lượt agent coding dài
- * không thổi phồng một record IndexedDB.
+ * (state 'result' — pending không tái tạo được part hợp lệ), redact rồi cắt
+ * trần result quá lớn thành ghi chú, và giới hạn số lượng để một lượt agent
+ * coding dài không thổi phồng một record IndexedDB.
+ *
+ * Phạm vi của việc redact ở đây là RANH GIỚI CẮT: kết quả dưới trần vẫn được
+ * giữ nguyên object gốc (không deep-redact) — không đổi so với trước, và cùng
+ * giá trị đó vẫn đi lên model qua serializeToolResult (đã redact ở đó).
  */
 export function sanitizeToolInvocations(
   list?: StoredToolInvocation[],
@@ -301,7 +335,11 @@ export function sanitizeToolInvocations(
     if (!inv || typeof inv.toolName !== 'string' || inv.state !== 'result') continue;
     let result = inv.result;
     try {
-      const raw = JSON.stringify(result ?? null) ?? 'null';
+      /* Redact TRƯỚC khi cắt: cắt trước thì một khoá nằm vắt qua ranh giới cắt
+         sẽ chỉ còn nửa chuỗi và không khớp rule nào nữa → lọt bí mật vào DB (và
+         từ đó vào ngữ cảnh lượt sau). Đúng thứ tự serializeToolResult dùng ở
+         lib/tool-limits.ts:66 — giữ hai đường cùng một thứ tự. */
+      const raw = redactSecretText(JSON.stringify(result ?? null) ?? 'null');
       if (raw.length > STORED_TOOL_RESULT_CHARS) {
         result = {
           truncated: true,
@@ -324,6 +362,110 @@ export function sanitizeToolInvocations(
   if (!cleaned.length) return undefined;
   // Giữ những invocation MỚI NHẤT khi vượt trần: chúng gần câu hỏi hiện tại nhất.
   return cleaned.slice(-STORED_TOOL_INVOCATIONS_MAX);
+}
+
+/** Payload `tool` của một annotation, nếu đúng hình dạng. */
+function annotationToolPayload(
+  ann: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  const tool = ann?.tool;
+  return typeof tool === 'object' && tool !== null
+    ? (tool as Record<string, unknown>)
+    : undefined;
+}
+
+/** `preview` (thân kết quả tool) của một annotation, nếu có và là chuỗi. */
+function annotationToolPreview(
+  ann: Record<string, unknown> | undefined,
+): string | undefined {
+  const preview = annotationToolPayload(ann)?.preview;
+  return typeof preview === 'string' && preview ? preview : undefined;
+}
+
+/**
+ * Cắt trần `preview` của annotation tool, kèm ghi chú nói rõ đã bị cắt.
+ * Ghi chú dài cố định (không nhúng con số) để không phụ thuộc vòng lặp chỉnh
+ * độ dài như toStoredReasoning: đây là dữ liệu để render, không phải số liệu.
+ */
+function cutAnnotationPreview(preview: string): string {
+  const cutNote = '\n[… phần thân đã bị cắt khi lưu …]';
+  return (
+    preview.slice(0, STORED_ANNOTATION_PREVIEW_CHARS - cutNote.length) + cutNote
+  );
+}
+
+/**
+ * `annotations` là kênh đa dạng: mỗi loại dữ liệu trong hội thoại đi qua đây,
+ * nên nó KHÔNG phải "tool data". Đủ các loại đang được ghi (xem
+ * app/api/chat/route.ts `writeAnnotation` và react/use-chat-orchestration.ts):
+ *
+ *   tool                phase 'start' (id/name/at/args tóm tắt) và 'done'
+ *                       (summary + preview)         ← LOẠI DUY NHẤT BỊ CẦN
+ *   routeReceipt        biên nhận định tuyến (route phát, client đọc)  ← giữ
+ *   evidenceLevel       bằng chứng lượt (đọc cùng routeReceipt)         ← giữ
+ *   lastStepUsage       usage của bước cuối                            ← giữ
+ *   usage/model/routingRole/durationMs/est   thống kê token, CLIENT ghi  ← giữ
+ *   subagentCall        lệnh tool của subagent (có args!)              ← giữ
+ *   subagent            tiến độ subagent                               ← giữ
+ *   memoryProposal      đề xuất ghi nhớ (client ghi thật vào DB)        ← giữ
+ *   orchestratorAdopted badge nguồn gốc mục tiêu                      ← giữ
+ *   capabilityProjection, attempt/totalAttempts/key/model (retry),
+ *   hb (heartbeat), error                                         ← giữ
+ *   type 'finish'       đọc bởi getFinishInfo; không có producer trong
+ *                       repo này (có thể từ provider)            ← giữ
+ *
+ * Chỉ có `tool` phase 'done' mang `preview` — tức là thân kết quả tool, thứ
+ * DUY NHẤT ở đây dài theo dữ liệu người dùng (tới TOOL_PREVIEW_MAX_CHARS 4k
+ * mỗi cái). `maxSteps` phía client không trần (CLIENT_MAX_STEPS_UNBOUNDED) và
+ * doom-loop guard chỉ bắt (tool, args) LẶP LIÊN TIẾP, nên model đổi qua lại
+ * hai tool là không bao giờ chạm ngưỡng: 100 tool call = ~400 KB trên một row.
+ *
+ * Vì vậy hàm này CẦN CHỌN LỌC, không cắt cả mảng: mọi loại annotation không
+ * phải tool đi qua nguyên vẹn. Trong nhóm tool cũng vậy — annotation phase
+ * 'start' nhỏ (id/name/at/args tóm tắt) và là thứ dựng timeline trong
+ * components/chat/tool-trace.tsx, nên không bị loại; chỉ phần `preview` bị cắt
+ * và chỉ N preview MỚI NHẤT được giữ.
+ *
+ * Trả về đúng tham chiếu đầu vào khi không cần can thiệp, để phần chưa bị cắt
+ * không tạo mảng mới mỗi lần reconcile.
+ */
+export function sanitizeAnnotations(
+  list?: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> | undefined {
+  if (!list?.length) return list;
+
+  const previewIndexes: number[] = [];
+  for (let i = 0; i < list.length; i++) {
+    if (annotationToolPreview(list[i]) !== undefined) previewIndexes.push(i);
+  }
+  const kept = new Set(previewIndexes.slice(-STORED_ANNOTATION_PREVIEWS_MAX));
+
+  let changed = false;
+  const cleaned: Array<Record<string, unknown>> = [];
+  for (let i = 0; i < list.length; i++) {
+    const ann = list[i];
+    const preview = annotationToolPreview(ann);
+    if (preview === undefined) {
+      cleaned.push(ann);
+      continue;
+    }
+    /* Preview quá cũ: bỏ hẳn annotation, như một invocation bị rớt khỏi
+       STORED_TOOL_INVOCATIONS_MAX. */
+    if (!kept.has(i)) {
+      changed = true;
+      continue;
+    }
+    if (preview.length <= STORED_ANNOTATION_PREVIEW_CHARS) {
+      cleaned.push(ann);
+      continue;
+    }
+    changed = true;
+    cleaned.push({
+      ...ann,
+      tool: { ...annotationToolPayload(ann), preview: cutAnnotationPreview(preview) },
+    });
+  }
+  return changed ? cleaned : list;
 }
 
 export class ChatAppDatabase extends Dexie {
@@ -732,6 +874,7 @@ export class ChatAppDatabase extends Dexie {
       if (typeof obj.branchOrder !== 'number') obj.branchOrder = 0;
       obj.attachments = sanitizeAttachments(obj.attachments);
       obj.toolInvocations = sanitizeToolInvocations(obj.toolInvocations);
+      obj.annotations = sanitizeAnnotations(obj.annotations);
       if (obj.status !== 'streaming' && (!obj.tokens || obj.tokens.length === 0)) {
         obj.tokens = tokenize(obj.content || '');
       }
@@ -756,6 +899,9 @@ export class ChatAppDatabase extends Dexie {
       }
       if ('toolInvocations' in mods) {
         patch.toolInvocations = sanitizeToolInvocations(mods.toolInvocations);
+      }
+      if ('annotations' in mods) {
+        patch.annotations = sanitizeAnnotations(mods.annotations);
       }
       return Object.keys(patch).length ? { ...mods, ...patch } : mods;
     });
@@ -872,6 +1018,7 @@ export async function appendMessage(input: AppendMessageInput): Promise<StoredMe
       createdAt: input.createdAt ?? Date.now(),
       attachments: sanitizeAttachments(input.attachments),
       toolInvocations: sanitizeToolInvocations(input.toolInvocations),
+      annotations: sanitizeAnnotations(input.annotations),
     };
 
     await db.messages.add(record);

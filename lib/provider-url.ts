@@ -80,8 +80,21 @@ export function isThinkingLevel(value: unknown): value is ThinkingLevel {
 }
 
 /**
- * Tầng gateway (nơi duy nhất đổi mức suy luận bằng fast-path) đã gỡ.
- * Mức suy luận giờ chỉ tra qua metadata kiểu OpenRouter (model-reasoning-cache).
+ * KHÔNG phải capability probe — đây là hằng số trả về `false`.
+ *
+ * Trong app này KHÔNG tồn tại nguồn dữ liệu nào gắn khả năng "nhận
+ * `reasoning_effort`" với một baseUrl. Tầng gateway env (nơi duy nhất tra
+ * hostname) đã gỡ, nên `baseUrl` ở đây không mang thông tin gì về khả năng
+ * đó và không thể trở thành probe mà không đoán mò.
+ *
+ * Nguồn thật là metadata kiểu OpenRouter trong `GET /v1/models`:
+ * `lib/reasoning-capability.ts` đọc nó (`parseModelReasoning`,
+ * `shouldShowThinkingControl`, `resolveNearestEffort`). `app/api/chat/route.ts`
+ * đã gọi đúng đường đó ở nhánh else, nên mức suy luận vẫn được gửi đúng.
+ *
+ * `false` ở đây nghĩa là "không có fast-path nào", KHÔNG phải "provider này
+ * không hỗ trợ". Giữ hàm vì `app/api/chat/route.ts` còn import; xoá đi thì
+ * phải sửa route theo cùng lúc.
  */
 export function supportsThinkingLevel(baseUrl: string | null | undefined): boolean {
   void baseUrl;
@@ -89,8 +102,16 @@ export function supportsThinkingLevel(baseUrl: string | null | undefined): boole
 }
 
 /**
- * Model media built-in đã gỡ khỏi catalog — khả năng media chỉ còn đến từ
- * /v1/models của provider người dùng (phát hiện qua tên model).
+ * KHÔNG phải capability probe — đây là hằng số trả về `false`, và hiện KHÔNG
+ * có caller nào trong repo (đã grep toàn bộ `.ts`/`.tsx`, kể cả test).
+ *
+ * Lý do không thể trở thành probe: khả năng sinh media không nằm trên
+ * baseUrl mà nằm trên TÊN MODEL, và cơ chế tra tên đó đã tồn tại và đã dùng:
+ * `lib/media-models.ts` (`detectMediaKind` / `isRetiredMediaOption`), dùng ở
+ * `components/model-selector.tsx` để loại các model media đã ngừng hoạt
+ * động. Model media built-in đã gỡ khỏi catalog từ lâu.
+ *
+ * Đừng thêm UI nào gọi hàm này để bật/tắt nút: nó không đọc gì cả.
  */
 export function supportsMediaGeneration(baseUrl: string | null | undefined): boolean {
   void baseUrl;

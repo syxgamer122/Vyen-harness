@@ -75,7 +75,7 @@ describe('extractMessageUsage', () => {
 });
 
 describe('formatMessageUsage', () => {
-  it('đủ các phần, nối bằng " · ", ≈ chỉ đứng trước ↓ khi ước lượng', () => {
+  it('đủ các phần, nối bằng " · ", ≈ đứng trước CẢ DÒNG khi ước lượng', () => {
     const real = formatMessageUsage({
       promptTokens: 1200,
       completionTokens: 300,
@@ -96,7 +96,7 @@ describe('formatMessageUsage', () => {
       costUsd: null,
       routingRole: null,
     });
-    expect(est).toBe('≈↓480 · 0.8s');
+    expect(est).toBe('≈ ↓480 · 0.8s');
   });
 
   it('chi phí nhỏ hơn 1 cent giữ 4 số lẻ để còn đọc được', () => {

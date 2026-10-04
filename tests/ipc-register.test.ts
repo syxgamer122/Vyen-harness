@@ -66,6 +66,7 @@ describe('register — đăng ký channel', () => {
       'vyen:fs-list',
       'vyen:fs-read',
       'vyen:fs-write',
+      'vyen:fs-append',
       'vyen:fs-delete',
       'vyen:fs-stat',
       'vyen:fs-search',
@@ -230,5 +231,67 @@ describe('workspace-set blocklist — chặn root là thư mục hệ thống', 
     await expect(call('vyen:workspace-set', { path: lower })).rejects.toThrow(
       /Không thể đặt workspace/,
     );
+  });
+});
+
+/**
+ * Hồi quy mất dữ liệu anchor log.
+ *
+ * Bản cũ append bằng cách ĐỌC file rồi ghi đè: `desktopFsRead` cắt ở
+ * `MAX_READ_CHARS = 24_000`, nên mỗi lần ghi lại đều xoá vĩnh viễn phần đuôi
+ * file vượt ngưỡng. `fsAppend` dùng `fsp.appendFile` (O_APPEND) nên không đọc,
+ * không TOCTOU, và ghi song song không mất dòng.
+ *
+ * Test này chỉ XANH khi handler là một lệnh append thật — nếu ai đó đổi lại
+ * thành read+write thì số dòng sẽ không khớp.
+ */
+describe('vyen:fs-append — append thật, không mất dòng', () => {
+  it('20 lần append song song vào một file thì đủ 20 dòng, không dòng nào đứt', async () => {
+    const relPath = 'append-race.log';
+    try {
+      await Promise.all(
+        Array.from({ length: 20 }, (_, i) =>
+          call('vyen:fs-append', { relPath, line: JSON.stringify({ seq: i, hash: `h${i}`, ts: 1700000000000 + i }) + '\n' }),
+        ),
+      );
+
+      const res = (await call('vyen:fs-read', { relPath })) as { content: string };
+      const lines = res.content.split('\n').filter(Boolean);
+
+      // Điều đòi hỏi: KHÔNG MẤT DÒNG, và mỗi dòng JSON nguyên vẹn.
+      expect(lines.length).toBe(20);
+      const seqs = lines.map((l) => JSON.parse(l).seq as number);
+      expect([...seqs].sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, i) => i));
+
+      // KHÔNG đòi thứ tự: O_APPEND bảo đảm tính nguyên tử của TỪNG LẦN GHI, không
+      // bảo đảm thứ tự giữa các lần ghi song song — đó là hành vi đúng của tầng OS.
+      // Bản cũ (read + ghi đè) mất dòng ở đây vì mọi lần đều ghi lại cùng một
+      // nội dung "đọc được", nên chỉ lần cuối còn sót.
+    } finally {
+      await call('vyen:fs-delete', { relPath }).catch(() => {});
+    }
+  });
+
+  it('append vào file chưa tồn tại thì tạo file mới, không ném', async () => {
+    const relPath = 'append-fresh.log';
+    try {
+      await call('vyen:fs-append', { relPath, line: '{"seq":1}\n' });
+      const res = (await call('vyen:fs-read', { relPath })) as { content: string };
+      expect(res.content).toBe('{"seq":1}\n');
+    } finally {
+      await call('vyen:fs-delete', { relPath }).catch(() => {});
+    }
+  });
+
+  it('append KHÔNG đụng nội dung đã có (không ghi đè)', async () => {
+    const relPath = 'append-keep.log';
+    try {
+      await call('vyen:fs-write', { relPath, content: '{"seq":1}\n' });
+      await call('vyen:fs-append', { relPath, line: '{"seq":2}\n' });
+      const res = (await call('vyen:fs-read', { relPath })) as { content: string };
+      expect(res.content).toBe('{"seq":1}\n{"seq":2}\n');
+    } finally {
+      await call('vyen:fs-delete', { relPath }).catch(() => {});
+    }
   });
 });

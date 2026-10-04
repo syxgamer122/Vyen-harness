@@ -7,27 +7,45 @@ interface ChatErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
   onReset?: () => void;
+  /**
+   * Đổi giá trị này để tự xoá trạng thái lỗi (vd: nội dung message).
+   * Không có nó, một lần render lỗi là bubble kẹt ở fallback mãi mãi —
+   * kể cả khi content đầy đủ/correct đã về, vì instance giữ nguyên theo
+   * key (message id) của list ảo. Xem `error-boundary.tsx` cùng pattern.
+   */
+  resetKey?: unknown;
 }
 
 interface ChatErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  lastResetKey?: unknown;
 }
 
 export class ChatErrorBoundary extends Component<
   ChatErrorBoundaryProps,
   ChatErrorBoundaryState
 > {
-  state: ChatErrorBoundaryState = {
-    hasError: false,
-    error: null,
-  };
+  constructor(props: ChatErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null, lastResetKey: props.resetKey };
+  }
 
   static getDerivedStateFromError(error: Error): ChatErrorBoundaryState {
     return {
       hasError: true,
       error,
     };
+  }
+
+  static getDerivedStateFromProps(
+    props: ChatErrorBoundaryProps,
+    state: ChatErrorBoundaryState,
+  ): Partial<ChatErrorBoundaryState> | null {
+    if (props.resetKey !== state.lastResetKey) {
+      return { hasError: false, error: null, lastResetKey: props.resetKey };
+    }
+    return null;
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -39,6 +57,7 @@ export class ChatErrorBoundary extends Component<
     this.setState({
       hasError: false,
       error: null,
+      lastResetKey: this.props.resetKey,
     });
   };
 
