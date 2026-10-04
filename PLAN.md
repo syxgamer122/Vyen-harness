@@ -448,3 +448,115 @@ Còn dở trong B4.2: validate tên trong `components/settings/slash-commands-se
   Nếu test đỏ bất thường kiểm `git worktree list` trước khi đi tìm lỗi code.
 - **`tests/secret-registry.test.ts` và `tests/web-bridge.test.ts` đỏ theo tải máy** —
   không sửa chúng, chạy riêng để xác nhận.
+
+---
+
+# TIẾN ĐỘ — phiên Codebuff 2026-10-04: GÓI A/B/C XONG
+
+**Đã sửa + verify đầy đủ. Gói D/E chưa làm — chờ user quyết.**
+
+| Gói | File | Trạng thái |
+|---|---|---|
+| A1 escape | `lib/mcp/code-mode.ts` — bridge cài TỪ TRONG sandbox (`vm.runInContext`), không nạp intrinsic host | ✅ |
+| A2 timeout | clear toàn bộ timer + cờ `cancelled` chặn mcp.call muộn (giảm thiểu, không dừng cứng) | ✅ |
+| A3 returnValue | cắt qua `truncateCodeOutput` cùng trần 24k | ✅ |
+| A4 egress | `lib/taint-tracker.ts` `isEgressTool('run_code')` → `true` (vô điều kiện) | ✅ |
+| A5 test | `tests/code-mode-escape.test.ts` mới — 19 test (12 case probe + chức năng + timer + trần) | ✅ |
+| B validate args | `lib/emulated-agent.ts` `validateToolArgs` (zod `safeParse`, guard cho MCP tool không schema) áp cho cả đường batch lẫn tuần tự; +2 test trong `tests/emulated-agent.test.ts` | ✅ |
+| C schema | `lib/cli/recipe-runner.ts` `emitResult` nhận `schema` (export để test), fail → phát `ok:false` kèm `errors`; +4 test trong `tests/cli-recipe-runner.test.ts` | ✅ |
+
+**Bằng chứng (máy sandbox này nhanh hơn máy baseline):**
+- `npx tsc --noEmit` → exit 0 (chạy sau mỗi gói).
+- `npx vitest related <4 file nguồn> --run` → 64 file / 1.195 test xanh (49s).
+- Full `npx vitest run` → **222/222 file xanh, 3.624 pass / 2 skip / 0 fail** (113s).
+  2 skip có sẵn; KHÔNG có test nào xanh → đỏ.
+- `npx eslint` trên 8 file đã sửa → 0 error.
+
+**Phát sinh so với plan (đã xử lý):**
+1. A1 còn một đường rò plan chưa liệt kê: object MCP trả về thuộc realm host → phải clone
+   JSON NGAY TRONG sandbox trước khi trả cho code; timer trả về id dạng SỐ, không trả
+   handle `Timeout` của host. Có test riêng cho case này.
+2. A4 không copy logic so khớp chuỗi của `shell_run`: `run_code` là egress vô điều kiện
+   vì `args.code` có thể gọi `mcp.call` bất kỳ và dễ nguỵ trang.
+3. C giữ nguyên exit code (0 = pass) — chỉ đổi dòng JSON thành `ok:false`. Nếu muốn CI
+   fail cứng theo schema thì phải đổi thêm `runRecipeHeadless` (chờ user).
+4. C chưa chạy được `npx tsx bin/vyen.ts <recipe> --output json` thật vì cần API key LLM
+   — đã test trực tiếp `emitResult`.
+
+---
+
+# TIẾN ĐỘ BỔ SUNG — phiên Codebuff (quét độc lập): GÓI D/E + 1 LỖ ESCAPE MỚI
+
+## 1. 🔴 Quét độc lập tìm ra lỗ escape THẬT mà đợt A1 đầu tiên bỏ sót
+
+Probe đối kháng (chạy ngoài vitest) phát hiện: `vm.createContext({})` khiến chuỗi
+prototype của global chạy về `Object.prototype` của **HOST** (sandbox object là
+object host được contextify). Hệ quả ĐO ĐƯỢC:
+
+```
+globalThis.constructor.constructor('return process')().pid  => pid CỦA HOST (ESCAPED)
+this.constructor.constructor(...)                           => ESCAPED
+(function(){ return this })().constructor.constructor(...)   => ESCAPED
+```
+
+Đây là lỗ nằm ngay trong "cách đúng" mà mục A1 ghi "probe 12/12" — probe cũ
+không thử `globalThis.constructor`/`this. Bài học: "probe qua" không bảo chứng
+cho vector không được thử.
+
+**Đã vá:** `vm.createContext(Object.create(null))` rồi chạy TRONG context
+`Object.setPrototypeOf(globalThis, Object.prototype)` → global mang prototype của
+realm sandbox, `globalThis.constructor === Object` (sandbox) và vẫn giữ
+`hasOwnProperty`. Probe mở rộng 23 vector (thêm `[].constructor.constructor`,
+`globalThis.__proto__`, async-generator, dynamic import, host object lồng nhau,
+`this` của hàm non-strict) → **0 escape**; bổ sung 10 test vào
+`tests/code-mode-escape.test.ts` (nay 29 test).
+
+## 2. Gói D — XONG
+
+- `lib/context-compaction.ts`: `buildReadFilesReminder(messages, options)` — nhắc
+  lại NỘI DUNG file đã đọc, mới nhất trước, dedupe theo path, có ngân sách ký tự;
+  file bị ghi/sửa sau khi đọc → chỉ tham chiếu (không nhồi nội dung cũ); hết ngân
+  sách → dòng tham chiếu thay vì bỏ hẳn; ngân sách áp cả khối nên
+  `output.length <= maxTotalChars`. Thêm `COMPACT_SUMMARY_MAX_CHARS = 16_000`
+  (khớp `contextSummary` z.string().max(16_000) của route).
+- `react/use-chat-orchestration.ts`: ngay sau khi có summary, ngân sách =
+  16.000 − summary.length → gọi builder → nối vào `summary` trước khi lưu marker.
+  Summary này đi vào system prompt qua `contextSummary` của /api/chat
+  (route:1986) — tức nội dung file THẬT SỰ tới context của agent, không chỉ
+  tới summarizer.
+- Không cần `messageId` trong `WorkspaceSnapshot`: độ mới suy trực tiếp từ thứ tự
+  message/invocation trong cửa sổ bị nén → không đụng Dexie schema.
+- Rà cuối bắt thêm 1 lỗi off-by-2: `summary.length` + reminder tối đa có thể vượt
+  trần 16.000 thêm 2 ký tự separator `\n\n` → /api/chat trả 400. Tách hàm thuần
+  `readReminderBudget(summaryChars)` (đã trừ 2, có test riêng) để chỗ này test được
+  thay vì nằm kín trong hook.
+- Test: 11 test mới trong `tests/tool-persistence-compaction.test.ts` (43 test).
+
+## 3. Gói E — XONG (một phần)
+
+- Thêm `npm run verify:security` (3 file `.cjs` — đã chạy từng cái trước khi thêm
+  script: pass 100%, exit 0).
+- **ĐÍNH CHÍNH**: "35/219 file test chưa git track" KHÔNG đúng trên clone này.
+  `ls tests/*.test.ts` = 222, `git ls-files` = 221 → chỉ file test MỚI của đợt này
+  chưa track (bình thường, commit qua Changes panel).
+- 5 test đỏ baseline: full suite trên sandbox này sạch — không sửa gì thêm.
+
+## 4. Bằng chứng cuối (chạy SAU mọi sửa đổi)
+
+| Lệnh | Kết quả |
+|---|---|
+| `npx tsc --noEmit` | exit 0 |
+| `npx vitest run` (full) | **222/222 file, 3.646 pass / 2 skip / 0 fail**, exit 0 |
+| `npm run verify:security` | exit 0 (3 suite pass) |
+| `npx eslint` 12 file đã sửa | 0 error (5 warning có sẵn ở orchestration) |
+| Probe đối kháng sandbox | 23/23 vector BLOCKED, functional + timeout-cancel PASS, exit 0 |
+
+## 5. Hạn chế trung thực
+
+- Môi trường này KHÔNG có công cụ spawn sub-agent — "quét" thực hiện bằng 3 lượt
+  độc lập (probe ngoài vitest, soi chéo call site, full suite) thay vì đa agent.
+- A2 vẫn là **giảm thiểu** (clear timer + cờ cancelled), không dừng cứng promise
+  loop tự dựng — như ghi chú sẵn trong code.
+- Gói C giữ nguyên exit code (chỉ dòng JSON `ok:false`) — chờ user quyết.
+- Chưa chạy `vyen run <recipe> --output json` thật (cần API key LLM) — đã test
+  trực tiếp `emitResult`.

@@ -343,4 +343,75 @@ describe('runEmulatedLoop — e2e với upstream giả lập', () => {
     expect(p).not.toContain('memory_search');
     expect(p).not.toContain('memory_save');
   });
+
+  it('web_fetch thiếu url → KHÔNG gọi execute, TOOL_RESULT nêu rõ field sai (validate zod)', async () => {
+    const base = buildAgentTools();
+    const executeSpy = vi.fn(async () => ({ note: 'KHÔNG ĐƯỢC CHẠY' }));
+    const tools = { ...base, web_fetch: { ...base.web_fetch, execute: executeSpy } } as typeof base;
+
+    const bodies: string[] = [];
+    let completionCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: string | URL, init?: RequestInit) => {
+        completionCount += 1;
+        bodies.push(String(init?.body ?? ''));
+        return completion(
+          completionCount === 1
+            ? '<tool_call>\n{"name":"web_fetch","arguments":{}}\n</tool_call>'
+            : 'Thiếu URL nên chưa đọc được nội dung.',
+        );
+      }),
+    );
+
+    const { opts } = makeOpts({ tools });
+    const result = await runEmulatedLoop(opts);
+
+    expect(result.totalCalls).toBe(1);
+    expect(executeSpy).not.toHaveBeenCalled();
+    const lastBody = bodies.at(-1) ?? '';
+    expect(lastBody).toContain('[TOOL_RESULT name=web_fetch]');
+    expect(lastBody).toContain('url');
+    expect(lastBody).toContain('Tham số không hợp lệ');
+    expect(completionCount).toBe(2);
+  });
+
+  it('batch 2 call sai schema → cả hai trả lỗi validate, không execute tool nào', async () => {
+    const base = buildAgentTools();
+    const fetchSpy = vi.fn(async () => ({ note: 'KHÔNG ĐƯỢC CHẠY' }));
+    const searchSpy = vi.fn(async () => ({ note: 'KHÔNG ĐƯỢC CHẠY' }));
+    const tools = {
+      ...base,
+      web_fetch: { ...base.web_fetch, execute: fetchSpy },
+      web_search: { ...base.web_search, execute: searchSpy },
+    } as typeof base;
+
+    const bodies: string[] = [];
+    let completionCount = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_input: string | URL, init?: RequestInit) => {
+        completionCount += 1;
+        bodies.push(String(init?.body ?? ''));
+        return completion(
+          completionCount === 1
+            ? '<tool_call>\n{"name":"web_fetch","arguments":{}}\n</tool_call>\n' +
+              '<tool_call>\n{"name":"web_search","arguments":{"count":5}}\n</tool_call>'
+            : 'Không có công cụ nào trả dữ liệu.',
+        );
+      }),
+    );
+
+    const { opts } = makeOpts({ tools });
+    const result = await runEmulatedLoop(opts);
+
+    expect(result.totalCalls).toBe(2);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(searchSpy).not.toHaveBeenCalled();
+    const lastBody = bodies.at(-1) ?? '';
+    expect(lastBody).toContain('[TOOL_RESULT name=web_fetch]');
+    expect(lastBody).toContain('[TOOL_RESULT name=web_search]');
+    expect(lastBody).toContain('Tham số không hợp lệ');
+    expect(completionCount).toBe(2);
+  });
 });

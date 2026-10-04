@@ -162,6 +162,11 @@ export function isEgressTool(toolName: string, args: Record<string, unknown> = {
   if (toolName.startsWith('mcp__')) return true;
   if (toolName === 'git_push') return true;
 
+  /* run_code là code model tự viết, gọi được `mcp.call` tới MCP server bất kỳ —
+     nội dung nằm trong `args.code` nên không có chuỗi lệnh cố định để so khớp
+     kiểu `shell_run`. Vì egress không thể loại trừ, mặc định phải hỏi. */
+  if (toolName === 'run_code') return true;
+
   if (toolName === 'shell_run') {
     const cmd = String(args.command ?? '').toLowerCase();
     if (

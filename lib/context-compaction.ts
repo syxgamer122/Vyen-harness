@@ -513,6 +513,170 @@ export function buildEmergencySummary(input: EmergencySummaryInput): string {
  * các bộ trích của compaction). Trả '' khi không trích được gì để caller
  * bỏ qua việc gắn; caller tự quyết định chèn vào system prompt ở đâu.
  */
+/* ------------------------------------------------------------------ */
+/* Nhắc lại NỘI DUNG file đã đọc sau nén (ý tưởng từ ZCode)           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Trần của `contextSummary` ở `app/api/chat/route.ts`
+ * (`z.string().max(16_000)`) — summary + khối nhắc phải nằm trong trần này,
+ * nếu không request /api/chat kế tiếp bị 400.
+ */
+export const COMPACT_SUMMARY_MAX_CHARS = 16_000;
+
+export const READ_REMINDER_LIMITS = {
+  /** Ngân sách ký tự cho cả khối nhắc (kể cả dòng tham chiếu). */
+  maxTotalChars: 4_000,
+  /** Trần nội dung của MỘT file trước khi cắt thành excerpt. */
+  maxFileChars: 1_600,
+  /** Số file được nhắc nhiều nhất. */
+  maxFiles: 6,
+} as const;
+
+/**
+ * Ngân sách còn lại cho khối nhắc file khi đã có `summaryChars` ký tự tóm tắt.
+ *
+ * Chừa 2 ký tự separator `\n\n` khi caller nối `summary + '\n\n' + reminder` —
+ * nếu không, summary dài nhất hợp lệ + reminder dài nhất có thể vượt trần
+ * 16.000 và /api/chat trả 400 (z.string().max(16_000)).
+ */
+export function readReminderBudget(summaryChars: number): number {
+  return Math.min(
+    READ_REMINDER_LIMITS.maxTotalChars,
+    Math.max(0, COMPACT_SUMMARY_MAX_CHARS - Math.max(0, summaryChars) - 2),
+  );
+}
+
+interface ReadReminderEntry {
+  path: string;
+  content: string | null;
+  /** File đã bị ghi/sửa sau khi đọc → nội dung đã cũ, chỉ giữ tham chiếu. */
+  stale: boolean;
+}
+
+/**
+ * Trích nội dung file từ tool result của `fs_read`. Chấp nhận cả object lẫn
+ * chuỗi JSON (đường client tool trả `JSON.stringify({ content, ... })`) và
+ * chuỗi thô. Trả null khi không có nội dung (lỗi đọc, ảnh, kết quả rỗng).
+ */
+function extractReadContent(result: unknown): string | null {
+  let value: unknown = result;
+  if (typeof value === 'string') {
+    const raw = value;
+    if (!raw.trim()) return null;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  }
+  if (!value || typeof value !== 'object') return null;
+  const obj = value as { content?: unknown; text?: unknown; error?: unknown };
+  if (typeof obj.error === 'string' && obj.error) return null;
+  if (typeof obj.content === 'string' && obj.content) return obj.content;
+  if (typeof obj.text === 'string' && obj.text) return obj.text;
+  return null;
+}
+
+/**
+ * Khối nhắc NỘI DUNG các file vừa đọc, xếp theo độ mới, có ngân sách ký tự.
+ *
+ * VẤN ĐỀ: sau nén, model chỉ còn *đường dẫn* file — nội dung đã đọc mất sạch,
+ * muốn trích dẫn hay sửa tiếp phải tốn lượt fs_read lại. Port ý tưởng
+ * compact-post-reminders của ZCode: nhắc lại nội dung (không chỉ đường dẫn),
+ * file quá dài hạ thành excerpt + tham chiếu thay vì bỏ hẳn.
+ *
+ * Ngân sách áp lên CẢ khối: mọi dòng đều trừ vào `maxTotalChars`, nên
+ * `result.length <= maxTotalChars` luôn đúng (caller chừa chỗ cho summary
+ * trong trần 16.000 của /api/chat). Trả '' khi không có fs_read nào để nhắc.
+ */
+export function buildReadFilesReminder(
+  messages: readonly BudgetMessageLike[],
+  options?: { maxTotalChars?: number; maxFileChars?: number; maxFiles?: number },
+): string {
+  const maxTotal = Math.max(0, options?.maxTotalChars ?? READ_REMINDER_LIMITS.maxTotalChars);
+  const maxFile = Math.max(0, options?.maxFileChars ?? READ_REMINDER_LIMITS.maxFileChars);
+  const maxFiles = Math.max(0, options?.maxFiles ?? READ_REMINDER_LIMITS.maxFiles);
+  if (maxTotal <= 0 || maxFiles <= 0) return '';
+
+  /* File bị ghi/sửa trong cùng cửa sổ → nội dung đọc được đã cũ. */
+  const ops = extractFileOps(messages);
+  const stale = new Set([...ops.edited, ...ops.written]);
+
+  /* Quét từ tin MỚI NHẤT lùi về trước; trong mỗi tin cũng quét ngược thứ tự
+     invocation. Bản đọc mới nhất của một path thắng (seen). */
+  const seen = new Set<string>();
+  const entries: ReadReminderEntry[] = [];
+  for (let i = messages.length - 1; i >= 0 && entries.length < maxFiles; i -= 1) {
+    const invs = messages[i].toolInvocations ?? [];
+    for (let j = invs.length - 1; j >= 0 && entries.length < maxFiles; j -= 1) {
+      const inv = invs[j];
+      if (!inv || inv.state !== 'result') continue;
+      if (inv.toolName !== 'fs_read') continue;
+      const args = (inv.args ?? {}) as Record<string, unknown>;
+      const path = typeof args.path === 'string' ? args.path : '';
+      if (!path || seen.has(path)) continue;
+      seen.add(path);
+      entries.push({ path, content: extractReadContent(inv.result), stale: stale.has(path) });
+    }
+  }
+  if (!entries.length) return '';
+
+  const header =
+    '[Ảnh chụp nội dung file đã đọc TRƯỚC khi nén — chỉ là tham chiếu, đọc lại bằng fs_read khi cần bản mới nhất]';
+  if (maxTotal < header.length + 40) return '';
+
+  /* Quỹ riêng cho dòng THAM CHIẾU: nội dung của các file mới nhất không được
+     ăn hết ngân sách, nếu không các file cũ sẽ biến mất thay vì hạ thành
+     reference (đúng ý "hạ thành reference thay vì bỏ"). Mỗi dòng ~70 ký tự. */
+  let budget = maxTotal - (header.length + 1);
+  const refReserve = Math.min(entries.length * 70, Math.max(0, budget - 200));
+  let contentBudget = budget - refReserve;
+
+  const refLineOf = (entry: ReadReminderEntry): string =>
+    entry.stale
+      ? `- ${entry.path} (đã sửa/ghi sau khi đọc — fs_read lại nếu cần bản mới nhất)`
+      : !entry.content
+        ? `- ${entry.path} (không còn nội dung đọc được — fs_read nếu cần)`
+        : `- ${entry.path} (còn nội dung nhưng hết ngân sách nhắc — fs_read nếu cần)`;
+
+  const out: string[] = [header];
+  for (const entry of entries) {
+    const refLine = refLineOf(entry);
+    if (entry.stale || !entry.content) {
+      if (refLine.length + 1 <= budget) {
+        out.push(refLine);
+        budget -= refLine.length + 1;
+      }
+      continue;
+    }
+    /* Chừa ~80 ký tự cho tiêu đề + ghi chú "đọc tiếp" của mục này. */
+    const bodyBudget = Math.min(maxFile, Math.max(0, Math.min(contentBudget, budget) - 80));
+    if (bodyBudget <= 0) {
+      if (refLine.length + 1 <= budget) {
+        out.push(refLine);
+        budget -= refLine.length + 1;
+      }
+      continue;
+    }
+    const take = Math.min(entry.content.length, bodyBudget);
+    const rest = entry.content.length - take;
+    const parts = [`### ${entry.path}`, entry.content.slice(0, take)];
+    if (rest > 0) parts.push(`…[còn ${rest} ký tự — fs_read "${entry.path}" để đọc tiếp]`);
+    const section = parts.join('\n');
+    if (section.length + 1 <= budget) {
+      out.push(section);
+      budget -= section.length + 1;
+      contentBudget = Math.max(0, contentBudget - (section.length + 1));
+    } else if (refLine.length + 1 <= budget) {
+      out.push(refLine);
+      budget -= refLine.length + 1;
+    }
+  }
+
+  return out.length > 1 ? out.join('\n') : '';
+}
+
 export function buildSubagentParentBrief(messages: readonly BudgetMessageLike[]): string {
   const sections: string[] = [];
 

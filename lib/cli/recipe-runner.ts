@@ -209,8 +209,9 @@ export async function runRecipeHeadless(args: RecipeRunArgs, io: HeadlessIo = DE
     }
 
     const action = nextRetryAction({ recipe, state: { attempt, maxRetries }, outcomes });
+    const schema = (recipe.response?.json_schema ?? undefined) as Parameters<typeof processStructuredOutput>[1];
     if (action.action === 'pass') {
-      emitResult(io, args, recipe.title, lastText, attempt, []);
+      emitResult(io, args, recipe.title, lastText, attempt, [], undefined, schema);
       return 0;
     }
     if (action.action === 'stop') {
@@ -222,6 +223,7 @@ export async function runRecipeHeadless(args: RecipeRunArgs, io: HeadlessIo = DE
         attempt,
         outcomes.filter((o) => !o.ok).map((o) => `${o.command} exit=${o.exitCode}`),
         action.reason,
+        schema,
       );
       return 1;
     }
@@ -230,7 +232,15 @@ export async function runRecipeHeadless(args: RecipeRunArgs, io: HeadlessIo = DE
   }
 }
 
-function emitResult(
+/**
+ * In kết quả cuối của recipe.
+ *
+ * `--output json` khi recipe có `response.json_schema`: validate theo schema
+ * (trước đây hardcode `undefined` nên CLI không bao giờ validate); output sai
+ * kiểu phải phát `ok:false` kèm `errors` — không được phát text thô với
+ * `ok:true` để CI đọc thành pass.
+ */
+export function emitResult(
   io: HeadlessIo,
   args: RecipeRunArgs,
   title: string,
@@ -238,11 +248,16 @@ function emitResult(
   attempts: number,
   failedChecks: string[],
   stopReason?: string,
+  schema?: Parameters<typeof processStructuredOutput>[1],
 ): void {
   if (args.output === 'json') {
     if (failedChecks.length === 0) {
       // Structured output: recipe có schema → validate; không có → trả text.
-      const structured = processStructuredOutput(finalText, undefined);
+      const structured = processStructuredOutput(finalText, schema);
+      if (schema && !structured.ok) {
+        io.writeOut(formatStructuredLine({ recipe: title, ok: false, errors: structured.errors }) + '\n');
+        return;
+      }
       io.writeOut(
         formatStructuredLine({
           recipe: title,

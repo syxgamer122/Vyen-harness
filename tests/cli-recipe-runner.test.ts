@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRecipeRunArgv } from '@/lib/cli/recipe-runner';
+import { emitResult, parseRecipeRunArgv, type RecipeRunArgs } from '@/lib/cli/recipe-runner';
 import { resolveDispatch, COMMANDS } from '@/lib/cli/cli-surface';
 
 describe('cli recipe-runner — parseRecipeRunArgv', () => {
@@ -48,6 +48,54 @@ describe('cli recipe-runner — parseRecipeRunArgv', () => {
     const r = parseRecipeRunArgv(['--recipe', 'a.yaml', '--model', 'qwen3.5-flash']);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.args.model).toBe('qwen3.5-flash');
+  });
+});
+
+describe('cli recipe-runner — emitResult validate structured output theo json_schema', () => {
+  const args: RecipeRunArgs = { recipePath: 'r.yaml', params: {}, output: 'json', noSession: true };
+
+  function capture() {
+    const lines: string[] = [];
+    const io = { writeOut: (s: string) => lines.push(s), writeErr: (s: string) => lines.push(s) };
+    return { io, lines };
+  }
+
+  it('có schema + output sai kiểu → ok:false kèm errors (không phát text thô ok:true)', () => {
+    const { io, lines } = capture();
+    emitResult(io, args, 'demo', '{"count":"hai"}', 1, [], undefined, {
+      type: 'object',
+      required: ['count'],
+      properties: { count: { type: 'number' } },
+    });
+    const payload = JSON.parse(lines.join('').trim());
+    expect(payload.ok).toBe(false);
+    expect(payload.errors.length).toBeGreaterThan(0);
+  });
+
+  it('có schema + output hợp lệ → ok:true với data đã parse', () => {
+    const { io, lines } = capture();
+    emitResult(io, args, 'demo', '{"count":2}', 1, [], undefined, {
+      type: 'object',
+      required: ['count'],
+      properties: { count: { type: 'number' } },
+    });
+    const payload = JSON.parse(lines.join('').trim());
+    expect(payload).toEqual({ recipe: 'demo', ok: true, data: { count: 2 } });
+  });
+
+  it('không schema → giữ hành vi cũ: ok:true với text thô', () => {
+    const { io, lines } = capture();
+    emitResult(io, args, 'demo', 'không phải JSON', 1, []);
+    const payload = JSON.parse(lines.join('').trim());
+    expect(payload).toEqual({ recipe: 'demo', ok: true, data: 'không phải JSON' });
+  });
+
+  it('checks fail → ok:false với errors như cũ', () => {
+    const { io, lines } = capture();
+    emitResult(io, args, 'demo', 'x', 1, ['check exit=1'], 'checks');
+    const payload = JSON.parse(lines.join('').trim());
+    expect(payload.ok).toBe(false);
+    expect(payload.errors).toContain('check exit=1');
   });
 });
 

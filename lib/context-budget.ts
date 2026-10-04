@@ -87,6 +87,8 @@ export interface BudgetMessageLike {
   content?: unknown;
   experimental_attachments?: Array<{ contentType?: string; url?: string }>;
   toolInvocations?: ReadonlyArray<{
+    /** Có ở runtime (mọi consumer cũ phải cast để đọc) — khai báo thật ở đây. */
+    toolName?: string;
     state?: string;
     args?: unknown;
     result?: unknown;

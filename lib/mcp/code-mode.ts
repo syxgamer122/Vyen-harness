@@ -10,6 +10,13 @@
  * - Giới hạn thời gian (timeout mặc định 30s).
  * - Output được cắt tối đa 24.000 ký tự (quy chuẩn Vyen).
  * - Vẫn tuân thủ đầy đủ cổng phê duyệt an toàn (auto-pilot / modal).
+ *
+ * Ranh giới bảo mật: `node:vm` KHÔNG phải sandbox cách ly — nó chỉ an toàn khi
+ * KHÔNG có object/function thuộc realm host lọt vào context. Mọi intrinsic của
+ * host (kể cả `Object`, `Math`, `setTimeout`, hay object trả về từ MCP) đều mở
+ * đường về host qua `.constructor` → `Function` của host → `process`.
+ * Vì vậy bridge được cài TỪ BÊN TRONG realm của context, và hàm host chỉ tồn
+ * tại dưới dạng tham số của hàm sandbox (xem SANDBOX_BRIDGE_SOURCE).
  */
 
 import vm from 'node:vm';
@@ -52,6 +59,63 @@ export function truncateCodeOutput(
 }
 
 /**
+ * Source của installer bridge — chạy bằng `vm.runInContext` nên TOÀN BỘ hàm
+ * trong đây thuộc realm của sandbox. Bốn hàm host (`hostCall`, `hostLog`,
+ * `hostSetTimeout`, `hostClearTimeout`) chỉ là tham số cục bộ, không phải
+ * property của `globalThis`, nên code trong sandbox không có đường chạm tới
+ * realm host qua `.constructor`.
+ *
+ * Lưu ý từng đường rò đã bịt:
+ * - Không nạp intrinsic host (Object/Array/Math/...): context trống tự có
+ *   intrinsic riêng của nó.
+ * - Kết quả `mcp.call` được clone bằng JSON ngay TRONG sandbox: object MCP trả
+ *   về thuộc realm host, nếu đưa thẳng cho code sandbox thì `.constructor` của
+ *   nó là `Function` của host.
+ * - `setTimeout` trả về id dạng SỐ (primitive qua realm an toàn), không trả
+ *   handle Timeout của host (handle là object realm host → lại là cửa escape).
+ */
+const SANDBOX_BRIDGE_SOURCE = `(function (hostCall, hostLog, hostSetTimeout, hostClearTimeout) {
+  'use strict';
+  var callHost = async function (serverId, toolName, args) {
+    var hostResult = await hostCall(String(serverId), String(toolName), args);
+    if (hostResult === undefined) return undefined;
+    var kind = typeof hostResult;
+    if (kind === 'function') return undefined;
+    if (kind !== 'object' || hostResult === null) return hostResult;
+    try {
+      return JSON.parse(JSON.stringify(hostResult));
+    } catch (err) {
+      throw new Error('Kết quả MCP không chuyển được qua ranh giới sandbox: ' + (err && err.message ? err.message : String(err)));
+    }
+  };
+  var bridge = {
+    call: async function (serverId, toolName, args) {
+      return await callHost(serverId, toolName, args);
+    },
+    log: function () {
+      hostLog.apply(null, arguments);
+    },
+  };
+  globalThis.mcp = bridge;
+  globalThis.console = {
+    log: bridge.log,
+    info: bridge.log,
+    warn: bridge.log,
+    error: bridge.log,
+  };
+  globalThis.setTimeout = function (fn, ms) {
+    if (typeof fn !== 'function') throw new TypeError('setTimeout yêu cầu callback là hàm.');
+    var extra = Array.prototype.slice.call(arguments, 2);
+    return hostSetTimeout(function () {
+      return fn.apply(undefined, extra);
+    }, ms);
+  };
+  globalThis.clearTimeout = function (handle) {
+    return hostClearTimeout(handle);
+  };
+})`;
+
+/**
  * Thực thi đoạn mã JavaScript trong sandbox Node.js VM.
  */
 export async function executeCodeMode(
@@ -71,41 +135,90 @@ export async function executeCodeMode(
     logs.push(line);
   };
 
-  // Mock hoặc bridge cho mcp.call
-  const mcpBridge = {
-    call: async (serverId: string, toolName: string, args: Record<string, unknown> = {}) => {
-      if (!options.mcpCaller) {
-        throw new Error(`MCP caller chưa được cấu hình cho Code Mode khi gọi ${serverId}/${toolName}.`);
+  /**
+   * Trạng thái huỷ của lượt chạy (A2). Khi hết thời gian (hoặc lượt chạy kết
+   * thúc), mọi timer còn treo bị clear và `mcp.call` sau đó bị từ chối.
+   *
+   * Đây là GIẢM THIỂU, không phải dừng cứng: một vòng lặp promise tự dựng
+   * (không dùng timer, không qua mcp.call) vẫn có thể chạy nền. Dừng cứng thật
+   * sự cần worker thread — chưa làm trong phạm vi này.
+   */
+  let cancelled = false;
+  let timerSeq = 0;
+  const timers = new Map<number, NodeJS.Timeout>();
+
+  const cancelRun = () => {
+    cancelled = true;
+    for (const handle of timers.values()) clearTimeout(handle);
+    timers.clear();
+  };
+
+  const hostCall = async (
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown> = {},
+  ): Promise<unknown> => {
+    if (cancelled) {
+      throw new Error(`Code Mode đã kết thúc hoặc quá thời gian — từ chối gọi ${serverId}/${toolName}.`);
+    }
+    if (!options.mcpCaller) {
+      throw new Error(`MCP caller chưa được cấu hình cho Code Mode khi gọi ${serverId}/${toolName}.`);
+    }
+    return await options.mcpCaller(serverId, toolName, args);
+  };
+
+  const hostSetTimeout = (fn: unknown, ms?: unknown): number => {
+    if (cancelled) return -1;
+    if (typeof fn !== 'function') {
+      throw new TypeError('setTimeout yêu cầu callback là hàm.');
+    }
+    const delay = Math.min(Math.max(Number(ms) || 0, 0), 2_147_483_647);
+    const id = ++timerSeq;
+    const handle = setTimeout(() => {
+      timers.delete(id);
+      if (cancelled) return;
+      try {
+        (fn as () => void)();
+      } catch {
+        /* Callback của sandbox ném lỗi là chuyện nội bộ của nó — không được làm sập host. */
       }
-      return await options.mcpCaller(serverId, toolName, args);
-    },
+    }, delay);
+    timers.set(id, handle);
+    return id;
   };
 
-  const sandbox = {
-    mcp: mcpBridge,
-    console: {
-      log: captureLog,
-      info: captureLog,
-      warn: captureLog,
-      error: captureLog,
-    },
-    JSON,
-    Math,
-    Date,
-    Array,
-    Object,
-    String,
-    Number,
-    Boolean,
-    RegExp,
-    Promise,
-    Map,
-    Set,
-    setTimeout,
-    clearTimeout,
+  const hostClearTimeout = (handle: unknown): void => {
+    const id = Number(handle);
+    const timer = timers.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timers.delete(id);
+    }
   };
 
-  const context = vm.createContext(sandbox);
+  /* Context KHÔNG nạp gì từ host. Bẫy ĐÃ ĐO BẰNG PROBE: `vm.createContext({})`
+     khiến chuỗi prototype của global chạy về `Object.prototype` của HOST →
+     `globalThis.constructor.constructor('return process')()` lấy được pid host
+     (escape thật, xem probe-code-mode-adversarial + tests/code-mode-escape).
+     Cách vá kiểm chứng được: sandbox object phải có prototype NULL, rồi gắn
+     prototype chuẩn của realm SANDBOX bằng setPrototypeOf chạy TRONG context
+     (sau bước này `globalThis.constructor === Object` của sandbox và mọi
+     intrinsic vẫn dùng được bình thường). */
+  const context = vm.createContext(Object.create(null));
+  vm.runInContext('Object.setPrototypeOf(globalThis, Object.prototype)', context, {
+    filename: 'code-mode-realm-fix.js',
+  });
+
+  const installBridge = vm.runInContext(SANDBOX_BRIDGE_SOURCE, context, {
+    filename: 'code-mode-bridge.js',
+  }) as (
+    hostCall: unknown,
+    hostLog: unknown,
+    hostSetTimeout: unknown,
+    hostClearTimeout: unknown,
+  ) => void;
+
+  installBridge(hostCall, captureLog, hostSetTimeout, hostClearTimeout);
 
   // Đóng gói code vào async IIFE để hỗ trợ top-level await và return
   const wrappedScript = `(async () => {\n${code}\n})()`;
@@ -123,7 +236,7 @@ export async function executeCodeMode(
 
     // Chờ promise với timeout race
     let timer: NodeJS.Timeout | null = null;
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         reject(new Error(`Thực thi mã quá thời gian cho phép (${timeoutMs / 1000}s).`));
       }, timeoutMs);
@@ -143,27 +256,41 @@ export async function executeCodeMode(
     if (logOutput) {
       combinedOutput += logOutput;
     }
+
+    let returnSerialized = '';
     if (rawResult !== undefined) {
-      const returnFormatted =
+      returnSerialized =
         typeof rawResult === 'object' && rawResult !== null
-          ? JSON.stringify(rawResult, null, 2)
+          ? JSON.stringify(rawResult, null, 2) ?? String(rawResult)
           : String(rawResult);
       if (combinedOutput) combinedOutput += '\n\n[Return Value]:\n';
-      combinedOutput += returnFormatted;
+      combinedOutput += returnSerialized;
     }
 
     if (!combinedOutput) {
       combinedOutput = '(Mã thực thi thành công không có output)';
     }
 
-    const { text: finalOutput, truncated } = truncateCodeOutput(combinedOutput, maxChars);
+    const { text: finalOutput, truncated: outputTruncated } = truncateCodeOutput(combinedOutput, maxChars);
+
+    // `returnValue` cũng phải chịu trần 24k: nếu để nguyên, lớp orchestration
+    // `JSON.stringify(res)` sẽ mang cả object vượt trần ra ngoài.
+    let returnValue: unknown = rawResult;
+    let returnValueTruncated = false;
+    if (rawResult !== undefined) {
+      const merged = truncateCodeOutput(returnSerialized, maxChars);
+      if (merged.truncated) {
+        returnValue = merged.text;
+        returnValueTruncated = true;
+      }
+    }
 
     return {
       ok: true,
       output: finalOutput,
-      returnValue: rawResult,
+      returnValue,
       durationMs,
-      truncated,
+      truncated: outputTruncated || returnValueTruncated,
     };
   } catch (err: unknown) {
     const durationMs = Date.now() - startTime;
@@ -179,6 +306,10 @@ export async function executeCodeMode(
       durationMs,
       truncated,
     };
+  } finally {
+    // Hết lượt chạy (thành công, lỗi, hay quá hạn) → clear timer còn treo và
+    // chặn mọi mcp.call đến muộn từ code chạy nền.
+    cancelRun();
   }
 }
 

@@ -12,6 +12,8 @@ import { sanitizeToolInvocations, STORED_TOOL_INVOCATIONS_MAX } from '@/lib/db';
 import type { StoredMessage } from '@/lib/db';
 import {
   buildEmergencySummary,
+  buildReadFilesReminder,
+  readReminderBudget,
   extractFileOps,
   extractLastConclusion,
   extractUserRequests,
@@ -20,6 +22,8 @@ import {
   serializeForCompaction,
   emptyCompactionState,
   COMPACTION_STATE_LIMITS,
+  COMPACT_SUMMARY_MAX_CHARS,
+  READ_REMINDER_LIMITS,
 } from '@/lib/context-compaction';
 import { estimateContextTokens } from '@/lib/context-budget';
 
@@ -393,5 +397,128 @@ describe('formatCompactContextBlock', () => {
     );
     expect(block).toContain('đang dở');
     expect(block).toContain('Chuyển toàn bộ sang TypeScript');
+  });
+});
+
+describe('buildReadFilesReminder — nhắc lại NỘI DUNG file đã đọc sau nén', () => {
+  function readMsg(path: string, content: unknown) {
+    return {
+      role: 'assistant',
+      content: '',
+      toolInvocations: [
+        { toolCallId: `r-${path}`, toolName: 'fs_read', args: { path }, state: 'result', result: content },
+      ],
+    };
+  }
+
+  function editMsg(path: string) {
+    return {
+      role: 'assistant',
+      content: '',
+      toolInvocations: [
+        { toolCallId: `e-${path}`, toolName: 'fs_edit', args: { path }, state: 'result', result: { ok: true } },
+      ],
+    };
+  }
+
+  it('xếp theo độ mới và dedupe: bản đọc mới nhất của path thắng', () => {
+    const out = buildReadFilesReminder([
+      readMsg('a.ts', { content: 'NOI-DUNG-CU' }),
+      readMsg('b.ts', { content: 'NOI-DUNG-B' }),
+      readMsg('a.ts', { content: 'NOI-DUNG-MOI' }),
+    ]);
+    expect(out).toContain('NOI-DUNG-MOI');
+    expect(out).not.toContain('NOI-DUNG-CU');
+    expect(out.indexOf('### a.ts')).toBeLessThan(out.indexOf('### b.ts'));
+  });
+
+  it('file quá dài → excerpt + ghi chú đọc tiếp thay vì nhồi cả file', () => {
+    const out = buildReadFilesReminder([readMsg('big.ts', { content: 'Z'.repeat(5_000) })], {
+      maxFileChars: 200,
+      maxTotalChars: 500,
+    });
+    expect(out).toContain('### big.ts');
+    expect(out).toContain('…[còn');
+    expect(out).toContain('fs_read "big.ts"');
+    expect(out).not.toContain('Z'.repeat(5_000));
+  });
+
+  it('file bị sửa sau khi đọc → chỉ giữ tham chiếu, không nhồi nội dung cũ', () => {
+    const out = buildReadFilesReminder([readMsg('a.ts', { content: 'NOI-DUNG-CU' }), editMsg('a.ts')]);
+    expect(out).not.toContain('NOI-DUNG-CU');
+    expect(out).toContain('a.ts');
+    expect(out).toContain('đã sửa/ghi sau khi đọc');
+  });
+
+  it('result dạng chuỗi JSON (đường client tool) vẫn đọc được nội dung', () => {
+    const out = buildReadFilesReminder([
+      readMsg('c.ts', JSON.stringify({ content: 'NOI-DUNG-JSON', size: 13, truncated: false })),
+    ]);
+    expect(out).toContain('NOI-DUNG-JSON');
+  });
+
+  it('không có fs_read (hoặc chưa có result) → chuỗi rỗng', () => {
+    expect(
+      buildReadFilesReminder([
+        {
+          role: 'assistant',
+          content: 'xong',
+          toolInvocations: [
+            { toolName: 'web_search', args: { query: 'x' }, state: 'result', result: { hits: [] } },
+            { toolName: 'fs_read', args: { path: 'a.ts' }, state: 'call' },
+          ],
+        },
+      ]),
+    ).toBe('');
+  });
+
+  it('ngân sách chật: file mới nhất giữ nội dung, file cũ hạ thành tham chiếu thay vì bỏ', () => {
+    const messages = ['a', 'b', 'c', 'd', 'e', 'f'].map((p) => readMsg(`${p}.ts`, { content: p.repeat(1_000) }));
+    const out = buildReadFilesReminder(messages, { maxTotalChars: 1_200 });
+    expect(out.length).toBeLessThanOrEqual(1_200);
+    // Mới nhất được nội dung, đúng thứ tự mới → cũ.
+    expect(out).toContain('### f.ts');
+    expect(out.indexOf('### f.ts')).toBeLessThan(out.indexOf('- e.ts'));
+    // File cũ không bị bỏ: vẫn còn dòng tham chiếu.
+    expect(out).toContain('- e.ts');
+    expect(out).toContain('- a.ts');
+  });
+
+  it('ngân sách rất chật vẫn giữ được phần nội dung của file mới nhất + tham chiếu', () => {
+    const messages = ['a', 'b', 'c'].map((p) => readMsg(`${p}.ts`, { content: p.repeat(500) }));
+    const out = buildReadFilesReminder(messages, { maxTotalChars: 400, maxFileChars: 1_600 });
+    expect(out.length).toBeLessThanOrEqual(400);
+    expect(out).toContain('### c.ts');
+    expect(out).toContain('- b.ts');
+  });
+
+  it('ngân sách 0 → chuỗi rỗng', () => {
+    expect(buildReadFilesReminder([readMsg('a.ts', { content: 'x' })], { maxTotalChars: 0 })).toBe('');
+  });
+});
+
+describe('readReminderBudget — summary + separator + reminder không vượt trần 16.000', () => {
+  it('summary rỗng → trần mặc định 4.000', () => {
+    expect(readReminderBudget(0)).toBe(READ_REMINDER_LIMITS.maxTotalChars);
+  });
+
+  it('summary vừa đủ chỗ → vẫn còn nguyên trần 4.000', () => {
+    expect(readReminderBudget(11_998)).toBe(READ_REMINDER_LIMITS.maxTotalChars);
+  });
+
+  it('summary sát trần → budget co lại đúng phần còn lại', () => {
+    expect(readReminderBudget(11_999)).toBe(READ_REMINDER_LIMITS.maxTotalChars - 1);
+    expect(readReminderBudget(15_998)).toBe(0);
+    expect(readReminderBudget(16_000)).toBe(0);
+  });
+
+  it('mọi cỡ summary: tổng thật (summary + \\n\\n + reminder) ≤ 16.000', () => {
+    for (const len of [0, 100, 5_000, 11_998, 11_999, 13_000, 15_000, 15_998, 16_000]) {
+      const budget = readReminderBudget(len);
+      expect(budget).toBeGreaterThanOrEqual(0);
+      // budget=0 → reminder là chuỗi rỗng ⇒ không cộng separator.
+      const total = budget > 0 ? len + 2 + budget : len;
+      expect(total).toBeLessThanOrEqual(COMPACT_SUMMARY_MAX_CHARS);
+    }
   });
 });

@@ -17,6 +17,7 @@
     "check": "node scripts/check-supply-chain.cjs",
     "docs:check": "node scripts/check-docs-sync.cjs",
     "test": "vitest run",
+    "verify:security": "node tests/phase1-security-verification.cjs && node tests/sprint-s1-verification.cjs && node tests/sprint-s2-verification.cjs",
     "teamwork": "npx tsx bin/teamwork.ts"
   },
   "dependencies": {
