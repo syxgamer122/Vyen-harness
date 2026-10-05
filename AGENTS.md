@@ -62,6 +62,68 @@ Didn't run a check? Say so. An unrun check is not a pass.
 
 Report in 2-3 lines: what you picked, what you gave up, and why.
 
+## 6. Answer first, then edit
+
+Question asked: answer it before running edits or build commands.
+
+Feedback or analysis: say whether you agree or disagree, then list what changed.
+
+No emojis in commits, PR text, or code comments. No filler openers ("Thanks so much!").
+
+Explain a non-trivial design as: problem, concrete example, solution. Say why the solution is required and what it costs.
+
+## 7. Read before you write
+
+Read a file end to end before a wide-ranging change, and before editing a file you have not fully read. Grep locates code, it does not replace reading it.
+
+Check external API types in node_modules instead of guessing. Next 16 and React 19 moved past your training data.
+
+## 8. TypeScript style
+
+No new `any`. Narrow `unknown` with a guard, or parse with zod. Use `@ts-expect-error` with a reason; never `@ts-ignore`.
+
+`const` over `let`. Early return over `else`. `map`/`filter`/`flatMap` over `for`, with a type guard on `filter`.
+
+Inline a helper with one call site. Extract only when it names a real concept. Avoid `try`/`catch` unless failure is genuinely expected.
+
+Dynamic `await import()` is load-bearing here (lazy load, server/client boundary). Do not hoist it to a top-level import.
+
+## 9. Dependencies
+
+Direct deps stay pinned to exact versions; `npm run check` fails otherwise.
+
+Install and refresh with scripts off: `npm install --ignore-scripts`; lockfile-only refresh: `npm install --package-lock-only --ignore-scripts`. CI uses `npm ci --ignore-scripts`.
+
+A new dep with an install script gets reviewed, then added to ALLOWLIST in scripts/check-supply-chain.cjs. Never add an entry silently.
+
+Treat a lockfile diff as reviewed code. Stage it only when the dependency change belongs to the current task.
+
+Never downgrade code to satisfy a stale type. Upgrade the dependency.
+
+## 10. Commands and tests
+
+After code changes: `npm run typecheck`, then `npm run lint`. Full output, fix every error. Never invoke raw `tsc`.
+
+`npm test` is the whole suite (222 files). Scope it: `npx vitest run tests/<file>.test.ts`, or `--related <files>`.
+
+Test the real implementation. No mocks of internal modules; assert on behavior and output.
+
+Never weaken an assertion, add a skip, or swallow an error to reach green.
+
+A regression gets a test carrying the issue number or the trace that produced it.
+
+## 11. Git
+
+Stage only files you changed in this session, by explicit path. Never `git add -A`, `git add .`, `git commit --no-verify`.
+
+Never `git reset --hard`, `git checkout .`, `git clean -fd`, `git stash`, or force push. Another session may share this checkout.
+
+Read `git status` before committing.
+
+Commit message: `type(scope): summary`, types feat/fix/docs/chore/refactor/test. Branch name: up to three words, hyphen separated, no slashes.
+
+Ask before removing functionality that looks intentional.
+
 ## Lessons
 
 <!-- Add one line per correction below, newest last. Ask before editing anything above this heading. -->
