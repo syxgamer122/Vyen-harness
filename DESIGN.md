@@ -12,10 +12,46 @@
 
 ---
 
+## Ràng buộc cứng
+
+Đọc mục này **trước khi sửa bất cứ thứ gì trong `components/` hoặc `app/`**. Bảy
+dòng dưới là **hợp đồng**, không phải sở thích: mỗi dòng có một assertion trong
+`tests/design-system.test.ts` canh đúng tên nó. Vi phạm làm test đỏ, nên nó là
+lỗi chứ không phải lựa chọn phong cách — kể cả khi bạn cho rằng hệ thống cũ sai
+và muốn sửa nó. Muốn sửa thì sửa `tailwind.config.ts` + `app/globals.css` +
+`tests/design-system.test.ts` **cùng một lần**; sửa một bên là tạo hai nguồn sự
+thật.
+
+| # | Ràng buộc | Assertion canh |
+|---|---|---|
+| 1 | Bóng đổi chỉ đến từ đúng 4 nguồn `.lift-sm` / `.lift-md` / `.lift-lg` / `.well`. Không khai `box-shadow` ở chỗ khác | `chiều sâu: đúng 4 nguồn sinh bóng, không có nguồn thứ năm` |
+| 2 | Bo góc là thang px đơn điệu 9 bậc, mỗi bậc là **một** số px. Không `ink` / `wobble`, không bán kính bất đối xứng | `borderRadius là thang THẬT theo vai trò, không còn chốt vuông` |
+| 3 | Chữ chỉ dùng 6 bậc `micro` / `meta` / `ui` / `body` / `read` / `head`. Cỡ px tự chế lệch bậc là cấm | `không còn cỡ chữ px tự chế nào lệch bậc trong thang 6 bậc` |
+| 4 | Mọi màu phải là token trong bảng §2. Cấm palette Tailwind, cấm `text-white`, cấm modifier opacity trên token **chữ** | `bề mặt hợp đồng không dùng class màu Tailwind mặc định (red-500, zinc-400…)` · `không dùng modifier opacity trên token CHỮ (text-tertiary/60 — fail WCAG AA)` |
+| 5 | Viền luôn 1px, và khai độ rộng viền thì phải khai kèm màu — recipe lẫn class | `recipe @apply đặt độ rộng viền thì phải @apply kèm màu` · `class đặt độ rộng viền phải có class màu CÙNG variant trong cùng className` |
+| 6 | Light-only. Thêm bất kỳ biến thể `dark:` nào là dựng nhánh sáng nửa vời thứ hai | `app là dark-only: không có biến thể dark: nào trong component` |
+| 7 | Ô nhập không được xoá dấu hiệu focus; phần tử bấm được phải đổi con trỏ tay | `ô nhập KHÔNG được xoá dấu hiệu focus (outline-none là anti-pattern hạng 1)` · `mọi phần tử bấm được đều đổi con trỏ tay` |
+
+Ba cái bẫy ngôn ngữ, đều đã gặp và đã sửa — đừng "sửa ngược":
+
+- **Class chết** (`class CHẾT đã bị gỡ khỏi hệ thống không được còn gọi trong
+  components/ và app/`): còn nằm trong JSX nhưng không còn sinh CSS. Danh sách cấm
+  là hằng số `DEAD_CLASSES` trong test — class mới chết mà không có tên trong danh
+  sách thì lọt. Đừng tin một class chỉ vì nó còn trong code.
+- **Ba chỗ ghi chữ "dark-only"** (`tailwind.config.ts` phần đầu, tên assertion ở
+  ràng buộc 6, khối `.dark` no-op `globals.css:121`): chúng đều mang nghĩa **"không
+  có nhánh tối"**, không phải "giao diện màu tối". Ứng dụng có nền trắng. Đọc sai
+  từ này là dựng lại cả nhánh sáng mà không ai đòi.
+- **`--panel-bg`, `--status-warning`, `--text-primary`** là alias của §2.6, đều trỏ
+  đúng giá trị token thật. Chúng không phải màu mới; đổi tên không đổi màu.
+
+---
+
 ## 0. Mục lục
 
 | § | Nội dung |
 |---|---|
+| [Ràng buộc cứng](#ràng-buộc-cứng) | 7 điều có test canh — đọc trước khi sửa bất cứ thứ gì trong UI |
 | [1](#1-quy-tắc-gốc) | Quy tắc gốc — một câu, kèm hệ quả bắt buộc |
 | [2](#2-token-màu) | Token màu: bề mặt, chữ, viền, trạng thái, diff — kèm HEX |
 | [3](#3-typography) | Typography: 2 họ chữ, 6 bậc cỡ chữ, quy tắc phân cấp |
@@ -23,7 +59,7 @@
 | [5](#5-chiều-sâu--bóng-mềm) | Chiều sâu: bóng mềm, 4 nguồn sinh bóng |
 | [6](#6-chính-sách-màu-trạng-thái) | Chính sách màu trạng thái + danh sách alias tạm |
 | [7](#7-light-only--không-có-nhánh-tối) | Light-only: một hướng duy nhất |
-| [8](#8-z-index) | Thang z-index (`lib/ui-z.ts`) |
+| [8](#8-z-index) | Thang z-index (`lib/ui-z.ts`) + [8.1](#81-bề-mặt-overlay--menu-popover-dialog-toast) bề mặt overlay |
 | [9](#9-drift-đã-biết--chưa-migrate) | **Drift đã biết / chưa migrate** — mục quan trọng nhất |
 | [10](#10-hợp-đồng-được-kiểm-chứng-bằng-gì) | Test kiểm chứng cái gì, và cái nó **không** kiểm |
 | [11](#11-kiểm-chứng-theo-checklist-ui-ux-pro-max-đợt-2) | Kiểm chứng theo checklist `ui-ux-pro-max` — mục nào sửa, mục nào cố ý giữ |
@@ -304,6 +340,70 @@ dùng.
 (`lib/ui-z.ts:14-39`). Vi phạm từng gây lỗi thật — Cài đặt ở `z-50` nằm **dưới**
 modal phê duyện, nên mở Cài đặt trong lúc có modal thì modal vẽ đè lên Cài đặt.
 
+### 8.1 Bề mặt overlay — menu, popover, dialog, toast
+
+**Không có test canh phần này** (§10.2) — nên nó là quy tắc cho người đọc, và mọi
+dòng dưới đây là **cái code đang làm**, không phải điều mong muốn. Sửa bề mặt
+overlay là sửa điện mạo của nhiều màn hình cùng lúc: đọc hết `§4` (bo góc), `§5`
+(bóng), `§2` (màu) trước.
+
+**Vỏ theo loại:**
+
+| Loại | class thật trong code | Lớp z |
+|---|---|---|
+| Menu gắn trigger | `surface-panel animate-pop-in p-1.5` (`thinking-menu.tsx:303`) | `dropdown` |
+| Menu rời: xuất khẩu, chọn model | `surface-panel` rồi ghi đè `lift-md rounded-xl border border-subtle bg-overlay p-1` (`chat-export-menu.tsx:103`, `model-selector.tsx:380`) | `popover` |
+| Dialog | `lift-lg rounded-2xl border border-default bg-overlay shadow-lift-lg`, vỏ `max-w-4xl`, cao `max-h-[min(70vh,calc(100dvh-3rem))]` (`settings-dialog.tsx:191`) | `system` · `approval` · `approvalCritical` |
+| Toast | `lift-lg rounded-xl border-warning/40 p-3.5` (`toast.tsx:30`) | `toast` |
+
+**Luật của vỏ:**
+
+- Bo góc theo vai trò §4.1: menu là khối nội dung nên `xl` 12px; khung modal là
+  `2xl` 16px. Menu và dialog không cùng bán kính vì chúng không cùng vai trò.
+- Bóng theo §5: menu/popover `lift-md`, dialog/toast `lift-lg`. Overlay không được
+  thêm nguồn bóng thứ năm.
+- Viền: menu/popover `border-subtle`, dialog `border-default`. Đây là ranh giới
+  **trong hệ** chứ không phải ranh giới control, nên nó không cần đạt 3:1 như §2.3.
+- Nền: `bg-surface` cho menu nằm trong luồng, `bg-overlay` cho popover rời và
+  dialog. Không trộn hai tầng này trong cùng một vỏ.
+- Đệm vỏ: `p-1` đến `p-1.5`. Menu nhiều dòng dùng `p-1.5`.
+- Vỏ overlay không dùng `backdrop-blur`: chiều sâu của hệ đến từ nền + viền (§1.4).
+  Chỗ duy nhất đang làm mờ là dải fade cuối cột hội thoại
+  (`components/chat/stream-bubble.tsx:92`), không phải overlay.
+
+**Hàng trong menu:**
+
+- Recipe `.menu-item` là mặc định: `rounded-lg px-3 py-2 text-ui font-mono`, hover
+  `bg-raised`, chuyển màu `duration-150`. Hàng nguy hiểm thêm `.menu-item-danger`.
+- Hàng cần vùng chạm 44px thì viết tay và **ghi rõ vì sao**:
+  `min-h-11 rounded-lg px-2.5 py-2` (`model-selector.tsx:275`).
+- Chọn / hover dùng `bg-raised` — hệ này không có token `menu-hover` riêng. Đừng tô
+  cả hàng bằng màu nhấn để đánh dấu mục đang chọn; dùng dấu tick hoặc đổi màu chữ.
+- Tiêu đề nhóm trong menu: `text-micro uppercase tracking-wide text-accent`, dán nền
+  khi cuộn bằng `sticky top-0 bg-raised/95` (`model-selector.tsx:440`). `/95` là
+  modifier trên **nền** nên hợp lệ — cấm của §2.2 là trên **chữ**.
+
+**Dialog.** Backdrop `bg-sunken/70` phủ lên lớp `content`; đầu vỏ
+`bg-raised px-4 py-2.5` + `border-b border-subtle`; thân cuộn được. Modal phê duyệt
+dùng `approval` / `approvalCritical` — không dùng `system`, vì `system` là hộp thoại
+người dùng mở chủ động.
+
+**Toast.** Nằm trên `dropdown` và dưới modal theo §8. Vỏ nhỏ, một dòng chữ; không
+dùng `lift-lg` cho thứ khác.
+
+**Chuyển động.** `animate-pop-in` / `animate-fade-in` / `animate-slide-up` khai ở
+`tailwind.config.ts` (`theme.extend.animation` + `theme.extend.keyframes`), lần lượt
+160ms / 160ms / 180ms — dưới 200ms nên không cảm nhận được là chờ. Không đổi sang
+thư viện animation khác chỉ để làm một hiệu ứng overlay.
+
+**Điều không được làm trong overlay**, vì mỗi điều sẽ đẻ thêm một bộ quy ước riêng:
+
+- `z-[...]` hoặc `z-40` viết tay. Số lấy từ `Z_CLASS` trong `lib/ui-z.ts`. Trừ `z-0`
+  cho nội dung và `sticky top-0 z-10` bên trong một overlay đang xếp chồng nội bộ.
+- Shadow riêng cho overlay — chỉ `lift-md` / `lift-lg`.
+- Nền overlay tự dựng bằng hex hay alpha trung tính (`bg-white/90`): phải là token
+  §2, và alpha trung tính là thứ §2.6 cấm.
+
 ---
 
 ## 9. Drift đã biết / chưa migrate
@@ -375,6 +475,10 @@ xem §3.
   **đặc** làm nền, khiến `text-primary` trên đó chỉ còn 2.39:1 (fail AA) và icon
   `text-reasoning` là 1.00:1 — vô hình. Nay dùng `bg-reasoning/10` + chữ
   `text-primary`/`text-secondary`. Xem §2.4.
+- **`thinking-menu.tsx:303` tự ghi `z-40` thay vì `Z_CLASS.dropdown`.** Giá trị thì
+  đúng (40 = `dropdown`), nên màn hình không sai — nhưng nó vi phạm §8 và là hàng
+  thứ 12 trong số overlay nên lấy số từ `lib/ui-z.ts` (11 component còn lại đều gọi
+  `Z_CLASS`). Sửa là đổi một chữ, không đổi diện mạo.
 
 ---
 
@@ -430,6 +534,10 @@ npx vitest run tests/design-system.test.ts
   Tên màu nhắc trong comment là tài liệu, không phải màu được vẽ ra — và tài liệu
   gọi tên màu cũ là điều ĐÚNG. Nếu thấy assertion đỏ vì comment, hãy sửa
   assertion theo mẫu này, đừng xoá comment.
+- **Nó không kiểm bề mặt overlay** (§8.1): vỏ menu/popover/dialog/toast, đệm, bo
+  góc vỏ, hàng menu, `Z_CLASS` có được dùng hay không. Cùng cơ chế lỗ hổng mà
+  §11.1c đã gọi tên: rule chỉ soi một phần bề mặt thì phần còn lại không được canh.
+  Ví dụ còn sống: `thinking-menu.tsx` tự ghi `z-40` và test vẫn xanh (§9.4).
 
 Một tài liệu design system mà chỉ test được một nửa vẫn tốt hơn không tài liệu —
 miễn là phần không test được được viết ra thành quy tắc rõ ràng, đúng như §10.2
