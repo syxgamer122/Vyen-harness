@@ -219,7 +219,7 @@ const ChatItem = memo(function ChatItem({
               }
             }}
             onBlur={handleSaveRename}
-            className="w-full rounded-md border border-strong bg-raised px-2 py-1 font-sans text-ui text-primary outline-none focus:border-accent"
+            className="w-full rounded-md border border-strong bg-raised px-2 py-1 font-sans text-ui text-primary focus:border-accent"
           />
         ) : (
           <button
@@ -227,7 +227,11 @@ const ChatItem = memo(function ChatItem({
             onClick={() => onSelect(chat.id)}
             onDoubleClick={() => setIsEditing(true)}
             aria-current={isActive ? 'page' : undefined}
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 -mx-1.5 text-left outline-none"
+            /*
+             * `outline-offset-[-2px]` vẽ ring vào TRONG: hàng này nằm trong danh
+             * sách `overflow-y-auto`, ring mặc định (offset +1px) sẽ bị cắt mép.
+             */
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 -mx-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
           >
             <span className="truncate text-ui">{titleSegments ? <Highlight segments={titleSegments} /> : chat.title}</span>
           </button>
@@ -242,7 +246,7 @@ const ChatItem = memo(function ChatItem({
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => (menuOpen ? closeMenu() : openMenu())}
-            className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-tertiary transition-all hover:bg-overlay hover:text-primary ${
+            className={`relative flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-tertiary transition-all after:absolute after:-inset-[8px] after:content-[''] hover:bg-overlay hover:text-primary ${
               menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100'
             }`}
           >
@@ -455,7 +459,7 @@ export function Sidebar() {
                 aria-label="Thu gọn thanh bên"
                 title="Thu gọn (Ctrl+\)"
                 onClick={() => setSidebarCollapsed(true)}
-                className="hidden h-7 w-7 items-center justify-center rounded-lg text-tertiary transition-colors hover:bg-raised hover:text-primary md:inline-flex"
+                className="relative hidden h-7 w-7 items-center justify-center rounded-lg text-tertiary transition-colors after:absolute after:-inset-[8px] after:content-[''] hover:bg-raised hover:text-primary md:inline-flex"
               >
                 <PanelLeftClose size={15} />
               </button>
@@ -463,7 +467,7 @@ export function Sidebar() {
                 type="button"
                 aria-label="Đóng thanh bên"
                 onClick={() => setSidebarOpen(false)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-tertiary transition-colors hover:bg-raised hover:text-primary md:hidden"
+                className="relative flex h-7 w-7 items-center justify-center rounded-lg text-tertiary transition-colors after:absolute after:-inset-[8px] after:content-[''] hover:bg-raised hover:text-primary md:hidden"
               >
                 <X size={16} />
               </button>
@@ -474,9 +478,9 @@ export function Sidebar() {
             <button
               type="button"
               onClick={handleNewChat}
-              className="lift-sm flex w-full items-center justify-center gap-2 rounded-wobble border-2 border-default bg-accent-mint/60 px-4 py-2.5 font-mono text-ui text-primary transition-all duration-150 hover:bg-accent-mint/80 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-transparent bg-primary px-4 py-2.5 text-ui font-medium text-on-fill transition-colors duration-150 hover:bg-strong"
             >
-              <Plus size={15} className="text-accent" />
+              <Plus size={15} className="text-on-fill" />
               <span>$ new session</span>
             </button>
           </div>
@@ -492,7 +496,7 @@ export function Sidebar() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="$ /search..."
-                className="well w-full rounded-wobble border-2 border-default bg-base py-2.5 pl-9 pr-8 font-mono text-ui text-primary outline-none transition-colors duration-150 placeholder:text-tertiary focus:border-accent"
+                className="well w-full rounded-lg border border-default bg-surface py-2.5 pl-9 pr-8 font-mono text-ui text-primary transition-colors duration-150 placeholder:text-tertiary focus:border-accent"
               />
               {isSearching ? (
                 <Loader2 size={12} aria-hidden="true" className="absolute right-2 animate-spin text-accent" />
@@ -501,9 +505,10 @@ export function Sidebar() {
                   type="button"
                   aria-label="Xóa từ khóa"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 flex h-5 w-5 items-center justify-center rounded-full text-tertiary transition-colors hover:bg-raised hover:text-primary"
+                  /* 28px + hit-area 8px = 44px; `right-1` để mép phải vẫn khớp `pr-8` của input. */
+                  className="absolute right-1 flex h-7 w-7 items-center justify-center rounded-full text-tertiary transition-colors after:absolute after:-inset-[8px] after:content-[''] hover:bg-raised hover:text-primary"
                 >
-                  <X size={11} />
+                  <X size={13} />
                 </button>
               ) : null}
             </div>
@@ -615,7 +620,7 @@ export function Sidebar() {
                 if (!isDesktop) setSidebarOpen(false);
                 setSettingsOpen(true);
               }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-tertiary transition-colors hover:bg-raised hover:text-primary"
+              className="relative flex h-8 w-8 items-center justify-center rounded-lg text-tertiary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:bg-raised hover:text-primary"
             >
               <SettingsIcon size={14} />
             </button>

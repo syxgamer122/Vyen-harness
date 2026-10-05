@@ -31,33 +31,33 @@
      * và bóng lệch cứng. Vì vậy thang này chỉ là những chênh lệch rất nhỏ:
      * `surface` và `overlay` đều là giấy trắng, phân tầng bằng `.lift-*`.
      */
-    --bg-sunken: 242 242 239; /* ngoài cùng — nền app, vùng tĩnh, sidebar */
-    --bg-base: 250 250 248; /* nền vùng làm việc chính — chat stream, composer */
+    --bg-sunken: 247 247 247; /* ngoài cùng — nền app, vùng tĩnh, sidebar */
+    --bg-base: 252 252 252; /* nền vùng làm việc chính — chat stream, composer */
     --bg-surface: 255 255 255; /* khối nội dung — thẻ, bubble, dải tiêu đề */
-    --bg-raised: 238 238 235; /* control — ô nhập, nút, khối hover, code */
+    --bg-raised: 245 245 245; /* control — ô nhập, nút, khối hover, code */
     --bg-overlay: 255 255 255; /* nổi trên cùng — popover, dropdown, menu */
 
     /*
      * CHỮ — 4 tầng theo VAI TRÒ chứ không theo độ sáng tuyệt đối, nên
      * `text-disabled` không phải "mờ hơn tertiary" mà là "không dùng được".
      */
-    --text-primary: 24 24 27; /* nội dung chính — mực đậm */
-    --text-secondary: 82 82 91; /* mô tả, nhãn phụ, metadata */
-    --text-tertiary: 107 107 115; /* nhãn nhóm, gợi ý, dấu thời gian */
-    --text-disabled: 161 161 170; /* control bị vô hiệu — không dùng cho nội dung */
+    --text-primary: 24 24 27; /* nội dung chính — 16.4:1 */
+    --text-secondary: 87 87 87; /* mô tả, nhãn phụ, metadata — 7.2:1 */
+    --text-tertiary: 111 111 111; /* nhãn nhóm, gợi ý, dấu thời gian — 5.0:1 */
+    --text-disabled: 163 163 163; /* control bị vô hiệu — WCAG miễn trừ */
 
     /*
      * VIỀN — 3 tầng, mỗi tầng đảm nhiệm đúng MỘT việc. Đây là thứ quyết định
      * một khối trông như "khung" hay như "control".
      */
-    --border-subtle: 220 220 216; /* đường phân cách giữa các dòng TRONG một khối */
-    --border-default: 42 42 46; /* ranh giới control — input, nút, ô chọn — nét mực */
-    --border-strong: 24 24 27; /* hover / focus / selected — nét mực đậm nhất */
+    --border-subtle: 229 229 229; /* đường phân cách giữa các dòng TRONG một khối */
+    --border-default: 148 148 148; /* ranh giới control — 3.03:1 (WCAG 1.4.11) */
+    --border-strong: 82 82 82; /* hover / focus / selected — 6.4:1 */
 
     /* NHẤN & TRẠNG THÁI — một bảng màu duy nhất cho toàn ứng dụng. */
-    --accent: 42 115 96; /* nhấn chủ đạo: link, con trỏ, viền focus — mint ĐẬM, đạt AA */
-    --accent-dim: 143 199 184; /* nhấn bị tắt, sọc trạng thái active, nền nhấn nhạt */
-    --accent-mint: 152 216 200; /* MINT NHẠT — nền nút chính, tag active, bubble */
+    --accent: 42 115 96; /* nhấn chủ đạo: link, con trỏ, viền focus — 5.6:1, đạt AA */
+    --accent-dim: 127 184 166; /* nhấn bị tắt, cột biểu đồ — 4.0:1 (đạt 3:1 cho vật thể đồ hoạ) */
+    --accent-soft: 240 244 243; /* NỀN nhấn nhạt — tag active, bubble, hover mềm */
     /*
      * CHỮ TRÊN NỀN BÃO HÒA. Không phải "chữ thứ 5 theo độ sáng" — nó là
      * câu trả lời cho một câu hỏi: "chữ màu gì để đọc được trên nút tô đậm?".
@@ -68,7 +68,7 @@
      * mực đen chỉ đạt 2.7–3.5:1 (FAIL AA), còn trắng đạt 5.1–6.5:1.
      */
     --on-fill: 255 255 255;
-    --success: 42 115 71;
+    --success: 22 122 74;
     --warning: 154 98 6;
     --danger: 179 38 30;
     --info: 3 105 161;
@@ -77,9 +77,7 @@
     /* DIFF — add/del/ctx phải phân biệt được khi đọc thuần văn bản. */
     --diff-add: 31 122 61;
     --diff-del: 179 38 30;
-    --diff-ctx: 107 107 115;
-
-    --font-hand: 'Patrick Hand', 'Quicksand', 'Comic Sans MS', cursive;
+    --diff-ctx: 87 87 87;
 
     /*
      * ALIAS LƯỚT — các component chưa migrate sang bảng màu mới vẫn dùng những
@@ -87,25 +85,25 @@
      * nên migrate tên không đổi màu. Xem "ALIAS TẠM" trong tailwind.config.ts
      * — khi component nào đổi hết thì xoá cả khối này.
      */
-    --bg-deep: 242 242 239; /* = --bg-sunken — vai trò "nền khung ngoài cùng" */
-    --bg-canvas: 250 250 248; /* = --bg-base — vai trò "vùng làm việc" */
+    --bg-deep: 247 247 247; /* = --bg-sunken — vai trò "nền khung ngoài cùng" */
+    --bg-canvas: 252 252 252; /* = --bg-base — vai trò "vùng làm việc" */
     --panel-bg: 255 255 255; /* = --bg-surface — vai trò "khối chat/panel phụ" */
-    --panel-soft: 238 238 235; /* = --bg-raised — vai trò "khối hover, code" */
-    --border-hover: 24 24 27; /* = --border-strong */
-    --text-muted: 82 82 91; /* = --text-secondary */
+    --panel-soft: 245 245 245; /* = --bg-raised — vai trò "khối hover, code" */
+    --border-hover: 82 82 82; /* = --border-strong */
+    --text-muted: 87 87 87; /* = --text-secondary */
     --accent-steel: 42 115 96; /* = --accent */
-    --status-success: 42 115 71; /* = --success */
+    --status-success: 22 122 74; /* = --success */
     --status-warning: 154 98 6; /* = --warning */
     --status-error: 179 38 30; /* = --danger */
-    --surface: 250 250 248; /* = --bg-base — nền html/body */
-    --surface-raised: 238 238 235; /* = --bg-raised */
+    --surface: 252 252 252; /* = --bg-base — nền html/body */
+    --surface-raised: 245 245 245; /* = --bg-raised */
     --surface-bubble: 255 255 255; /* = --bg-surface */
-    --surface-muted: 238 238 235; /* = --bg-raised */
-    --surface-code: 238 238 235; /* = --bg-raised */
+    --surface-muted: 245 245 245; /* = --bg-raised */
+    --surface-code: 245 245 245; /* = --bg-raised */
     --brand: 42 115 96; /* = --accent */
     --brand-accent: 179 38 30; /* = --danger — dùng trực tiếp bởi vyen-logo.tsx */
     --foreground: 24 24 27; /* = --text-primary */
-    --muted-foreground: 82 82 91; /* = --text-secondary */
+    --muted-foreground: 87 87 87; /* = --text-secondary */
   }
 
   /*
@@ -156,6 +154,28 @@
   :focus-visible {
     outline: 2px solid rgb(var(--accent) / 0.72);
     outline-offset: 1px;
+  }
+
+  /*
+   * CON TRỎ TAY trên mọi phần tử bấm được.
+   *
+   * Tailwind preflight KHÔNG đặt `cursor` cho `<button>` — UA stylesheet mặc
+   * định là mũi tên. Đo được: 180 call site `<button>` trong components+app,
+   * chỉ 21 trong số đó tự ghi `cursor-pointer`. Phần lớn dùng recipe
+   * (`.icon-btn`, `.menu-item`, `.btn-*`) vốn không có cursor, nên giao diện
+   * TRÔNG như bấm được còn chuột thì báo không bấm được — người dùng phải
+   * di chuột tới mới tin.
+   *
+   * Một rule ở `base` phủ hết thay vì sửa 180 chỗ. Chỗ nào cần con trỏ khác
+   * (`cursor-not-allowed` trên nút disabled, `cursor-text` trên vùng chọn)
+   * vẫn thắng: utility nằm layer `utilities`, sau `base`. `:not(:disabled)`
+   * giữ nguyên hành vi "bấm vào nút tắt = không phản ứng" thay vì đổi con
+   * trỏ thành bàn tay cảm ứng trên nút không dùng được.
+   */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary {
+    cursor: pointer;
   }
 }
 
@@ -219,28 +239,31 @@ html[data-animations='off'] *::after {
  * dùng `border-*` để tách, không tự dán bóng.
  */
 .lift-sm {
-  box-shadow: 2px 2px 0 rgb(0 0 0 / 0.9);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .lift-md {
   box-shadow:
-    3px 3px 0 rgb(0 0 0 / 0.9),
-    7px 7px 0 rgb(0 0 0 / 0.10);
+    0 1px 3px 0 rgb(0 0 0 / 0.06),
+    0 6px 16px -4px rgb(0 0 0 / 0.08);
 }
 
 .lift-lg {
   box-shadow:
-    4px 4px 0 rgb(0 0 0 / 0.9),
-    10px 10px 0 rgb(0 0 0 / 0.14);
+    0 2px 6px 0 rgb(0 0 0 / 0.07),
+    0 16px 40px -8px rgb(0 0 0 / 0.12);
 }
 
 /*
- * Ô nhập chìm: bóng đổ nằm TRONG viền. Trên giấy trắng, "chìm" không còn là
- * bóng đen nhạt (đó là cách của nền tối) — nó là một lớp phủ GIẤY nhạt hơn
- * nền, đủ để ô nhập thấp hơn mặt giấy mà vẫn là giấy.
+ * Ô nhập chìm: bóng đổ nằm TRONG viền, rất nhạt.
+ *
+ * Trước đây nó là `inset 0 2px 5px …/0.10` — đủ đậm để ô nhập thành hố. Nay
+ * alpha hạ xuống 0.04 và chỉ 1px: ô nhập vẫn đọc ra là "chỗ để gõ" nhờ viền
+ * + nền, không nhờ một hố tối. Đây là hàng rào của yêu cầu "cắt hiệu ứng
+ * không cần thiết": mọi bóng phải còn đúng việc sau khi bị giảm.
  */
 .well {
-  box-shadow: inset 0 2px 5px rgb(24 24 27 / 0.10);
+  box-shadow: inset 0 1px 2px 0 rgb(24 24 27 / 0.04);
 }
 
 /*
@@ -285,25 +308,25 @@ html[data-animations='off'] *::after {
  */
 
 /* ------------------------------------------------------------------ */
-/* Chữ vẽ tay — chỉ cho lớp UI, KHÔNG cho nội dung model              */
+/* Lớp chữ UI — KHÔNG dùng cho nội dung model                          */
 /* ------------------------------------------------------------------ */
 /*
- * Patrick Hand là chữ NÉT KẺ: nhãn, nút, tiêu đề, wordmark, dải nhóm ngày.
- * Nó KHÔNG dùng cho prose của assistant — một câu trả lời kỹ thuật dài bằng
- * chữ viết tay thì người dùng mỏi mắt, và đó là thứ họ đọc lâu nhất. Xem
- * `.claude-prose` (Inter) và `font-mono` (JetBrains Mono cho code/timestamp).
+ * `.uic` trước đây là Patrick Hand (chữ nét kể). Nay chuyển sang chữ sans
+ * của hệ, với weight THẬT — `font-semibold`/`font-bold` trên `.uic` giờ
+ * tạo ra nét khác hẳn thay vì rơi về một nét duy nhất.
  *
- * Vì Patrick Hand CHỈ có weight 400, phân cấp đậm/nhạt trong UI không đến
- * từ `font-bold` (không có nét nào đậm hơn để dùng) mà đến từ CỠ CHỮ và
- * mức đậm của nét mực. `font-semibold` trên `.uic` bị hạ về 400 có chủ đích.
+ * Lý do bỏ chữ vẽ tay (đo được, không phải thẩm mỹ): chữ nét kể chỉ có
+ * một nét đậm, nên phân cấp đậm/nhạt phải làm bằng CỠ CHỮ, dẫn tới nhãn 12px
+ * mỏng đến mức dưới ngưỡng đọc thoải mái trên nền trắng. Sans có đủ các
+ * nét, nên cùng một cỡ chữ vẫn phân cấp được mà không phải làm nhạt đi.
+ *
+ * `.claude-prose` (prose dài của assistant) vẫn dùng sans; code/timestamp
+ * vẫn dùng `font-mono`. Xem §3 DESIGN.md.
  */
 .uic {
-  font-family: var(--font-hand), 'Patrick Hand', 'Quicksand', 'Comic Sans MS', cursive;
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  /* Chữ vẽ tay không có weight 600 — các class `font-semibold`/`font-bold` rơi
-     về một nét duy nhất, nên bù lại bằng độ đậm của nét mực + cỡ chữ. */
-  font-synthesis-weight: none;
+  font-family: var(--font-sans), 'Inter', 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 /*
@@ -344,9 +367,8 @@ html[data-animations='off'] *::after {
    * màu, nên không phá bảng token.
    */
   .icon-btn {
-    @apply flex flex-shrink-0 items-center justify-center rounded-wobble text-tertiary
-      transition-all duration-150 hover:bg-accent-mint/50 hover:text-accent
-      active:translate-x-[1px] active:translate-y-[1px]
+    @apply flex flex-shrink-0 items-center justify-center rounded-md text-tertiary
+      transition-colors duration-150 hover:bg-raised hover:text-primary
       disabled:pointer-events-none disabled:opacity-40;
   }
   .icon-btn-sm {
@@ -364,7 +386,7 @@ html[data-animations='off'] *::after {
    * 20px. Nhờ vậy khối tách khỏi nền mà không cần viền đậm thứ hai.
    */
   .surface-panel {
-    @apply lift-md rounded-ink border-2 border-default bg-surface;
+    @apply lift-md rounded-xl border border-subtle bg-surface;
   }
 
   .menu-item {
@@ -378,16 +400,26 @@ html[data-animations='off'] *::after {
   /*
    * Ô nhập — `.well`: bóng nằm trong viền nên mắt đọc ngay đây là chỗ "khoét
    * vào" để gõ, khác hẳn khối nổi xung quanh.
+   *
+   * KHÔNG `outline-none` ở đây. Class đó khai `outline: 2px solid
+   * transparent` trong layer `components`, đè lên `:focus-visible` ở layer
+   * `base` (cùng specificity, layer sau thắng) — tức là mọi ô nhập trong app
+   * mất hẳn dấu hiệu focus, chỉ còn lại viền đổi màu. Với người điều
+   * hướng bàn phím thì đó là bay mất vị trí. Ô nhập bàn phím luôn khớp
+   * `:focus-visible` nên vòng 2px accent hiện đúng lúc cần, và `focus:border-accent`
+   * vẫn chạy như lớp nhấn thứ hai. Cùng lý do này, `focus:ring-0` cũng bị gỡ:
+   * không class `ring-*` nào tồn tại nên nó vô nghĩa, còn `box-shadow: none`
+   * lại xoá mất bóng `.well` đúng lúc người dùng đang gõ.
    */
   .field {
-    @apply well w-full rounded-wobble border-2 border-default bg-base px-3 py-2
-      text-sm font-mono text-primary outline-none transition-all duration-150
-      placeholder:text-tertiary focus:border-accent focus:ring-0;
+    @apply well w-full rounded-lg border border-default bg-surface px-3 py-2
+      text-sm font-mono text-primary transition-colors duration-150
+      placeholder:text-tertiary focus:border-accent;
   }
   .field-sm {
-    @apply well w-full rounded-wobble border-2 border-default bg-base px-2.5 py-1.5
-      text-ui font-mono text-primary outline-none transition-all duration-150
-      placeholder:text-tertiary focus:border-accent focus:ring-0;
+    @apply well w-full rounded-lg border border-default bg-surface px-2.5 py-1.5
+      text-ui font-mono text-primary transition-colors duration-150
+      placeholder:text-tertiary focus:border-accent;
   }
 
   /*
@@ -399,17 +431,15 @@ html[data-animations='off'] *::after {
    * cùng một cơ chế với `.lift-*`, chỉ ở chiều ngược lại.
    */
   .btn-primary {
-    @apply lift-sm inline-flex items-center justify-center gap-2 rounded-wobble border-2
-      border-default bg-accent-mint px-4 py-2 text-ui text-primary
-      transition-all duration-150 hover:bg-accent-mint/80
-      active:translate-x-[2px] active:translate-y-[2px] active:shadow-none
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border
+      border-transparent bg-primary px-4 py-2 text-ui font-medium text-on-fill
+      transition-colors duration-150 hover:bg-strong
       disabled:pointer-events-none disabled:opacity-50;
   }
   .btn-secondary {
-    @apply lift-sm inline-flex items-center justify-center gap-2 rounded-wobble border-2
-      border-default bg-surface px-3.5 py-2 text-ui text-primary
-      transition-all duration-150 hover:bg-accent-mint/40
-      active:translate-x-[2px] active:translate-y-[2px] active:shadow-none
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border
+      border-default bg-surface px-3.5 py-2 text-ui font-medium text-primary
+      transition-colors duration-150 hover:bg-raised
       disabled:pointer-events-none disabled:opacity-50;
   }
 
@@ -447,7 +477,7 @@ html[data-animations='off'] *::after {
    * 2px padding bớt đi ở đây là 2px trả lại cho người dùng. Đừng vội nới ra.
    */
   .settings-card {
-    @apply lift-md rounded-ink border-2 border-default bg-surface;
+    @apply lift-md rounded-xl border border-subtle bg-surface;
   }
   .settings-card-head {
     @apply flex items-start gap-2.5 px-4 py-3;
@@ -477,7 +507,7 @@ html[data-animations='off'] *::after {
   }
 
   /* ---------------------------------------------------------------- */
-  /* BONG BÓT TRUYỆN TRANH — nơi duy nhất trong app có "đuôi" nói      */
+  /* BONG BÓT — phân biệt hai bên bằng NỀN, không bằng đuôi.            */
   /* ---------------------------------------------------------------- */
   /*
    * Đuôi được vẽ bằng MỘT pseudo-element hình vuông xoay 45°: nửa nằm trong
@@ -491,47 +521,29 @@ html[data-animations='off'] *::after {
    * (`textarea`) có `resize` nên không tràn ngang, và các khối khác bên
    * trong đều tự bo góc; nên không cần cắt.
    *
-   * Vì sao `rounded-ink` chứ không phải bo đều: góc bo to ở góc đối diện đuôi
-   * làm bong bóng trông "vẽ tay", còn bo đều là hình dạng của một control.
+   * Đuôi truyện tranh (pseudo-element vuông xoay 45°) đã bị gỡ khỏi hệ: nó là
+   * trang trí thuần, mép bo góc đã mang hết thông tin. Dấu hiệu hướng giờ đến
+   * từ MÀU NỀN (user nền nhấn nhạt, bot nền trắng) và CĂN LỀ trái/phải.
    */
   .bubble {
-    @apply relative rounded-ink border-2 border-default;
+    @apply relative rounded-2xl border border-subtle;
   }
   .bubble-user {
-    @apply bubble bg-accent-mint/70;
+    @apply bubble border-transparent bg-accent-soft;
   }
   .bubble-bot {
     @apply bubble bg-surface;
   }
   /*
-   * Đuôi nằm ở góc DƯỚI, hướng về phía đầu kia của hội thoại: bubble user
-   * (phải) chỉ xuống-trái, bubble bot (trái) chỉ xuống-phải. Đây là dấu
-   * hiệu hướng DUY NHẤT khi quét nhanh — nên nó cũng là dấu hiệu duy nhất
-   * được phép làm khác nhau giữa hai bên.
+   * KHÔNG còn đuôi bong bóng (pseudo-element xoay 45°).
    *
-   * `bottom: -9px` = nửa chiều cao (8px) + 1px để mép dưới cùng của hình
-   * vuông chạm đúng mép dưới của bong bóng, nên đuôi ăn vào viền chứ không
-   * hở một khe trắng.
+   * Đuôi là trang trí thuần: nó không mang thông tin nào mà mép bo góc chưa
+   * mang, và mỗi đuôi là thêm một đường viền phải vẽ tay + một phần tử giả.
+   * Người dùng đọc hội thoại theo vị trí trái/phải, nên bỏ đuôi không mất
+   * tín hiệu nào. Phía nào là câu trả lời, phía nào là câu hỏi, đã đọc ra
+   * từ màu nền (`bubble-user` nền nhấn nhạt, `bubble-bot` nền trắng) và từ
+   * căn lề trái/phải của hàng.
    */
-  .bubble-user::after,
-  .bubble-bot::after {
-    content: '';
-    position: absolute;
-    bottom: -9px;
-    width: 16px;
-    height: 16px;
-    background: inherit;
-    border-right: 2px solid rgb(var(--border-default));
-    border-bottom: 2px solid rgb(var(--border-default));
-    transform: rotate(45deg);
-  }
-  .bubble-user::after {
-    right: 26px;
-  }
-  .bubble-bot::after {
-    left: 26px;
-    transform: rotate(225deg);
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -616,7 +628,7 @@ html[data-animations='off'] *::after {
   color: rgb(var(--accent));
   text-decoration: underline;
   text-underline-offset: 3px;
-  transition: color 100ms ease;
+  transition: color 150ms ease;
 }
 .claude-prose a:hover {
   color: rgb(var(--text-primary));

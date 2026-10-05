@@ -215,7 +215,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Đóng cài đặt"
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:text-primary"
+            className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-raised text-secondary transition-colors after:absolute after:-inset-[8px] after:content-[''] hover:border-strong hover:text-primary"
           >
             <X size={15} />
           </button>

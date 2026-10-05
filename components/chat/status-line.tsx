@@ -173,7 +173,7 @@ export const StatusLine = memo(function StatusLine({
                 ? 'PLAN: agent chỉ đọc và hỏi, bấm để cho phép ghi'
                 : 'ACT: agent đọc + ghi file, chạy lệnh, bấm để về PLAN'
             }
-            className={`flex-none rounded-full px-2 py-0.5 uppercase tracking-[0.08em] text-micro transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`flex-none rounded-full px-2 py-0.5 uppercase tracking-[0.08em] text-micro transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 ${
               agentMode === 'plan'
                 ? 'text-warning'
                 : 'text-tertiary hover:text-primary'

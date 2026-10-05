@@ -191,14 +191,14 @@ export default function ChatInterface() {
                 <button
                   type="button"
                   onClick={orch.reconnectWorkspace}
-                  className="bg-accent hover:bg-accent/80 text-on-fill px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer"
+                  className="bg-accent hover:bg-accent/80 text-on-fill px-2.5 py-1 text-meta font-medium transition-colors cursor-pointer"
                 >
                   Kết nối lại
                 </button>
                 <button
                   type="button"
                   onClick={() => orch.setDismissedReconnect(true)}
-                  className="text-tertiary hover:text-primary px-1.5 py-1 text-[11px] transition-colors cursor-pointer"
+                  className="text-tertiary hover:text-primary px-1.5 py-1 text-meta transition-colors cursor-pointer"
                 >
                   Bỏ qua
                 </button>
@@ -223,7 +223,7 @@ export default function ChatInterface() {
 
         {orch.hintsChip && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="lift-sm rounded-lg border border-subtle bg-raised font-mono text-[11.5px] text-tertiary">
+            <div className="lift-sm rounded-lg border border-subtle bg-raised font-mono text-meta text-tertiary">
               <button
                 type="button"
                 onClick={() => orch.setShowHints((v) => !v)}
@@ -232,10 +232,10 @@ export default function ChatInterface() {
               >
                 <span className="text-accent">gợi ý đã nạp</span>
                 <span className="truncate">{orch.hintsChip.file}</span>
-                <span className="ml-auto flex-none text-[10.5px] text-secondary">{orch.showHints ? 'thu gọn' : 'xem nội dung'}</span>
+                <span className="ml-auto flex-none text-micro text-secondary">{orch.showHints ? 'thu gọn' : 'xem nội dung'}</span>
               </button>
               {orch.showHints && (
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap border-t border-subtle bg-surface px-3 py-2 text-[11px] leading-relaxed">
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap border-t border-subtle bg-surface px-3 py-2 text-meta leading-relaxed">
                   {orch.hintsChip.content}
                 </pre>
               )}
@@ -249,10 +249,10 @@ export default function ChatInterface() {
               <button
                 type="button"
                 onClick={() => orch.setShowRecalledDetail((v) => !v)}
-                className="flex items-center gap-1.5 font-medium hover:underline text-[12px] text-primary"
+                className="flex items-center gap-1.5 font-medium hover:underline text-ui text-primary"
               >
                 <span>Đã nhớ {orch.activeRecallPack.items.length} ghi chú</span>
-                <span className="text-[10px] text-accent">({orch.showRecalledDetail ? 'thu gọn' : 'xem chi tiết'})</span>
+                <span className="text-micro text-accent">({orch.showRecalledDetail ? 'thu gọn' : 'xem chi tiết'})</span>
               </button>
               <button
                 type="button"
@@ -266,20 +266,20 @@ export default function ChatInterface() {
 
             {orch.showRecalledDetail && (
               <div className="mt-1.5 lift-sm rounded-lg border border-subtle bg-panel-bg p-3 text-xs">
-                <div className="mb-1.5 text-[11px] font-semibold text-primary">
+                <div className="mb-1.5 text-meta font-semibold text-primary">
                   Ghi chú đã nạp vào ngữ cảnh ({orch.activeRecallPack.budget.usedTokens}/{orch.activeRecallPack.budget.limitTokens} tokens):
                 </div>
                 <ul className="space-y-1.5">
                   {orch.activeRecallPack.items.map((item) => (
-                    <li key={item.id} className="flex items-start gap-1.5 text-[11px] text-primary">
+                    <li key={item.id} className="flex items-start gap-1.5 text-meta text-primary">
                       <span className="text-accent font-bold">•</span>
                       <span className="flex-1 leading-relaxed">{item.text}</span>
-                      <span className="shrink-0 text-[10px] text-tertiary">[{item.why}]</span>
+                      <span className="shrink-0 text-micro text-tertiary">[{item.why}]</span>
                     </li>
                   ))}
                 </ul>
                 {orch.activeRecallPack.budget.droppedIds.length > 0 && (
-                  <div className="mt-1.5 border-t border-subtle pt-1 text-[10px] text-tertiary italic">
+                  <div className="mt-1.5 border-t border-subtle pt-1 text-micro text-tertiary italic">
                     Đã cắt {orch.activeRecallPack.budget.droppedIds.length} ghi chú do giới hạn ngân sách token.
                   </div>
                 )}

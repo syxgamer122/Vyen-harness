@@ -284,7 +284,8 @@ export const MessageItem = memo(
                     if (e.key === 'Escape') onCancelEdit();
                   }}
                   aria-label="Sửa nội dung tin nhắn"
-                  className="w-full resize-none bg-transparent font-mono text-body text-primary outline-none placeholder:text-tertiary"
+                  /* Bỏ `outline-none`: ring `:focus-visible` toàn cục ở globals.css là dấu hiệu focus duy nhất của ô này. */
+                  className="w-full resize-none bg-transparent font-mono text-body text-primary placeholder:text-tertiary"
                   autoFocus
                 />
                 <div className="flex justify-end gap-2 border-t border-subtle pt-2 font-mono text-ui">
@@ -318,12 +319,12 @@ export const MessageItem = memo(
                 {isLongUserMsg && !isExpanded && (
                   /*
                    * Lớp mờ dần phải dừng đúng ở màu BUBBLE, không phải ở một hex
-                   * viết tay và cũng không phải ở nền app: bubble nay là MINT
-                   * (`bg-accent-mint/70`), nên gradient phải kết thúc bằng
-                   * chính mint đó. Dùng `from-raised` sẽ để lộ một vệt xám ở
-                   * chỗ hai lớp gặp nhau — đúng lỗi mà comment cũ cảnh báo.
+                   * viết tay và cũng không phải ở nền app: bubble nay là nền
+                   * nhấn nhạt (`bg-accent-soft`), nên gradient phải kết thúc
+                   * bằng chính màu đó. Dùng `from-raised` sẽ để lộ một vệt
+                   * xám ở chỗ hai lớp gặp nhau.
                    */
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-accent-mint/70 from-70% via-accent-mint/60 to-transparent" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-accent-soft from-70% to-transparent" />
                 )}
               </div>
             )}

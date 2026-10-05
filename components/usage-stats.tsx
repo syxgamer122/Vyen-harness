@@ -42,7 +42,7 @@ export function UsageStats() {
               type="button"
               aria-pressed={days === r.days}
               onClick={() => setDays(r.days)}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${
+              className={`rounded-full px-3 py-1 text-meta font-medium transition ${
                 days === r.days
                   ? 'bg-accent text-on-fill font-semibold'
                   : 'text-text-muted hover:text-text-primary hover:bg-panel-bg'
@@ -52,7 +52,7 @@ export function UsageStats() {
             </button>
           ))}
         </div>
-        <span className="text-[11px] text-text-muted">{formatTokens(summary.messages)} tin nhắn</span>
+        <span className="text-meta text-text-muted">{formatTokens(summary.messages)} tin nhắn</span>
       </div>
 
       {totalAll === 0 ? (
@@ -68,15 +68,15 @@ export function UsageStats() {
           {/* Tổng quan */}
           <div className={`grid gap-2 ${summary.costUsd !== null ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="border border-subtle bg-raised p-2.5">
-              <div className="text-[11px] uppercase tracking-wide text-text-muted">Token vào</div>
+              <div className="text-meta uppercase tracking-wide text-text-muted">Token vào</div>
               <div className="text-sm font-semibold text-text-primary">{formatTokens(summary.promptTokens)}</div>
             </div>
             <div className="border border-subtle bg-raised p-2.5">
-              <div className="text-[11px] uppercase tracking-wide text-text-muted">Token ra</div>
+              <div className="text-meta uppercase tracking-wide text-text-muted">Token ra</div>
               <div className="text-sm font-semibold text-text-primary">{formatTokens(summary.completionTokens)}</div>
             </div>
             <div className="border border-subtle bg-raised p-2.5">
-              <div className="text-[11px] uppercase tracking-wide text-text-muted">Tổng cộng</div>
+              <div className="text-meta uppercase tracking-wide text-text-muted">Tổng cộng</div>
               <div className="text-sm font-semibold text-accent-steel">{formatTokens(totalAll)}</div>
             </div>
             {summary.costUsd !== null && (
@@ -84,7 +84,7 @@ export function UsageStats() {
                 title="Ước lượng theo bảng giá công khai — gateway riêng của bạn có thể khác"
                 className="border border-subtle bg-raised p-2.5"
               >
-                <div className="text-[11px] uppercase tracking-wide text-text-muted">Chi phí ước tính</div>
+                <div className="text-meta uppercase tracking-wide text-text-muted">Chi phí ước tính</div>
                 <div className="text-sm font-semibold text-accent-steel">{formatUsd(summary.costUsd)}</div>
               </div>
             )}
@@ -93,7 +93,7 @@ export function UsageStats() {
           {/* Theo ngày — cột xếp chồng vào/ra */}
           {summary.byDay.length > 1 && (
             <div className="border border-subtle bg-raised p-3">
-              <div className="mb-2 text-[11px] font-medium text-text-primary">Theo ngày</div>
+              <div className="mb-2 text-meta font-medium text-text-primary">Theo ngày</div>
               <div className="flex h-20 items-end gap-1">
                 {summary.byDay.map((d) => {
                   const t = d.promptTokens + d.completionTokens;
@@ -113,7 +113,7 @@ export function UsageStats() {
                   );
                 })}
               </div>
-              <div className="mt-1 flex justify-between text-[11px] text-text-muted">
+              <div className="mt-1 flex justify-between text-meta text-text-muted">
                 <span>{summary.byDay[0]?.day}</span>
                 <span>{summary.byDay[summary.byDay.length - 1]?.day}</span>
               </div>
@@ -122,12 +122,12 @@ export function UsageStats() {
 
           {/* Theo model */}
           <div className="space-y-1.5 border border-subtle bg-raised p-3">
-            <div className="mb-1 text-[11px] font-medium text-text-primary">Theo model</div>
+            <div className="mb-1 text-meta font-medium text-text-primary">Theo model</div>
             {summary.byModel.map((m) => {
               const t = m.promptTokens + m.completionTokens;
               return (
                 <div key={m.model} className="space-y-0.5">
-                  <div className="flex items-baseline justify-between gap-2 text-[11px]">
+                  <div className="flex items-baseline justify-between gap-2 text-meta">
                     <span className="min-w-0 truncate font-mono text-text-primary">{m.model}</span>
                     <span className="flex-shrink-0 text-text-muted">
                       {formatTokens(t)} · {m.messages} tin

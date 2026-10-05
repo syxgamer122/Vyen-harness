@@ -392,7 +392,7 @@ export function ModelSelector({
                   }}
                   aria-label="Tìm model"
                   placeholder="Tìm model: tên hoặc id"
-                  className="w-full bg-transparent font-mono text-ui text-primary outline-none placeholder:text-tertiary"
+                  className="w-full bg-transparent font-mono text-ui text-primary placeholder:text-tertiary"
                 />
               </div>
               <span className="flex-none text-micro tabular-nums text-tertiary">

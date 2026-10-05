@@ -10,10 +10,45 @@
 
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertCircle, Ban, Check, Clock, Sparkles, Trash2 } from 'lucide-react';
+import {
+  AlertCircle,
+  Ban,
+  BookOpen,
+  Check,
+  Clock,
+  FileText,
+  Lightbulb,
+  Ruler,
+  Sparkles,
+  Trash2,
+  TriangleAlert,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
 import { db, MAX_MEMORY_CHARS } from '@/lib/db';
 import { proposeCandidate, reviewCandidate, deleteReviewedRecord } from '@/lib/memory/store';
 import type { MemoryKind } from '@/lib/memory/types';
+
+/**
+ * Icon cho từng loại ghi nhớ — SVG (Lucide), không emoji.
+ *
+ * Checklist `ui-ux-pro-max` hạng 4 cấm emoji làm icon: hình dáng/màu của emoji
+ * do font hệ điều hành quyết định nên khác nhau giữa macOS / Windows / Linux,
+ * và không theo được hệ màu accent của ứng dụng.
+ */
+const KIND_ICONS: Record<MemoryKind, LucideIcon> = {
+  rule: Ruler,
+  pattern: Wrench,
+  gotcha: TriangleAlert,
+  decision: Lightbulb,
+  term: BookOpen,
+};
+
+/** Icon loại ghi nhớ; kind lạ (dữ liệu cũ) rơi về FileText thay vì mất icon. */
+function KindGlyph({ kind }: { kind: MemoryKind }) {
+  const Icon = KIND_ICONS[kind] ?? FileText;
+  return <Icon size={13} aria-hidden="true" className="flex-shrink-0 text-tertiary" />;
+}
 
 export function MemoriesSection() {
   const candidates = useLiveQuery(
@@ -66,14 +101,6 @@ export function MemoriesSection() {
     }
   };
 
-  const kindIcons: Record<MemoryKind, string> = {
-    rule: '📏',
-    pattern: '🔧',
-    gotcha: '⚠️',
-    decision: '💡',
-    term: '📖',
-  };
-
   return (
     <div className="space-y-4">
       <div>
@@ -118,7 +145,7 @@ export function MemoriesSection() {
               >
                 <div className="flex items-center justify-between gap-2 border-b border-subtle pb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-ui">{kindIcons[cand.kind] || '📌'}</span>
+                    <KindGlyph kind={cand.kind} />
                     <span className="font-mono text-micro font-semibold uppercase tracking-wider text-primary">
                       {cand.kind}
                     </span>
@@ -228,7 +255,7 @@ export function MemoriesSection() {
               >
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-meta">{kindIcons[rec.kind] || '📌'}</span>
+                    <KindGlyph kind={rec.kind} />
                     <span
                       className={`rounded-full border px-2 py-0.5 font-mono text-micro font-semibold uppercase tracking-wider ${
                         rec.status === 'active'
@@ -272,7 +299,8 @@ export function MemoriesSection() {
                     void deleteReviewedRecord(rec.id);
                   }}
                   aria-label="Xóa ký ức"
-                  className="icon-btn icon-btn-sm icon-btn-danger opacity-60 group-hover:opacity-100"
+                  /* Hit-area 6px (28→40px) — 6px = đúng khe `space-y-1.5` giữa hai hàng, không chồm sang nút của hàng kế. */
+                  className="icon-btn icon-btn-sm icon-btn-danger relative after:absolute after:-inset-[6px] after:content-[''] opacity-60 group-hover:opacity-100"
                 >
                   <Trash2 size={12} />
                 </button>
@@ -294,11 +322,12 @@ export function MemoriesSection() {
             onChange={(e) => setNewKind(e.target.value as MemoryKind)}
             className="field-sm py-0.5"
           >
-            <option value="pattern">🔧 Pattern (cách làm tốt)</option>
-            <option value="rule">📏 Rule (quy tắc bắt buộc)</option>
-            <option value="gotcha">⚠️ Gotcha (cạm bẫy tránh)</option>
-            <option value="decision">💡 Decision (quyết định thiết kế)</option>
-            <option value="term">📖 Term (thuật ngữ dự án)</option>
+            {/* `<option>` không render được SVG, nên ở đây chỉ có chữ. */}
+            <option value="pattern">Pattern (cách làm tốt)</option>
+            <option value="rule">Rule (quy tắc bắt buộc)</option>
+            <option value="gotcha">Gotcha (cạm bẫy tránh)</option>
+            <option value="decision">Decision (quyết định thiết kế)</option>
+            <option value="term">Term (thuật ngữ dự án)</option>
           </select>
         </div>
 

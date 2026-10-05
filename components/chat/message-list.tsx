@@ -448,7 +448,7 @@ export const MessageList = memo(function MessageList({
                   key={prompt}
                   type="button"
                   onClick={() => onSelectSuggestion(prompt)}
-                  className="lift-sm rounded-wobble border-2 border-default bg-surface px-4 py-3.5 text-left font-mono text-xs text-text-primary transition-all duration-150 hover:bg-accent-mint/40 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                  className="rounded-xl border border-subtle bg-surface px-4 py-3.5 text-left font-mono text-xs text-text-primary transition-colors duration-150 hover:bg-raised"
                 >
                   {prompt}
                 </button>
@@ -492,7 +492,7 @@ export const MessageList = memo(function MessageList({
                             <summary className="cursor-pointer select-none font-medium text-accent-steel">
                               Đã nén {compaction.compactedCount} tin nhắn trước đó. Bấm để xem tóm tắt
                             </summary>
-                            <div className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-status-warning">
+                            <div className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-meta leading-relaxed text-status-warning">
                               {compaction.summary}
                             </div>
                           </details>

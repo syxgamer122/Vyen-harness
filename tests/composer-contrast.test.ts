@@ -347,8 +347,15 @@ const AA_NON_TEXT = 3;
 
 describe('composer — tương phản tính được, không soi bằng mắt', () => {
   describe('chip file chờ duyệt', () => {
-    /** Chip: `lift-sm … border border-warning bg-warning/10 … text-primary`. */
-    const CHIP = 'rounded-wobble';
+    /**
+ * Chip: `ml-2 inline-flex flex-none items-center gap-1.5 rounded-md border
+ * border-warning bg-warning/10 … text-primary`.
+ *
+ * Neo bằng CHÚỒI class CHỨA CHUYỆN, không phải `rounded-md` trần: hệ bo góc
+ * nay đều nên `rounded-md`, nên `rounded-md` khớp cả slash-command item ở trên
+ * và phép đo sẽ trượt sang phần tử khác — đo đúng con số nhưng của vật thể sai.
+ */
+    const CHIP = 'gap-1.5 rounded-md border border-warning';
     const idx = indexOfClassWith(CHIP);
     const chipClass = CLASS_HITS[idx]!.text;
     /** Nền ngoài chip = dải công cụ ghép trên vỏ composer. */
@@ -370,9 +377,12 @@ describe('composer — tương phản tính được, không soi bằng mắt', 
        * tỷ lệ hợp lệ — chỉ là của đối tượng khác.
        *
        * Chuỗi cha của chip: `bg-surface` (vỏ form) → `bg-raised/60` (dải công
-       * cụ) = #f5f5f3. Không phải `bg-raised` đặc của nút anh em.
+       * cụ) = #f9f9f9. Không phải `bg-raised` đặc của nút anh em.
+       *
+       * Đây là con số GHÉP của hai tầng, không phải một token — nên nó đổi theo
+       * bảng màu. Cập nhật ở đây khi §2 của DESIGN.md đổi, đừng đoán.
        */
-      expect(outer, 'nền ngoài chip phải là dải công cụ ghép trên vỏ form').toBe('#f5f5f3');
+      expect(outer, 'nền ngoài chip phải là dải công cụ ghép trên vỏ form').toBe('#f9f9f9');
     });
 
     it('nhãn ở trạng thái nghỉ đạt WCAG AA trên nền ĐÃ GHÉP, không phải trên trắng trơn', () => {

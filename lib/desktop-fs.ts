@@ -88,7 +88,8 @@ export async function desktopDisconnectWorkspace(): Promise<{ connected: boolean
 export async function desktopRequireWorkspace(): Promise<{ ok: true } | { ok: false; error: string }> {
   const info = await desktopGetWorkspaceInfo();
   if (!info.connected) {
-    return { ok: false, error: 'Chưa kết nối thư mục làm việc trong Vyen desktop. Bấm 📁 trên composer để chọn thư mục.' };
+    /* "nút thư mục": UI dùng icon SVG (Lucide Folder), không còn emoji 📁. */
+    return { ok: false, error: 'Chưa kết nối thư mục làm việc trong Vyen desktop. Bấm nút thư mục trên composer để chọn thư mục.' };
   }
   return { ok: true };
 }

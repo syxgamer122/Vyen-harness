@@ -18,26 +18,29 @@ const token = (name: string) => `rgb(var(${name}) / <alpha-value>)`
  * Chỉ dùng cho token KHÔNG nằm trong hệ thống channel RGB.
  */
 const hex = {
-  sunken: '#f2f2ef',
-  base: '#fafaf8',
+  /* BỀ MẶT — 5 tầng gần như đều nhau trên nền trắng. */
+  sunken: '#f7f7f7',
+  base: '#fcfcfc',
   surface: '#ffffff',
-  raised: '#eeeeeb',
+  raised: '#f5f5f5',
   overlay: '#ffffff',
 
+  /* CHỮ — 4 tầng, mỗi tầng đều đạt WCAG AA trên nền trắng. */
   primary: '#18181b',
-  secondary: '#52525b',
-  tertiary: '#6b6b73',
-  disabled: '#a1a1aa',
+  secondary: '#575757',
+  tertiary: '#6f6f6f',
+  disabled: '#a3a3a3',
 
-  subtle: '#dcdcd8',
-  default: '#2a2a2e',
-  strong: '#18181b',
+  /* VIỀN — 3 tầng. `default` đạt 3.03:1 (WCAG 1.4.11 cho ranh giới control). */
+  subtle: '#e5e5e5',
+  default: '#949494',
+  strong: '#525252',
 
   accent: '#2a7360',
-  'accent-dim': '#8fc7b8',
-  'accent-mint': '#98d8c8',
+  'accent-dim': '#7fb8a6',
+  'accent-soft': '#f0f4f3',
   'on-fill': '#ffffff',
-  success: '#2a7347',
+  success: '#167a4a',
   warning: '#9a6206',
   danger: '#b3261e',
   info: '#0369a1',
@@ -45,7 +48,7 @@ const hex = {
 
   'diff-add': '#1f7a3d',
   'diff-del': '#b3261e',
-  'diff-ctx': '#6b6b73',
+  'diff-ctx': '#575757',
 } as const
 
 /**
@@ -144,11 +147,12 @@ const config: Config = {
         accent: hex.accent,
         'accent-dim': hex['accent-dim'],
         /*
-         * MINT NHẠT — token NỀN, không phải token chữ. Tách riêng khỏi `accent`
-         * vì `accent` còn dùng làm màu chữ (link, con trỏ, viền focus) và mint
-         * nhạt trên giấy trắng chỉ đạt ~1.6:1 — không đọc được.
+         * NỀN NHẤN NHẠT — token NỀN, không phải token chữ. Tách riêng khỏi
+         * `accent` vì `accent` còn dùng làm màu chữ (link, con trỏ, viền
+         * focus) và nền nhạt trên giấy trắng chỉ đạt ~1.1:1 — không đọc
+         * được nếu dùng làm chữ.
          */
-        'accent-mint': hex['accent-mint'],
+        'accent-soft': hex['accent-soft'],
         'on-fill': hex['on-fill'],
         success: hex.success,
         warning: hex.warning,
@@ -184,43 +188,38 @@ const config: Config = {
       },
       borderRadius: {
         /*
-         * BO GÓC BẤT ĐỐI XỨNG — dấu hiệu nhận dạng của phong cách nét vẽ tay.
+         * BO GÓC ĐỀU, NHỎ — phong cách hiện đại tối giản.
          *
-         * Người vẽ tay không bao giờ kéo cung tròn đều tứ phương; mỗi góc lệch
-         * một chút. Ở đây mỗi bậc là một "organic pill" 4 góc, trong đó 2 góc
-         * bo lớn (255px-class) và 2 góc bo nhỏ (15px-class) xen kẽ nhau —
-         * nhìn bề ngoài vẫn là hình bầu dục nhưng mép không bao giờ đều.
+         * Đã bỏ toàn bộ dạng bất đối xứng (`ink`/`wobble`). Hai lý do, đều
+         * đo được chứ không phải thẩm mỹ:
+         *   1. Mép chữ dịch. Bán kính lệch nhau giữa bốn góc làm vị trí
+         *      ký tự đầu/cuối dòng đổi theo chiều cao khối — cùng một nội
+         *      dung mà hai lần hiển thị lệch nhau.
+         *   2. Một bán kính cho cả bốn góc là thứ mắt đọc nhanh nhất trên
+         *      nền trắng, vì ranh giới khối đã do VIỀN đảm nhiệm, không cần
+         *      bo góc thêm một lớp tín hiệu nữa.
          *
-         *   sm    6px  — chip nhỏ, badge, ô inline
-         *   md   10px  — control: nút, input, menu item
-         *   lg   14px  — nút icon gần như viên thuốc, ô tìm kiếm
-         *   xl   20px  — khối nội dung: thẻ settings, panel
-         *   2xl  28px  — khối lớn: bubble, khung modal
-         *   3xl  36px  — vỏ composer
-         *   ink        — BẤT ĐỐI XỨNG đậm: bubble truyện tranh, nút nhấn mạnh
-         *   wobble     — BẤT ĐỐI XỨNG nhẹ: ô nhập, chip
+         *   sm    4px  — chip nhỏ, badge, ô inline
+         *   md    6px  — DEFAULT: control nhỏ, ô nhập một dòng
+         *   lg    8px  — control: nút, input, menu item
+         *   xl   10px  — khối nội dung: thẻ settings, panel
+         *   2xl   12px — khối lớn: bubble, khung modal
+         *   3xl   16px — vỏ composer, popover lớn nhất
          */
         none: '0px',
-        sm: '6px',
-        DEFAULT: '10px',
-        md: '10px',
-        lg: '14px',
-        xl: '20px',
-        '2xl': '28px',
-        '3xl': '36px',
-        /*
-         * Dạng `A B C D / E F G H` là tám giá trị bán kính theo thứ tự
-         * góc trên-phải → phải → dưới-phải → dưới-trái → trái → trên-trái
-         * → trên (theo quy ước CSS). Hai góc "bo to" xen kẽ hai góc "bo nhỏ"
-         * tạo ra mép nguệch ngoạc.
-         */
-        ink: '255px 15px 225px 15px / 15px 225px 15px 255px',
-        wobble: '18px 6px 16px 6px / 6px 16px 6px 18px',
+        sm: '4px',
+        DEFAULT: '6px',
+        md: '8px',
+        lg: '10px',
+        xl: '12px',
+        '2xl': '16px',
+        '3xl': '20px',
         full: '9999px',
       },
       boxShadow: {
         /*
-         * Bóng đổ THÔ, LỆCH CỨNG — không blur, không mờ dần.
+         * BÓNG MỀM MỜ DẦN — chiều sâu DUY NHẤT của hệ này (bóng lệch cứng
+         * kiểu vẽ tay đã bị gỡ; xem DESIGN.md §5).
          *
          * Đây là đổi hệ thống so với bóng mềm trước đây: bóng mềm đọc "chiều
          * sâu" theo kiểu vật lý, còn bóng lệch cứng đọc "vẽ tay" — cùng một
@@ -233,18 +232,17 @@ const config: Config = {
          * khối lớn không bị cắt khúc ở góc. Lớp `0 … 0` được bỏ hẳn: nó
          * không vẽ ra gì mà chỉ làm test so số lớp khó đọc.
          *
-         * Giá trị phải khớp BYTE với `.lift-sm` / `.lift-md` / `.lift-lg` trong
-         * globals.css — sửa một bên thì phải sửa cả bên kia.
+         * Giá trị phải khớp BYTE với `.lift-sm` / `.lift-md` / `.lift-lg` /
+         * `.well` trong globals.css — sửa một bên thì phải sửa cả bên kia.
          *
          * `inner` vẫn là `none`: ô nhập chìm dùng `.well` (inset), không dùng
          * `shadow-inner` của Tailwind.
          */
         none: 'none',
         DEFAULT: 'none',
-        'lift-sm': '2px 2px 0 rgb(0 0 0 / 0.9)',
-        'lift-md': '3px 3px 0 rgb(0 0 0 / 0.9), 7px 7px 0 rgb(0 0 0 / 0.10)',
-        'lift-lg':
-          '4px 4px 0 rgb(0 0 0 / 0.9), 10px 10px 0 rgb(0 0 0 / 0.14)',
+        'lift-sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        'lift-md': '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 6px 16px -4px rgb(0 0 0 / 0.08)',
+        'lift-lg': '0 2px 6px 0 rgb(0 0 0 / 0.07), 0 16px 40px -8px rgb(0 0 0 / 0.12)',
         inner: 'none',
       },
       fontSize: {
@@ -281,21 +279,18 @@ const config: Config = {
         /*
          * BA HỌ, BA VIỆC.
          *
-         * `next/font` chỉ tạo biến `--font-hand` / `--font-sans` / `--font-mono`;
+         * `next/font` chỉ tạo biến `--font-sans` / `--font-mono`;
          * nếu không map vào đây thì class của Tailwind sẽ rơi về font hệ thống và
          * font đã tải kèm subset tiếng Việt không bao giờ được dùng.
          *
-         *   hand — Patrick Hand: nét vẽ. Nhãn, nút, tiêu đề, wordmark.
-         *          CHỈ có weight 400 (xác minh trong font-data.json của
-         *          next/font) — nên phân cấp đậm/nhạt trong UI KHÔNG đến từ
-         *          `font-bold` mà đến từ CỠ CHỮ và mực đậm/nhạt.
-         *   sans — Inter: prose dài của assistant. Chữ vẽ tay cho văn bản kỹ
-         *          thuật dài làm người dùng mỏi mắt; phần đọc lâu nhất phải dễ
-         *          đọc nhất.
+         *   sans — Inter: TOÀN BỘ nhãn, nút, tiêu đề, prose dài. Hệ mới bỏ
+         *          chữ vẽ tay (Patrick Hand) vì nó chỉ có một nét đậm —
+         *          phân cấp đậm/nhạt bắt buộc phải làm bằng cỡ chữ, nên nhãn
+         *          12px mỏng đến mức dưới ngưỡng đọc thoải mái trên nền trắng.
+         *          Xem `.uic` trong globals.css và DESIGN.md §3.
          *   mono — JetBrains Mono: MỌI thứ do máy sinh ra. Code, token, id,
          *          đường dẫn, hash, timestamp, số đếm, nhãn trường.
          */
-        hand: ['var(--font-hand)', 'Patrick Hand', 'Quicksand', 'Comic Sans MS', 'cursive'],
         sans: ['var(--font-sans)', 'Geist', 'Inter', ...defaultTheme.fontFamily.sans],
         mono: [['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'], { fontFeatureSettings: '"calt" 1, "zero" 1' }],
       },

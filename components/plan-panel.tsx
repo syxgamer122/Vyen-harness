@@ -115,14 +115,14 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
             </span>
           </button>
           <EvidenceBadge level={planEvidence} />
-          <span className="flex-none text-[11px] tabular-nums text-accent-steel">
+          <span className="flex-none text-meta tabular-nums text-accent-steel">
             {prog.done}/{prog.total} · {prog.percentComplete}%
           </span>
           {canApprove && onApprove && (
             <button
               type="button"
               onClick={onApprove}
-              className="rounded-full border border-success/60 px-2.5 py-1 text-[11px] font-semibold text-status-success transition-colors hover:bg-success/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[accent]"
+              className="rounded-full border border-success/60 px-2.5 py-1 text-meta font-semibold text-status-success transition-colors hover:bg-success/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[accent]"
               title="Chuyển sang ACT mode và bắt đầu thực thi kế hoạch này"
             >
               Duyệt &amp; thực hiện
@@ -163,7 +163,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-[12px] leading-5 ${
+                          className={`text-ui leading-5 ${
                             st.status === "done"
                               ? "text-text-muted line-through"
                               : st.isActive
@@ -174,16 +174,16 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
                           {st.title}
                         </span>
                         {st.isActive && (
-                          <span className="text-[10px] uppercase tracking-wider text-accent-steel font-semibold">
+                          <span className="text-micro uppercase tracking-wider text-accent-steel font-semibold">
                             [active]
                           </span>
                         )}
                       </div>
                       {st.description && (
-                        <p className="text-[11px] text-text-muted">{st.description}</p>
+                        <p className="text-meta text-text-muted">{st.description}</p>
                       )}
                       {st.files && st.files.length > 0 && (
-                        <p className="mt-0.5 truncate font-mono text-[10.5px] text-accent-steel">
+                        <p className="mt-0.5 truncate font-mono text-micro text-accent-steel">
                           {st.files.join(" · ")}
                         </p>
                       )}
@@ -199,7 +199,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
                 <button
                   type="button"
                   onClick={() => setShowAllTasks(!showAllTasks)}
-                  className="text-[11px] text-accent-steel hover:text-text-primary transition-colors"
+                  className="text-meta text-accent-steel hover:text-text-primary transition-colors"
                 >
                   {showAllTasks
                     ? "▲ Thu gọn danh sách (hiện 8 mục đầu)"

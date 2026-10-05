@@ -156,7 +156,8 @@ export async function requireWorkspace(): Promise<{ ok: true; deps: FsDeps } | {
       return {
         ok: false,
         error:
-          'Chưa kết nối thư mục làm việc hoặc quyền đã hết. Bấm nút 📁 trên composer để chọn/cấp quyền lại.',
+          /* "nút thư mục": UI dùng icon SVG (Lucide Folder), không còn emoji 📁. */
+          'Chưa kết nối thư mục làm việc hoặc quyền đã hết. Bấm nút thư mục trên composer để chọn/cấp quyền lại.',
       };
     }
   }

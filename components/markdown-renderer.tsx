@@ -17,10 +17,18 @@ import { useThrottledValue } from '@/lib/use-throttled-value';
 import { preprocessMarkdown } from '@/lib/markdown-preprocess';
 import { rehypeSanitizer } from '@/lib/rehype-sanitizer';
 
-/** Khối code thuần — dùng cho cả nhánh không tô màu lẫn lúc chờ nạp chunk. */
+/**
+ * Khối code thuần — dùng cho cả nhánh không tô màu lẫn lúc chờ nạp chunk.
+ *
+ * `text-primary`, KHÔNG phải hex thô. Trước đây nó ghi `text-[rgb(212,212,216)]`
+ * — màu chữ của theme tối còn sót lại từ trước lúc ứng dụng chuyển nền sang
+ * sáng. Trên `bg-sunken` (#f7f7f7) nó chỉ đạt 1.38:1, tức là gần như vô hình:
+ * đúng cái lúc `loading: () => null` đang chờ chunk tô màu về, người dùng thấy
+ * một khối code gần như trắng trơn.
+ */
 function PlainCode({ value }: { value: string }) {
   return (
-    <pre className="m-0 overflow-x-auto bg-sunken px-4 py-[0.9rem] font-mono text-[13px] leading-[1.6] text-[rgb(212,212,216)]">
+    <pre className="m-0 overflow-x-auto bg-sunken px-4 py-[0.9rem] font-mono text-body leading-[1.6] text-primary">
       <code>{value}</code>
     </pre>
   );
@@ -178,7 +186,7 @@ class MarkdownErrorBoundary extends React.Component<BoundaryProps, BoundaryState
   render() {
     if (this.state.failed) {
       return (
-        <pre className="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-tertiary">
+        <pre className="whitespace-pre-wrap break-words text-read leading-relaxed text-tertiary">
           {this.props.fallbackText}
         </pre>
       );
@@ -222,15 +230,15 @@ const CodeBlock = memo(function CodeBlock({
 
   return (
     <div className="claude-code-block my-4">
-      {/* Thanh công cụ nằm trên nền tối → dùng border/chữ sáng cho đủ tương phản. */}
+      {/* Thanh công cụ trên nền `bg-raised` — dùng token chữ đủ tương phản. */}
       <div className="flex items-center justify-between border-b border-subtle bg-raised px-3 py-1.5">
-        <span className="font-mono text-[11px] font-medium text-text-muted">
+        <span className="font-mono text-meta font-medium text-text-muted">
           {language || 'text'}
         </span>
         <button
           type="button"
           onClick={onCopy}
-          className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[11px] text-text-muted transition-colors hover:bg-accent-mint/50 hover:text-text-primary"
+          className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-meta text-text-muted transition-colors hover:bg-raised hover:text-text-primary"
           aria-label={copied ? 'Đã chép đoạn mã' : 'Chép đoạn mã'}
         >
           {copied ? <Check size={12} className="text-success" /> : <Copy size={12} />}

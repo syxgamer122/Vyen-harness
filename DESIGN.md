@@ -2,13 +2,8 @@
 
 > Tài liệu này **mô tả** hệ thống đang chạy, không mô tả hệ thống mong muốn. Mỗi
 > khẳng định ở đây đều có một nơi kiểm chứng: `tests/design-system.test.ts`, hoặc
-> dòng `file:line` được nêu kèm. Ai viết code mà làm tài liệu này sai sẽ làm
+> dòng `file:line` được nêu kèm. Ai viết code mà làm tài liệu này sai sẽ khiến
 > **test đỏ**, không phải tài liệu sai.
->
-> Nguồn sự thật cho màu / bo góc / bóng / cỡ chữ là `tailwind.config.ts`
-> (mảng `hex`, `theme.extend`) và `app/globals.css` (khối `:root`). Tài liệu này
-> chỉ diễn giải chúng. Khi hai bên lệch nhau, **hai file kia đúng, tài liệu này
-> sai** — sửa tài liệu.
 >
 > **LƯU Ý VỀ NGUỒN SỰ THẬT:** mảng `hex` trong `tailwind.config.ts` là các giá
 > trị **tĩnh**, KHÔNG phải `rgb(var(--token))`. Sửa `:root` trong `globals.css`
@@ -23,39 +18,36 @@
 |---|---|
 | [1](#1-quy-tắc-gốc) | Quy tắc gốc — một câu, kèm hệ quả bắt buộc |
 | [2](#2-token-màu) | Token màu: bề mặt, chữ, viền, trạng thái, diff — kèm HEX |
-| [3](#3-typography) | Typography: 3 họ chữ, 6 bậc cỡ chữ, quy tắc phân cấp |
-| [4](#4-bo-góc--khoảng-cách) | Bo góc bất đối xứng và khoảng cách |
-| [5](#5-chiều-sâu-nét-vẽ-tay) | Chiều sâu: nét mực + bóng lệch cứng, điểm thực thi duy nhất |
-| [6](#6-chính-sách-màu-trạng-thái) | Chính sách màu trạng thái + danh sách alias tạm phải xoá |
-| [7](#7-light-only--không-có-nhánh-tối) | Light-only: vì sao đổi từ dark sang light |
+| [3](#3-typography) | Typography: 2 họ chữ, 6 bậc cỡ chữ, quy tắc phân cấp |
+| [4](#4-bo-góc--khoảng-cách) | Bo góc đều theo vai trò và khoảng cách |
+| [5](#5-chiều-sâu--bóng-mềm) | Chiều sâu: bóng mềm, 4 nguồn sinh bóng |
+| [6](#6-chính-sách-màu-trạng-thái) | Chính sách màu trạng thái + danh sách alias tạm |
+| [7](#7-light-only--không-có-nhánh-tối) | Light-only: một hướng duy nhất |
 | [8](#8-z-index) | Thang z-index (`lib/ui-z.ts`) |
 | [9](#9-drift-đã-biết--chưa-migrate) | **Drift đã biết / chưa migrate** — mục quan trọng nhất |
-| [10](#10-hợp-đồng-được-kiểm-chứng-bằng-gì) | Test kiểm chứng cái gì, và cái gì nó **không** kiểm |
+| [10](#10-hợp-đồng-được-kiểm-chứng-bằng-gì) | Test kiểm chứng cái gì, và cái nó **không** kiểm |
+| [11](#11-kiểm-chứng-theo-checklist-ui-ux-pro-max-đợt-2) | Kiểm chứng theo checklist `ui-ux-pro-max` — mục nào sửa, mục nào cố ý giữ |
 
 ---
 
 ## 1. Quy tắc gốc
 
-> **Giao diện này vẽ tay: nét mực đen 2px, bo góc bất đối xứng, bóng đổ lệch
-> cứng không blur, một bảng màu duy nhất trên nền giấy trắng. Mọi chiều sâu đều
-> phải đọc được bằng mắt trước khi đọc được bằng code — nếu một khối không khiến
-> mắt biết nó nổi hay chìm, khối đó chưa xong.**
+> **Giao diện này tối giản trên nền trắng: viền 1px, bo góc đều, bóng mềm, một
+> bảng màu trung tính và đúng một màu nhấn. Mọi chiều sâu phải đọc được bằng
+> mắt trước khi đọc được bằng code — nếu một khối không khiến mắt biết nó nổi
+> hay chìm, khối đó chưa xong.**
 
 Bốn hệ quả cụ thể, mỗi cái đều kiểm được:
 
-1. **Chiều sâu = nét viền mực 2px + bóng lệch cứng ba bậc, cộng `.well` cho ô
-   nhập.** Không blur, không bóng mềm mờ dần. Bốn class `.lift-sm` /
-   `.lift-md` / `.lift-lg` / `.well` là toàn bộ cơ chế nổi/chìm, và chúng là
-   nguồn DUY NHẤT được phép khai báo `box-shadow`. Xem §5.
-2. **Viền mang đúng MỘT vai trò.** Ba bậc `subtle` / `default` / `strong`, mỗi
-   bậc một việc. Xem §2.3. Nếu bạn không phân biệt được bạn đang cần bậc nào,
-   bạn chưa cần viền.
-3. **Bo góc bất đối xứng là mặc định.** `rounded-ink` / `rounded-wobble` là hai
-   bậc hữu hình của phong cách vẽ tay; thang bo đều (`sm`…`3xl`) chỉ dành cho
-   control nhỏ. Xem §4.1.
-4. **Doodle tập trung, không rải đều.** Chi tiết trang trí đậm chỉ ở bong bóng
-   tin nhắn, màn hình trống và trạng thái đang trả lời. Sidebar / settings /
-   bảng / diff / code **phẳng**. Xem §4.5.
+1. **Chiều sâu = bóng mềm, đúng 4 nguồn.** `.lift-sm` / `.lift-md` / `.lift-lg` /
+   `.well` là toàn bộ cơ chế nổi/chìm và là nguồn DUY NHẤT được phép khai báo
+   `box-shadow`. Xem §5.
+2. **Viền mang đúng MỘT vai trò, và luôn mảnh.** Ba bậc `subtle` / `default` /
+   `strong`. Không có viền 2px trong hệ này. Xem §2.3.
+3. **Bo góc đều là mặc định.** Thang px `4 → 6 → 8 → 10 → 12 → 16 → 20`, một
+   bán kính cho cả bốn góc. Dạng bất đối xứng (`ink`/`wobble`) đã bị gỡ. Xem §4.1.
+4. **Chiều sâu đến từ ánh sáng, không từ nét vẽ.** Không doodle, không đuôi bong
+   bóng, không nhấn dịch bóng, không chữ vẽ tay. Xem §3, §5.
 
 Ứng dụng **light-only** — xem §7.
 
@@ -63,538 +55,230 @@ Bốn hệ quả cụ thể, mỗi cái đều kiểm được:
 
 ## 2. Token màu
 
-Toàn bộ token khai trong `tailwind.config.ts:20-47` (mảng `hex`) và phản chiếu 1-1
-trong `app/globals.css:27-101` (khối `:root`) dưới dạng channel RGB để CSS thuần
-dùng `rgb(var(--token) / a)`.
+### 2.1 Bề mặt — 5 tầng, đều nhau trên nền trắng
 
-### 2.1 Bề mặt — 5 tầng trên nền giấy trắng
-
-**Trên nền sáng, thứ tự "càng sáng hơn càng nổi hơn" không còn đúng.** Nền app
-gần như toàn trắng; chiều sâu đến từ **nét viền mực** và **bóng lệch cứng**
-(§5), không phải từ độ sáng của nền. Vì vậy thang này chỉ là những chênh lệch
-rất nhỏ, và `surface` cùng `overlay` là **cùng một màu trắng**.
-
-| Token | HEX | Class | Dùng cho |
-|---|---|---|---|
-| `bg-sunken` | `#f2f2ef` | `bg-sunken` | Ngoài cùng: nền app, sidebar, vùng tĩnh |
-| `bg-base` | `#fafaf8` | `bg-base` | Vùng làm việc: ô nhập, mã |
-| `bg-surface` | `#ffffff` | `bg-surface` | Khối nội dung: card, bubble, dải tiêu đề |
-| `bg-raised` | `#eeeeeb` | `bg-raised` | Control: nút, vùng hover, code |
-| `bg-overlay` | `#ffffff` | `bg-overlay` | Nổi trên cùng: popover, dropdown, menu |
-
-Nguồn chân thực tương phản: `bg-sunken` là nền `<html>`/`<body>`. Thang này
-**không** có bậc cao hơn `overlay`; thêm tầng mới là thêm token, phải sửa cả
-hai file.
-
-**Vì sao `surface` và `overlay` cùng là `#ffffff`.** Chúng trả lời hai câu hỏi
-khác nhau nhưng trên giấy trắng cùng một màu trả lời được cả hai: "khối nội
-dung nằm trên nền giấy" và "popover nổi trên nền giấy". Chúng PHẢI là hai
-token riêng — nếu gộp làm một, mỗi token mất hết nghĩa, và khi cần một miền
-tách khỏi miền kia (ví dụ sau này làm nền riêng cho rail) thì không còn chỗ để
-ghi vào.
-
-### 2.2 Chữ — 4 tầng theo vai trò, không theo độ sáng
-
-(`app/globals.css:41-48`)
-
-| Token | HEX | Class | Dùng cho |
-|---|---|---|---|
-| `text-primary` | `#18181b` | `text-primary` | Nội dung chính — mực đậm |
-| `text-secondary` | `#52525b` | `text-secondary` | Mô tả, nhãn phụ, metadata |
-| `text-tertiary` | `#6b6b73` | `text-tertiary` | Nhãn nhóm, gợi ý, dấu thời gian |
-| `text-disabled` | `#a1a1aa` | `text-disabled` | Control bị vô hiệu — **không dùng cho nội dung** |
-
-`text-disabled` không phải "mờ hơn `tertiary`" — nó là "không dùng được". Đừng dùng
-nó để làm mờ một thứ vẫn cần đọc được.
-
-**Có thêm một token chữ, không phải một bậc trong thang:** `on-fill` (`#ffffff`).
-Nó trả lời "chữ màu gì để đọc được **trên nút tô đậm**", và câu trả lời là trắng
-chứ không phải mực. Trước đây vai trò này do `text-sunken` đảm nhiệm — hợp lý
-khi nền là tối; nay `sunken` là giấy trắng nên tên đó không còn đúng nghĩa và
-mực đen trên nền bão hòa chỉ đạt 2.7–3.5:1 (FAIL AA). Đừng dùng
-`text-primary` cho nút tô đậm, và đừng dùng `on-fill` cho nền thường.
-
-**Cấm modifier opacity trên token chữ.** `text-tertiary/60`,
-`text-text-muted/40` … là cách lách kiểm tra tương phản: 60% của một màu đã được
-chọn để đạt WCAG AA thì không còn đạt nữa. Dùng đúng bậc, hoặc bậc dưới.
-
-### 2.3 Viền — 3 tầng, mỗi tầm đúng MỘT việc
-
-Đây là phần dễ trôi nhất trong hệ thống, nên nó được ghi ra bằng **công việc**, không
-phải bằng tên. (`app/globals.css:50-56`)
-
-| Token | HEX | Class | VIỆC CỦA NÓ — dùng khi nào, không dùng khi nào |
-|---|---|---|---|
-| `border-subtle` | `#dcdcd8` | `border-subtle` | **Đường phân cách TRONG một khối.** Giữa các dòng bảng, dưới dải tiêu đề `.settings-card-head`, `<hr>` trong prose. Không bao giờ để làm ranh giới ngoài của control. |
-| `border-default` | `#2a2a2e` | `border-default` | **Ranh giới control.** Ô nhập, nút, ô chọn — thứ tay chạm vào. Đây là bậc mặc định khi bạn viết `border` mà không nghĩ kỹ. |
-| `border-strong` | `#18181b` | `border-strong` | **Hover / focus / selected.** Chỉ dùng ở trạng thái tương tác, KHÔNG dùng ở trạng thái nghỉ. Dùng nó lúc nghỉ làm mọi control trông như đang được chạm tới. |
-
-Vì sao tách: trước đây cả bốn vai trò dùng chung `#495059`, mắt không phân biệt
-được đâu là khối, đâu là thứ bấm được, đâu là đang bấm.
-
-**Trên nền giấy trắng, cả ba bậc viền đều là MÀU MỰC ở ba bậc đậm nhạt** — khác
-nhau ở độ đậm, không ở sắc độ. Đó là đúng cách người vẽ tay làm: nét mực không
-đổi màu, chỉ đổi bút nặng hay nhẹ. `subtle` là nét mảnh, `default` là nét
-thường, `strong` là nét đậm.
-
-**Vì sao `subtle` vẫn phải nhìn thấy được trên giấy trắng.** Trên nền tối, bậc dưới
-cùng từng là `#1c222a` — chênh lệch **2–3/255 mỗi kênh** so với nền, tương phản
-**1.03:1**, tức vô hình; có 61 chỗ `border border-subtle bg-raised` mà chẳng vẽ
-được đường kẽ nào. Bài toán đó **không tự biến mất khi đổi sang nền sáng**: trên
-giấy trắng, một viền quá nhạt lại chìm theo kiểu khác, vì nó hòa vào nền chứ
-không phải vì thiếu độ tương phản. Nên `subtle` nay là `#dcdcd8`: nhạt, nhưng vẫn
-là một nét mảnh nhìn thấy được trên `#f2f2ef`.
-
-**Vì sao `default` lại là mực đậm (`#2a2a2e`) chứ không phải xám trung bình.**
-Đây là khác biệt lớn nhất so với bảng cũ: trên nền tối, viền control cần **nổi
-hơn nền**, nên nó là một bậc xám sáng. Trên giấy trắng, viền control cần **đậm
-hơn nền** để đọc ra là nét vẽ — nên nó là mực. Một nét xám trung bình trên giấy
-trắng trông như mép in, không phải như nét tay.
-
-**Cạm bẫy `border` trần — bậc viền thứ tư ẩn.** Tailwind preflight đặt
-`border-color: #e5e7eb` cho mọi phần tử, và class `border` **chỉ sinh
-`border-width`** chứ không sinh `border-color`. Nên `border` mà không kèm
-`border-<màu>` sẽ kế thừa viền gần-trắng đó — trên nền tối là 13.4:1, sáng
-hơn cả `text-primary`. Lỗi này từng làm **~67 viền trắng** trong app (31/32
-call site của `.settings-card`, 32/39 của `.btn-secondary`, 4/6 của
-`.surface-panel`) mà **không assertion nào bắt được**, vì `#e5e7eb` do
-Tailwind chèn lúc build nên không bao giờ xuất hiện trong source. Nay có hai
-assertion chặn: một cho recipe trong `globals.css`, một cho JSX.
-
-**Quy tắc chống trôi:** không dùng `border-strong` ở trạng thái nghỉ; không dùng
-`border-subtle` làm viền ngoài của control; không tự chế bậc thứ tư bằng
-`border-white/10`.
-
-### 2.4 Nhấn & trạng thái — MỘT bảng màu cho toàn ứng dụng
-
-(`app/globals.css:58-65`)
-
-| Token | HEX | Class | Dùng cho |
-|---|---|---|---|
-| `accent` | `#2a7360` | `text-accent` / `bg-accent` | Nhấn chủ đạo: link, con trỏ, viền focus, hành động chính — **mint ĐẬM** |
-| `accent-mint` | `#98d8c8` | `bg-accent-mint` | **MINT NHẠT** — nền nút chính, tag active, bubble người dùng |
-| `accent-dim` | `#8fc7b8` | `bg-accent-dim` | Nhấn bị tắt, sọc trạng thái active |
-| `on-fill` | `#ffffff` | `text-on-fill` | Chữ **trên** nền tô đậm (`accent`/`success`/`warning`/`danger`) |
-| `success` | `#2a7347` | `text-success` | Thành công |
-| `warning` | `#9a6206` | `text-warning` | Cảnh báo, mode PLAN |
-| `danger` | `#b3261e` | `text-danger` | Lỗi, xoá, phủ định |
-| `info` | `#0369a1` | `text-info` | Thông tin trung tính |
-| `reasoning` | `#6d4aa8` | `text-reasoning` | Khối suy luận — **màu riêng, không dùng cho trạng thái** |
-
-**Vì sao mint bị tách làm HAI token.** Đây là điểm dễ sai nhất của bảng màu
-khi đổi sang nền sáng, nên nó được ghi ra bằng công việc chứ không phải bằng tên:
-
-| | `accent` (mint đậm) | `accent-mint` (mint nhạt) |
+| Token | HEX | Dùng cho |
 |---|---|---|
-| Dùng làm **chữ**? | ✅ link, con trỏ, viền focus | ❌ **không bao giờ** |
-| Tương phản trên giấy `#f2f2ef` | **5.6:1** ✅ AA | **1.6:1** ❌ không đọc được |
-| Dùng làm **nền**? | ✅ (nút bão hòa) | ✅ nút chính, tag, bubble |
+| `bg-sunken` | `#f7f7f7` | ngoài cùng — nền app, sidebar |
+| `bg-base` | `#fcfcfc` | vùng làm việc chính — chat stream, composer |
+| `bg-surface` | `#ffffff` | khối nội dung — thẻ, bubble, dải tiêu đề |
+| `bg-raised` | `#f5f5f5` | control — ô nhập, nút, khối hover, code |
+| `bg-overlay` | `#ffffff` | nổi trên cùng — popover, dropdown, menu |
 
-Một màu không thể vừa là chữ vừa là nền trên cùng một nền giấy. Nếu chỉ có
-`accent` mint nhạt thì mọi link và con trỏ trong app là vô hình; nếu chỉ có
-`accent` mint đậm thì bubble và nút chính thành một khối xanh nặng nề, hết
-chất nét vẽ tay.
+Trên giấy trắng, chiều sâu **không** đến từ độ sáng của nền nữa (nền sáng hơn =
+nổi hơn), nên năm tầng này chỉ lệch nhau rất nhỏ. `surface` và `overlay` cùng
+trắng; `sunken` và `base` lệch 2–4 điểm.
 
-Trước đây có **hai** bảng trạng thái cùng sống (`--success` và `--emerald-safe`,
-`--warning` và `--amber-warn`, …). Xem §6.
+### 2.2 Chữ — 4 tầng theo VAI TRÒ, mỗi tầng đều đạt WCAG AA
 
-### 2.5 Diff — ba trạng thái của một dòng thay đổi
-
-(`app/globals.css:67-70`, áp dụng tại `app/globals.css:768-777`)
-
-| Token | HEX | Class | Dùng cho |
+| Token | HEX | Tương phản trên `#fff` | Dùng cho |
 |---|---|---|---|
-| `diff-add` | `#1f7a3d` | `text-diff-add` | Dòng thêm |
-| `diff-del` | `#b3261e` | `text-diff-del` | Dòng xoá |
-| `diff-ctx` | `#6b6b73` | `text-diff-ctx` | Dòng giữ nguyên |
+| `text-primary` | `#18181b` | **16.4:1** | nội dung chính |
+| `text-secondary` | `#575757` | **7.2:1** | mô tả, nhãn phụ, metadata |
+| `text-tertiary` | `#6f6f6f` | **5.0:1** | nhãn nhóm, gợi ý, dấu thời gian |
+| `text-disabled` | `#a3a3a3` | 2.6:1 | control bị vô hiệu — WCAG miễn trừ |
 
-Màu CHỮ mang thông tin (thêm/bớt/giữ), nền chỉ nhấn ở mức `/0.08`
-(`app/globals.css:770,774`). Ba màu phải phân biệt được khi đọc thuần văn bản —
-nghĩa là không được thay bằng `success` / `danger` dù trông gần nhau, vì `success`
-đã mang nghĩa "thành công" ở nơi khác.
+`text-disabled` không phải "mờ hơn tertiary" mà là **"không dùng được"** — đừng
+dùng nó cho nội dung.
+
+**Cấm modifier opacity trên token chữ.** 60% của một màu đã chọn để đạt AA thì
+không còn đạt. `bg-surface/60` hay `border-danger/40` vẫn hợp lệ vì nền/viền
+không mang thông tin chữ.
+
+### 2.3 Viền — 3 tầng, mỗi tầng một việc
+
+| Token | HEX | Tương phản | Dùng cho |
+|---|---|---|---|
+| `subtle` | `#e5e5e5` | 1.2:1 | đường phân cách **giữa các dòng trong một khối** |
+| `default` | `#949494` | **3.03:1** | ranh giới **control** — input, nút, ô chọn |
+| `strong` | `#525252` | 6.4:1 | hover / focus / selected |
+
+`default` đạt 3:1 là yêu cầu của WCAG 1.4.11 cho ranh giới control. Đây là lý do
+ nó không xuống `#d4d4d4` cho "nhẹ hơn": viền input nhạt hơn 3:1 là **không nhìn
+thấy**, mà ô nhập không nhìn thấy thì không phải ô nhập.
+
+Viền luôn **1px**. Viền 2px là dấu hiệu của hệ cũ (nét mực) và đã bị gỡ khỏi toàn
+bộ recipe trong `globals.css` cùng 7 call site trong component.
+
+### 2.4 Nhấn & trạng thái
+
+| Token | HEX | Dùng cho |
+|---|---|---|
+| `accent` | `#2a7360` | nhấn chủ đạo: link, con trỏ, viền focus — 5.6:1 |
+| `accent-dim` | `#7fb8a6` | nhấn bị tắt, cột biểu đồ — 4.0:1 (đạt 3:1 cho vật thể đồ hoạ) |
+| `accent-soft` | `#f0f4f3` | **nền** nhấn nhạt — tag active, bubble người dùng |
+| `on-fill` | `#ffffff` | chữ trên nền tô đậm |
+| `success` / `warning` / `danger` / `info` | `#167a4a` / `#9a6206` / `#b3261e` / `#0369a1` | trạng thái |
+| `reasoning` | `#6d4aa8` | khối suy luận — màu riêng, không dùng cho trạng thái |
+
+`accent-soft` là token **nền**, không phải token chữ — nó tách riêng khỏi `accent`
+vì nền nhạt trên giấy trắng chỉ đạt ~1.1:1, không đọc được.
+
+`reasoning` là token **chữ**, không phải token nền. Dùng nó làm nền đặc sẽ hạ
+`text-primary` trên nền đó xuống ~2.4:1 (fail AA). Nền suy luận phải là
+`bg-reasoning/10` + chữ `text-primary`.
+
+### 2.5 Diff
+
+`diff-add` `#1f7a3d` · `diff-del` `#b3261e` · `diff-ctx` `#575757`.
+Màu CHỮ mang thông tin (thêm / bớt / giữ nguyên); nền chỉ nâng 8%, đủ để mắt quét
+dọc cột mà không tranh chấp với chữ.
+
+### 2.6 Alias tạm
+
+Các component chưa migrate sang tên mới vẫn dùng những tên cũ ở khối
+`ALIAS LƯỚT` trong `globals.css` và `ALIAS TẠM` trong `tailwind.config.ts`. Mỗi
+biến chỉ là **cách viết khác của một token ở trên**, nên migrate tên không đổi
+màu. **KHÔNG thêm alias mới** — thêm là đẻ thêm một cách gọi cho cùng một màu,
+và đó chính là thứ làm bảng màu loãng.
 
 ---
 
 ## 3. Typography
 
-### 3.1 Sáu bậc — mỗi bậc là MỘT VAI TRÒ
+**Hai họ chữ, hai việc.**
 
-(`tailwind.config.ts:235-240`)
-
-| Bậc | Size | Line-height | Class | Dùng cho |
-|---|---|---|---|---|
-| micro | 10px | 1.4 | `text-micro` | Siêu nhỏ: dấu phân biệt, số đếm |
-| meta | 11px | 1.45 | `text-meta` | Timestamp, metadata, chú thích nhỏ |
-| ui | 12px | 1.5 | `text-ui` | Nhãn, nút, chữ trong khối giao diện — **mặc định** |
-| body | 13px | 1.6 | `text-body` | Nội dung ô nhập, dòng bảng |
-| read | 15px | 1.7 | `text-read` | Văn bản đọc dài (markdown, đoạn văn) |
-| head | 20px | 1.3 | `text-head` | Tiêu đề khối lớn |
-
-Mỗi bậc dùng lại được ở **mọi** nơi. `text-micro` ở logo và `text-micro` ở số đếm
-phải trông giống nhau — đó là toàn bộ mục đích của thang. Nếu bạn cần một cỡ
-khác, bạn cần thêm một **bậc có tên**, không phải `text-[13.5px]`.
-
-**Base = 16px** (`app/globals.css:121`). Trước đây là 18px, làm mọi kích thước
-rem phình 12,5%. Thân bài đọc dài giữ 15px riêng ở `.claude-prose`
-(`app/globals.css:527`).
-
-### 3.2 Quy tắc ba họ chữ
-
-| Font | Class | Dùng cho |
+| Họ | Font | Dùng cho |
 |---|---|---|
-| **Patrick Hand** | `.uic` | **Nét kẻ**: nhãn, nút, tiêu đề khối, wordmark, dải nhóm ngày ("HÔM NAY"), mọi chữ trong bong bóng truyện tranh. |
-| **Inter** | `font-sans` | **Nội dung đọc dài**: prose của assistant (`.claude-prose`), mô tả. Đây là mặc định của app. |
-| **JetBrains Mono** | `font-mono` | **Mọi thứ do máy sinh ra**: code, token, id, đường dẫn, hash, timestamp, số đếm, nhãn trường. |
+| `sans` | Inter | **toàn bộ** nhãn, nút, tiêu đề, prose dài của assistant |
+| `mono` | JetBrains Mono | mọi thứ do máy sinh ra: code, token, id, đường dẫn, hash, timestamp |
 
-`next/font` tạo `--font-hand` / `--font-sans` / `--font-mono`; vì vậy
-`fontFamily` trong config **phải** map qua `var(--…)` — nếu không, class sẽ rơi
-về font hệ thống và font đã tải kèm subset tiếng Việt không bao giờ được dùng.
+Chữ vẽ tay (Patrick Hand) **đã bị gỡ khỏi hệ**. Lý do đo được, không phải thẩm
+mỹ: Patrick Hand chỉ có **một nét** (weight 400), nên phân cấp đậm/nhạt buộc
+phải làm bằng **cỡ chữ** — dẫn tới nhãn 12px mỏng đến mức dưới ngưỡng đọc thoải
+mái trên nền trắng. Sans có đủ các nét, nên cùng một cỡ chữ vẫn phân cấp được mà
+không phải làm nhạt đi.
 
-**Vì sao Patrick Hand KHÔNG dùng cho prose.** Đây là quyết định quan trọng nhất
-của mục này, nên nó được ghi bằng lý do chứ không phải bằng quy ước: chữ vẽ tay
-đẹp ở **câu ngắn**, và mệt ở **đoạn dài**. Nội dung của assistant là thứ người
-dùng đọc lâu nhất trong ứng dụng — đặt chữ khó đọc nhất lên đúng chỗ đó là đổi
-ngược. Nên: nhãn/nút/tiêu đề đi `.uic`, prose đi Inter.
+`.uic` trong `globals.css` giờ là lớp chữ UI: sans, weight 500, letter-spacing
+`-0.01em`.
 
-**Patrick Hand CHỈ có weight 400.** Xác minh trong `font-data.json` của (docs-check:ignore — file do `next/font` SINH RA lúc build, không nằm trong repo)
-`next/font` (`weights: ["400"]`). Hệ quả trực tiếp: **phân cấp đậm/nhạt trong
-UI không đến từ `font-bold`** — không có nét nào đậm hơn để dùng — mà đến từ
-**CỠ CHỮ** và **độ đậm của nét mực**. `.uic` đặt `font-synthesis-weight: none`
-để `font-semibold` rơi về 400 thay vì bị trình duyệt giả lập nét đậm. Đừng thêm
-`font-bold` lên `.uic` và mong nó đậm hơn: nó sẽ không đậm hơn.
+**Sáu bậc cỡ chữ, mỗi bậc là một VAI TRÒ:**
 
-Nhãn trường (`.field-label`) là **chữ thường, mono, không giãn chữ** — không
-bao giờ in hoa. Mô tả phụ dưới nhãn là `.field-hint`: 12px, `text-tertiary`.
+| Bậc | px | Dùng cho |
+|---|---|---|
+| `micro` | 10 | siêu nhỏ, dấu phân biệt, số đếm |
+| `meta` | 11 | timestamp, metadata, chú thích nhỏ |
+| `ui` | 12 | nhãn, nút, chữ trong khối giao diện (mặc định) |
+| `body` | 13 | nội dung trong ô nhập, dòng bảng |
+| `read` | 15 | văn bản đọc dài (markdown, đoạn văn) |
+| `head` | 20 | tiêu đề khối lớn |
+
+`fontSize` giữ nguyên `xs`/`sm`/`base` của Tailwind cho tới khi từng component
+chuyển sang tên bậc mới — đổi số ở đó là đổi diện mạo toàn ứng dụng trong một lần,
+còn mỗi lần đổi tên class thì an toàn.
 
 ---
 
 ## 4. Bo góc & khoảng cách
 
-### 4.1 Bo góc — thang THẬT, chia theo vai trò
+### 4.1 Thang bo góc — đều, nhỏ
 
-`tailwind.config.ts:196-204` là một thang bo góc thật, từ 6px lên 36px. Trước đây
-thang bị **khoá**: `lg` / `xl` / `2xl` / `3xl` bị gỡ hẳn khỏi cấu hình nên gọi
-`rounded-lg` **không sinh ra class nào** (thà không bo còn hơn bo sai), còn `sm` /
-`md` chỉ 3–5px — mọi khối là hình chữ nhật viền 1px, giao diện đọc như bản vẽ kỹ
-thuật chứ không phải sản phẩm dùng hằng ngày. Nay mỗi bậc là một **vai trò**, nên
-gọi đúng tên là đúng hình dạng:
-
-| Class | Giá trị | Vai trò — dùng cho |
+| Bậc | px | Dùng cho |
 |---|---|---|
-| `rounded-none` | `0px` | **NGOẠI LỆ.** Chỉ khi thật sự cần một cạnh sắc. Không phải mặc định. |
-| `rounded-sm` | `6px` | Chip nhỏ, badge, ô inline |
-| `rounded` (DEFAULT) / `rounded-md` | `10px` | **Control**: menu item, chip |
-| `rounded-lg` | `14px` | Nút icon (trên nền 28–32px nên gần như viên thuốc), ô tìm kiếm |
-| `rounded-xl` | `20px` | Khối nội dung: panel, hộp thoại |
-| `rounded-2xl` | `28px` | Khối lớn: khung modal, vỏ composer |
-| `rounded-3xl` | `36px` | Dự phòng |
-| **`rounded-ink`** | `255px 15px 225px 15px / 15px 225px 15px 255px` | **BẤT ĐỐI XỨNG đậm** — bong bóng truyện tranh, thẻ settings, panel. Đây là hình dạng mặc định của giao diện. |
-| **`rounded-wobble`** | `18px 6px 16px 6px / 6px 16px 6px 18px` | **BẤT ĐỐI XỨNG nhẹ** — ô nhập, nút bấm, `.icon-btn` |
-| `rounded-full` | `9999px` | **Hình tròn / viên thuốc**: chấm trạng thái, avatar, nút gửi, thanh tiến trình |
+| `none` | 0 | — |
+| `sm` | 4 | chip nhỏ, badge, ô inline |
+| `DEFAULT` | 6 | control nhỏ, ô nhập một dòng |
+| `md` | 8 | control: nút, menu item |
+| `lg` | 10 | control: nút, input, menu item |
+| `xl` | 12 | khối nội dung: thẻ settings, panel |
+| `2xl` | 16 | khối lớn: bubble, khung modal, vỏ composer |
+| `3xl` | 20 | dự phòng, lớn hơn mọi khối đang dùng |
+| `full` | 9999 | hình tròn |
 
-**Vì sao có hai bậc bất đối xứng.** Người vẽ tay không bao giờ kéo cung tròn đều
-tứ phương — mỗi góc lệch một chút. Dạng `A B C D / E F G H` là tám bán kính theo
-thứ tự góc của CSS, ở đây hai góc bo to xen kẽ hai góc bo nhỏ nên mép không bao
-giờ đều. `ink` (mạnh) dành cho khối lớn đọc nét ngay từ xa; `wobble` (nhẹ) dành
-cho control nhỏ, nơi bán kính to sẽ nuốt hết hình dạng. Thang bo đều
-(`sm`…`3xl`) vẫn cần cho chip nhỏ và hình tròn.
+**Dạng bất đối xứng (`ink`/`wobble`) đã bị gỡ khỏi hệ.** Hai lý do:
 
-**Luật của `rounded-full`:** đó là hình **tròn**, không phải "bo nhiều hơn". Đặt
-nó lên một hình chữ nhật là sai *hình dạng*, không phải sai *độ bo*. Vì vậy
-`.rounded-full` được ghim riêng trong `app/globals.css` — kể cả các class ghép
-(`sm:rounded-full`, `hover:rounded-full`) — để chúng đều phải ra hình tròn.
+1. **Mép chữ dịch.** Bán kính lệch nhau giữa bốn góc làm vị trí ký tự đầu/cuối
+   dòng đổi theo chiều cao khối — cùng một nội dung mà hai lần hiển thị lệch nhau.
+2. **Viền đã đảm nhiệm ranh giới.** Một bán kính đều cho cả bốn góc là thứ mắt
+   đọc nhanh nhất trên nền trắng; bo thêm một lớp tín hiệu ở góc là thừa.
 
-**Vì sao `rounded-none` là ngoại lệ chứ không phải mặc định.** Cạnh sắc là thứ mắt
-đọc là "cứng", và nó chỉ đúng ở đúng một loại ranh giới — ô khe, lưới kỹ thuật.
-Trái lại, khi mọi khối cùng có một bán kính, tay vẽ hiện ra ngay: khối nhỏ bo
-nhiều, khối lớn bo ít. Đó là lý do thang chia theo vai trò chứ không phải theo một
-con số duy nhất.
+Assertion `borderRadius là thang THẬT theo vai trò` **cấm** `ink`/`wobble` quay
+lại dưới bất kỳ dạng nào (xem §10.1).
 
-Không viết `border-radius` thô trong component — cấu hình là nguồn duy nhất. Trong
-chính `globals.css` có **8** chỗ khai thẳng, và cả 8 đều là ngoại lệ có lý do: ghim
-`rounded-full` cho hình tròn (`:181`), hai thumb thanh cuộn (`:207,282`), sườn trái
-của trích dẫn (`:562`), bảng trong prose (`:585`), inline code (`:626`), code block
-cần góc vuông bên trong (`:639`) và vỏ code block (`:649`). Đổi số ở bất kỳ chỗ nào
-trong số đó thì sửa luôn bảng ở trên, vì hai bên là cùng một quyết định.
+`rounded-full` được ghim `!important` trong `globals.css` vì các class ghép
+(`sm:rounded-full`, `hover:rounded-full`) đều phải ra hình tròn.
 
 ### 4.2 Khoảng cách
 
-Các mốc dùng giữa các **nhóm**: **4 / 8 / 12 / 16 / 24 / 32px** (Tailwind
-`1 / 2 / 3 / 4 / 6 / 8`). Khoảng lẻ kiểu `2.5` / `3.5` chỉ dùng trong nội bộ
-một control, không dùng để tách hai nhóm.
+Thang Tailwind mặc định (4px) là đủ. Hai nơi được ghim cứng vì chúng phải khớp
+nhau chứ không vì đẹp:
 
-Quy ước: trong một nhóm (label ↔ input) `8px`; giữa hai trường cùng khối
-`12–16px`; giữa hai khối `16px`; padding trong khối `16px`.
-
-### 4.3 Bề rộng cột — một token cho mọi thứ bám cột hội thoại
-
-`max-w-thread` = `48rem` là bề rộng **duy nhất** của cột hội thoại, và mọi
-thứ bám cột đó — message list, composer, các dải thông báo, Agent HUD — đều
-phải gọi **chính token này**.
-
-**Composer từng vi phạm, và test từng bảo vệ cái vi phạm đó.** Ô nhập dùng
-`max-w-4xl` (56rem) viết thẳng trong JSX trong khi cột hội thoại là 48rem, đo
-được ở 1360px là **composer 896px vs thread 768px** — ô nhập lấn 64px ra ngoài
-nội dung đang đọc mỗi bên. `tests/design-system.test.ts` lúc đó assert
-`not.toMatch(/max-w-thread/)`, tức là **bảo vệ chính cái lệch đó**. Nay cả hai
-gọi chung `thread`, và test kiểm bất biến thay vì kiểm một con số: composer
-không được tự khai báo bề rộng riêng.
-
-Đổi bề rộng cột = đổi **một số** trong `tailwind.config.ts` (`maxWidth.thread`).
-
-### 4.4 Cột phụ (≥1400px)
-
-Ở màn rộng, phần trống hai bên của cột hội thoại là 448px mỗi bên — đất để
-trống. Từ 1400px, `PlanPanel` và `WorkspaceCheckpointBar` chuyển sang **cột
-phụ bên phải** (`components/chat/session-rail.tsx`, rộng 320px).
-
-- **Dưới ngưỡng: hành vi y hệt trước đây.** Hai khối nằm giữa cột hội thoại,
-  ẩn đi bằng `rail:hidden` ở màn rộng chứ không bị thay đổi ở màn hẹp.
-- **Rail không bao giờ bật trống** — nó hỏi chính `useUndoTarget` mà thanh undo
-  đang dùng, nên "có gì để hiện" chỉ được quyết định ở một chỗ.
-- **Mốc 1400px khai ở hai nơi phải khớp:** `screens.rail` trong
-  `tailwind.config.ts` và `RAIL_QUERY` trong `lib/hooks/use-media-query.ts`
-  (Tailwind không sinh class từ media query viết tay trong JSX). Con số này là
-  phép trừ của 256 (sidebar) + 768 (thread) + 320 (rail) + gutter.
-
-### 4.5 Doodle: đậm ở một chỗ, im lặng ở mọi nơi khác
-
-Đây là quy tắc dễ phá nhất của phong cách nét vẽ, nên nó được ghi bằng **phân bổ**
-chứ không phải bằng danh sách. Một ứng dụng công cụ dùng hằng ngày mà rải đều
-sticker thì đọc như đồ chơi, và người dùng ngừng đọc nó.
-
-| Mức | Ở đâu | Cụ thể |
-|---|---|---|
-| **ĐẬM** | Bong bóng tin nhắn, màn hình trống, trạng thái đang trả lời | Đuôi bong bóng, avatar chibi, nét mực, bóng lệch |
-| **KÍN** | Mọi container và control | Viền mực 2px, bo bất đối xứng, bóng lệch 2px |
-| **IM LẶNG** | Sidebar, settings, bảng, diff, code, form field | Không sticker, không đuôi, không avatar |
-
-**Vì sao phân bổ này.** Ba chỗ "ĐẬM" đều là chỗ người dùng **dừng lại nhìn** —
-tin nhắn vừa tới, màn hình trống lúc mới mở app, và lúc đang chờ model trả lời.
-Chi tiết trang trí đặt ở đó không cạnh tranh với nhau, vì không có hai chỗ nào
-cùng lúc đòi mắt. Đặt thêm sticker ở sidebar và settings thì chúng **có** mặt
-cùng lúc, và mắt phải chọn — mà không có gì để chọn, vì chúng đều chỉ trang trí.
-
-**Vì sao avatar chibi là SVG vẽ tay chứ không phải emoji.** Emoji render theo font
-của hệ điều hành nên mỗi máy một sắc, còn ứng dụng này mọi đường viền đều là nét
-mực — một emoji đầy màu phá vỡ đúng thứ đang giữ. Xem
-`components/chat/chibi-avatar.tsx`.
-
-**Đừng thêm mặt thứ ba.** Hệ thống là **một-nguồn** như bảng màu: mỗi vai trò một
-token. Thêm mặt thứ ba là thêm một cách vẽ cho cùng một việc.
+- **Cột hội thoại** dùng chung token `maxWidth.thread` với composer. Không nơi
+  nào được tự khai `max-w-4xl`.
+- **Gutter ngang** là `px-5` ở cả `message-list` lẫn `composer`; hàng tin nhắn
+  không tự thêm padding ngang.
 
 ---
 
-## 5. Chiều sâu — nét vẽ tay
+## 5. Chiều sâu — bóng mềm
 
-### 5.1 Bài toán
+Bốn class này là **toàn bộ** cơ chế nổi/chìm và là nguồn DUY NHẤT được phép khai
+báo `box-shadow`; chúng được expose thành `shadow-lift-sm|md|lg` trong
+`tailwind.config.ts`.
 
-Ứng dụng dùng bóng đổ và bo góc (§1, §4.1). Nhưng nếu mọi khối đều là hình chữ
-nhật viền mỏng **cùng một màu**, thì container, control và đường phân cách có
-**cùng trọng lượng thị giác** — mắt không có tầng bậc để bám vào, toàn bộ giao
-diện thành một khối bùi nhùi.
-
-Trên **nền tối**, bài toán này được giải bằng bóng mềm mờ dần theo khoảng cách.
-Trên **giấy trắng** cách đó không dùng được: nền đã sáng hết, bóng mềm chỉ còn
-là một vệt xám nhạt trên nền trắng — đọc ra là bẩn, không phải là nổi. Đó là lý do
-cơ chế đã đổi hoàn toàn sang **nét lệch cứng**.
-
-### 5.2 Lời giải: bóng lệch cứng — nét mực, không phải nét bóng
-
-Bốn class dưới đây là **toàn bộ** hệ chiều sâu, và là nguồn DUY NHẤT được phép
-khai báo `box-shadow` trong toàn bộ codebase:
-
-| Class | CSS | Tailwind | Dùng cho |
-|---|---|---|---|
-| `.lift-sm` | `2px 2px 0 rgb(0 0 0 / 0.9)` | `shadow-lift-sm` | Control nhỏ: chip, nút icon, nút bấm |
-| `.lift-md` | `3px 3px 0 rgb(0 0 0 / 0.9), 7px 7px 0 rgb(0 0 0 / 0.10)` | `shadow-lift-md` | Khối nội dung: thẻ settings, menu, bong bóng |
-| `.lift-lg` | `4px 4px 0 rgb(0 0 0 / 0.9), 10px 10px 0 rgb(0 0 0 / 0.14)` | `shadow-lift-lg` | Lớp trên cùng: modal, popover, dropdown |
-| `.well` | `inset 0 2px 5px rgb(24 24 27 / 0.10)` | *(không có key)* | Ô nhập **CHÌM**: composer, input trong sidebar/settings |
-
-**Vì sao KHÔNG blur.** Bóng mềm đọc chiều sâu theo kiểu vật lý — cùng một cách
-đúng về mặt quang học, nhưng không phải cách vẽ tay. Người vẽ tạo cảm giác nổi
-bằng cách để vệt mực **lệch cứng** ra một bên, và nét đó tự nó đã đọc ra ngay
-mà không cần blur. Trên nền tối trước đây buộc phải dùng bóng mềm vì cùng một
-alpha trên `#0b0e13` gần như biến mất; trên giấy trắng nét lệch cứng tự nó đủ.
-
-**Vì sao lớp thứ hai rất nhạt (`/0.10`, `/0.14`).** Khối lớn ở góc dễ bị cắt
-khúc khi chỉ có một nét lệch; lớp thứ hai đẩy bóng ra xa thêm một chút, màu nhạt
-đủ để nối mà không thành vệt bẩn. Lớp `0 … 0` được bỏ hẳn: nó không vẽ ra gì mà
-chỉ làm con số "số lớp bóng" khó so trong test.
-
-**Vì sao `.well` dùng `inset` còn ba bậc kia thì không.** Ô nhập phải đọc ra là
-"chỗ khoét vào để gõ" — tức là **chìm** — nên bóng nằm bên trong viền. Trên giấy
-trắng, "chìm" không còn là bóng đen nhạt (cách của nền tối) mà là một lớp phủ
-giấy nhạt hơn nền, đủ để ô nhập thấp hơn mặt giấy mà vẫn là giấy.
-
-`.well` **không** có key trong `theme.extend.boxShadow` — nó là class CSS thuần,
-dùng qua `@apply` trong recipe (`.field`, `.field-sm`) và không cần utility.
-`shadow-inner` của Tailwind vẫn là `'none'`: ô nhập chìm không đi qua đường đó.
-
-### 5.3 Quy tắc dùng
-
-- Khối **nổi nhẹ** (chip, nút icon, ô nhập viền mảnh) → `lift-sm`.
-- Khối **nổi vừa** (panel, menu, thẻ settings, hộp thoại) → `lift-md`.
-- **Lớp trên cùng** (modal, popover, dropdown) → `lift-lg`. Bậc này dành riêng
-  cho thứ che nội dung; dùng nó cho một panel thường làm phẳng hệ phân tầng.
-- Ô nhập → `.well`, không phải `lift-*`.
-- **Nếu không phân biệt được khối nào nổi, khối đó đang thiếu bóng.**
-
-Recipe đã áp dụng trong `app/globals.css`: `.surface-panel` (`:367`) và
-`.settings-card` (`:439`) dùng `lift-md`; `.btn-primary` / `.btn-secondary`
-(`:398,403`) dùng `lift-sm`; `.field` / `.field-sm` (`:383,388`) dùng `.well`.
-Một component tự dựng khối bằng `className` thuần thì **tự thêm** `shadow-lift-*`.
-
-### 5.4 Điểm thực thi duy nhất
-
-Giá trị bóng tồn tại ở **hai** nơi và phải khớp byte:
-
-1. `app/globals.css` — sinh class `.lift-sm` / `.lift-md` / `.lift-lg` /
-   `.well`.
-2. `tailwind.config.ts` — `boxShadow['lift-sm'|'lift-md'|'lift-lg']`, sinh
-   class `shadow-lift-sm|md|lg` cho JSX.
-
-Hai nơi tồn tại vì lớp recipe CSS dùng `@apply lift-md` (đọc class trong
-`@layer components`) còn JSX không thể `@apply` nên cần utility. Sửa một bên thì
-phải sửa cả bên kia. Và vì chúng phải khớp **byte** chứ không "gần giống", thứ tự
-layer cũng là thông tin: `3px 3px 0 …` phải đứng trước `7px 7px 0 …`.
-`.well` chỉ tồn tại ở nơi thứ nhất, nên nó không có bản sao nào để lệch.
-
-**Cùng cơ chế, hướng ngược lại:** nút bấm được (`.btn-primary`, `.btn-secondary`)
-ấn vệt mực xuống bằng `active:translate-x-[2px] active:translate-y-[2px]
-active:shadow-none` — dịch đúng bằng bóng. Đó là cùng một hệ, chỉ ở chiều ngược
-lại, nên nó không cần thêm một class chiều sâu nào.
-
-### 5.5 Đã gỡ khỏi `app/globals.css` — và vì sao
-
-Bảng này tồn tại để người sau không thấy một mảnh trong `git log` rồi tưởng mình
-đang viết lại thứ đáng giữ. **Tất cả những thứ dưới đây đã bị xoá**, và mỗi cái
-đều có lý do: chúng là chiều sâu **trang trí** chồng lên chiều sâu **thật**, hoặc
-là dấu vết của một hợp đồng bo góc cũ.
-
-| Đã gỡ | Nó là gì | Vì sao gỡ |
+| Class | Giá trị | Dùng cho |
 |---|---|---|
-| `body::before` | Hai lớp `repeating-linear-gradient` 24px (alpha 2.5%) gợi giấy kẻ ô, chạy dưới **mọi** màn hình | Không mang thông tin, chỉ thêm nhiễu thị giác — và làm các cạnh trông cứng hơn. Nền giờ chỉ cần một màu phẳng; chiều sâu do `.lift-*` đảm nhiệm. Dấu vết còn lại: `app/globals.css:135-141`. |
-| `.bevel-out` / `.bevel-in` | Viền hai tông, 4 lớp `inset` kiểu Minecraft / Windows 95 — cơ chế nổi/chìm cũ | Đọc "cứng" và tương phản cục bộ: mọi khối thành ô khoét vào màn hình. Bóng ngoài vùng mờ dần đọc ra chiều sâu ở mọi kích thước mà vẫn mềm. Thay bằng `.lift-sm/md/lg` + `.well`. |
-| `.vyen-frame` / `.pi-frame` + 8 ngoặc góc `.vyen-corner-*` | Khung góc kiểu HUD vẽ thêm 1–3 đường quanh khối **đã có viền** | Mắt phải đọc hai lớp đường cho cùng một ranh giới. Sau khi `.lift-*` đảm nhiệm chiều sâu, chúng thành nhiễu thuần. Dấu vết còn lại: `app/globals.css:289-301`. Còn **1 chỗ gọi sót** — xem §9.7. |
-| `.pi-active-indicator` / `.vyen-active-indicator` | Vạch 3px gradient báo trạng thái chọn | Trạng thái chọn giờ do nền + bo tròn + chữ đậm báo, không cần vạch bên. Dùng 2 nguồn cho cùng một trạng thái là chính cái loại trôi §6 nói về. |
-| Các key `boxShadow` `sm` / `md` / `lg` / `xl` / `2xl` bị khoá `'none'` | Người giữ chỗ cho bóng mềm, từng là cách lách để thêm bóng ngoài ý muốn | Nay **không còn key này trong config**. Thay bằng ba key có tên theo vai trò: `lift-sm` / `lift-md` / `lift-lg`. `none`, `DEFAULT` và `inner` vẫn là `'none'`. |
+| `.lift-sm` | `0 1px 2px 0 rgb(0 0 0 / 0.05)` | control nhỏ: chip, nút icon |
+| `.lift-md` | `0 1px 3px 0 rgb(0 0 0 / 0.06), 0 6px 16px -4px rgb(0 0 0 / 0.08)` | khối nội dung: thẻ settings, menu, hộp thoại |
+| `.lift-lg` | `0 2px 6px 0 rgb(0 0 0 / 0.07), 0 16px 40px -8px rgb(0 0 0 / 0.12)` | lớp trên cùng: modal, popover, dropdown |
+| `.well` | `inset 0 1px 2px 0 rgb(24 24 27 / 0.04)` | ô nhập chìm: composer, input trong sidebar/settings |
 
-Cùng đợt đó, thang bo góc cũng đổi từ "khoá về vuông" sang thang thật 6→36px —
-xem §4.1 — và khối override `[class*="rounded-lg"] { !important }` đã bị xoá.
+`.lift-*` là bóng **NGOÀI** vùng, không `inset`. Một bộ "nâng" luôn có một cạnh sáng
+và một cạnh tối nên nó phải vẽ bóng; `.well` thì ngược lại — bóng nằm TRONG để
+đọc ra "khoét vào".
+
+**Giá trị phải khớp BYTE giữa `globals.css` và `tailwind.config.ts`** — sửa một bên
+thì phải sửa cả bên kia, và test `giá trị lift-* trong config khớp BYTE với
+globals.css` so từng LAYER để bắt lệch thứ tự.
+
+**Nút không sinh bóng.** `.btn-primary` (nền mực đậm) và `.btn-secondary` (viền
+1px) cố ý **không** `@apply` bóng nào: trên nền trắng, nền tô đậm hoặc viền đã đủ
+tách, và thêm bóng chỉ làm mép nút nhoè đi. Bóng là chiều sâu **dành cho khối nội
+dung**, không phải cho control.
+
+### 5.1 Những thứ đã cắt, và vì sao
+
+| Đã gỡ | Lý do |
+|---|---|
+| Nét mực 2px + bóng lệch cứng (`2px 2px 0 rgb(0 0 0/.9)`) | Trên nền trắng, mỗi khối mang một vệt đen đặc chạy song song viền — đọc ra như tem dán, không phải chiều sâu |
+| Đuôi bong bóng `.bubble-*/::after` | Trang trí thuần: mép bo góc đã mang hết thông tin, mỗi đuôi là thêm một đường viền vẽ tay + một phần tử giả |
+| Nhấn dịch bóng `active:translate-x/y-[2px]` | Nhấn đã có phản hồi rõ qua đổi nền; dịch bóng trên bóng mềm không đọc ra "ấn" mà chỉ làm mép nút rung |
+| Bo góc bất đối xứng | Mép chữ dịch theo chiều cao khối — xem §4.1 |
+| Chữ vẽ tay (Patrick Hand) | Một nét duy nhất → phân cấp đậm bằng cỡ chữ → nhãn 12px mỏng dưới ngưỡng đọc — xem §3 |
+| Nền lưới giấy `body::before` | Không mang thông tin, chỉ thêm nhiễu và làm cạnh thẳng trông cứng |
 
 ---
 
 ## 6. Chính sách màu trạng thái
 
-**Một bảng màu. Không hai.**
+Một bảng màu trạng thái duy nhất cho toàn ứng dụng: `success` / `warning` /
+`danger` / `info` / `reasoning` (§2.4).
 
-Trước đây có hai bảng trạng thái cùng sống và cùng được `DESIGN.md` mô tả:
-`--success` / `--emerald-safe`, `--warning` / `--amber-warn`, `--danger` /
-`--rose-danger`, `--accent` / `--cyan-glow`, `--reasoning` / `--violet-reasoning`.
-Hai bảng phủ cùng một miền nghĩa nên **không thể biết cái nào đúng**. Nay một bảng
-sống (§2.4), bảng kia bị gỡ.
+**Quy tắc bắt buộc:** ý nghĩa **không được chỉ dựa vào màu**. Mọi trạng thái phải
+có thêm một tín hiệu thứ hai — chữ, icon, hoặc viền. Đây là hạng 10 (Charts &
+Data) và hạng 1 (Accessibility) của nguyên tắc thiết kế, và là lý do `diff-add`
+/ `diff-del` / `diff-ctx` khác nhau ở **màu chữ** chứ không chỉ ở nền.
 
-Cùng cơ chế đó, `--brand-hover` bị xoá: nó **giống hệt `--brand` byte-for-byte**,
-tức là một no-op mang tên khác. Một alias không đổi màu chỉ tạo thêm một cách gọi
-cho cùng một thứ.
-
-### 6.1 Alias TẠM — phải xoá, đang tồn tại
-
-`tailwind.config.ts:60-100` giữ các key cũ trỏ thẳng sang **giá trị** của token mới,
-để component chưa migrate không vỡ. Đổi tên class không đổi màu. Số đếm là trên
-`components/` + `app/`, tại thời điểm viết tài liệu này — **188 lượt dùng** trên
-16 alias còn sống; 13 alias dưới đây đã rỗng và chỉ còn chờ xoá key:
-
-| Alias cũ | → Token mới | Còn | Việc cần làm |
-|---|---|---|---|
-| `text-text-muted` | `text-secondary` | 54 | Đổi tên class — **lớn nhất còn lại** |
-| `text-text-primary` | `text-primary` | 37 | Đổi tên class |
-| `text-accent-steel` | `text-accent` | 25 | Đổi tên class |
-| `text-status-error` | `text-danger` | 14 | Đổi tên class |
-| `bg-panel-bg` | `bg-surface` | 13 | Đổi tên class |
-| `text-status-warning` | `text-warning` | 13 | Đổi tên class |
-| `text-status-success` | `text-success` | 8 | Đổi tên class |
-| `border-border-hover` | `border-strong` | 7 | Đổi tên class |
-| `bg-panel-soft` | `bg-raised` | 6 | Đổi tên class |
-| `text-amber-warn` | `text-warning` | 3 | Đổi tên class |
-| `text-cyan-glow` | `text-accent` | 2 | Đổi tên class |
-| `text-brand` | `text-accent` | 2 | Đổi tên class |
-| `shadow-reasoning-glow` | `shadow-lift-sm` | 0 | ✅ **Đã rỗng** — lượt gọi cuối ở `stream-bubble.tsx` đã đổi. **Xoá key ngay** (`tailwind.config.ts:80`, key đang là `'none'`) |
-| `bg-bg-deep` | `bg-sunken` | 1 | Đổi tên class |
-| `text-rose-danger` | `text-danger` | 1 | Đổi tên class |
-| `text-violet-reasoning` | `text-reasoning` | 0 | ✅ **Đã rỗng** — lượt gọi cuối ở `stream-bubble.tsx:35` đã đổi. **Xoá key ngay** (`tailwind.config.ts:65`) |
-| `border-border-subtle` | `border-subtle` | 0 | **Xoá key ngay** — 185 → 0, alias viền lớn nhất đã rỗng hoàn toàn |
-| `border-border-hairline` | `border-subtle` | 0 | ✅ **Đã xoá** key + biến `--border-hairline` (§9.8) |
-| `text-emerald-safe` | `text-success` | 0 | **Xoá key ngay** |
-| `bg-surface-elevated` | `bg-overlay` | 0 | **Xoá key ngay** |
-| `shadow-ambient-glow` | `shadow-lift-md` | 0 | **Xoá key ngay** — key đang là `'none'` |
-| `bg-canvas` | `bg-sunken` | 0 | **Xoá key ngay** |
-| `border-zinc-200` | `border-subtle` | 0 | **Xoá key ngay** |
-| `bg-surface-subtle` | `bg-surface` | 0 | **Xoá key ngay** |
-| `bg-surface-glass` | `bg-overlay` | 0 | **Xoá key ngay** |
-| `border-border-control` | `border-default` | 0 | **Xoá key ngay** |
-| `bg-bg-canvas` | `bg-base` | 0 | **Xoá key ngay** |
-| `text-zinc-500` | `text-tertiary` | 0 | **Xoá key ngay** — đã rỗng |
-| `text-zinc-600` | `text-tertiary` | 0 | **Xoá key ngay** — đã rỗng |
-
-**Quy tắc:** KHÔNG thêm alias mới. Thêm là đẻ thêm một cách gọi cho cùng một
-màu, và đó chính là thứ làm bảng màu loãng (`tailwind.config.ts:56-58`).
-Xoá alias khi `grep -rn "<tên>" components/ app/` rỗng.
-
-### 6.2 Thang `zinc` lật bậc — một cái bẫy, đã gỡ
-
-`zinc` từng là một thang màu **bị lật**: `zinc-50` tối nhất, `zinc-950` sáng nhất,
-để `text-zinc-800` trông sáng trên nền tối. Cơ chế đó **giấu nhầm** cả những chỗ
-dùng sai — chữ viết bằng `text-zinc-800` có nghĩa là "gần đen" trong Tailwind mặc
-định, và một người đọc code sau này sẽ hiểu sai. Nay thang đã bị gỡ khỏi hệ màu;
-chỉ còn 3 bậc alias, map **theo vai trò thật sự** chứ không theo tên
-(`tailwind.config.ts:82-99`):
-
-| Còn lại | → | Vì sao |
-|---|---|---|
-| `zinc-200` | `border-subtle` | Viền ảnh trong markdown-renderer → viền mảnh |
-| `zinc-500` | `text-tertiary` | Chữ "đang tải" ở `app/page.tsx` → chữ phụ |
-| `zinc-600` | `text-tertiary` | Chữ fallback khi KaTeX lỗi → chữ phụ |
-
-Cả 3 call site đó đã được migrate: `grep` `zinc-` trên `components/` + `app/` +
-`lib/` (đã bỏ comment) trả **0 lượt**. Khối `zinc` trong `legacyAlias` nay là key
-chết — xoá được ngay, cùng đợt với 12 alias rỗng ở §6.1.
+`reasoning` là màu riêng cho khối suy luận, không dùng lại cho trạng thái nào.
 
 ---
 
 ## 7. Light-only, không có nhánh tối
 
-Ứng dụng **cố ý** chỉ có một theme: giấy trắng.
+Ứng dụng có **một** hướng hình ảnh: nền trắng. `darkMode: 'class'` vẫn khai trong
+config nhưng `<html>` **không** mang class `dark`, khối `.dark` trong `globals.css`
+là no-op khai `color-scheme: light`.
 
-- `app/globals.css` — một khối `:root` duy nhất, `color-scheme: light`.
-- Khối `.dark` còn lại là **no-op**, và nó khai `color-scheme: light` chứ không
-  phải `dark`: chỉ cần một class `dark` rơi sót là toàn bộ form control của
-  trình duyệt đổi sang bảng màu tối — lỗi chỉ xuất hiện đúng lúc đã hỏng.
-- `className="dark"` đã bị gỡ khỏi `<html>` ở cả ba nơi từng gắn nó:
-  `app/layout.tsx`, `app/page.tsx` (effect ghim cứng), `app/global-error.tsx`.
-- `viewport.colorScheme` = `'light'`, `themeColor` = `#f2f2ef`.
-- `app/manifest.ts` — `background_color` / `theme_color` = `#f2f2ef`, khớp với
-  `viewport.themeColor`, để splash khi cài PWA không nháy lệch màu.
-- Script chống FOUC đã bị gỡ: theme không đổi theo hệ điều hành nên **không có
-  gì để nhấp nháy** — trước first-paint nền đã là giấy trắng, tức cùng màu với màn
-  trắng của trình duyệt. Cổng chặn FOUC chỉ có ý nghĩa với theme động.
+Lý do khối no-op tồn tại thay vì xoá hẳn: chỉ cần một class `dark` rơi sót là toàn
+bộ form control của trình duyệt đổi sang bảng màu tối — nên nó cố ý khai
+`color-scheme: light` để một lỗi đó chỉ hậu quà nhẹ nhất.
 
-**Vì sao vẫn là "một theme" chứ không phải "thêm nhánh sáng".** Trước đây ứng dụng
-cũng một theme, nhưng là theme **tối**. Đổi hướng không phải thêm nhánh — nhánh
-sáng giả là thứ tệ nhất: nó đổi tên, đổi icon, đổi nhãn nhưng không đổi màu gì cả,
-và người dùng có một kỳ vọng sai để vi phạm. Nay vẫn đúng một bảng màu, nhưng nó
-là bảng của hướng đã chọn.
+Assertion `app là dark-only` chặn mọi biến thể `dark:` trong danh sách hợp
+đồng — thêm `dark:` trở lại là dấu hiệu đang cố dựng nhánh sáng nửa vời thứ hai.
 
-**Đổi từ tối sang sáng không phải đảo ngược bảng màu — phải chọn lại.** Ba thứ phải
-làm lại từ đầu, và cả ba đều đã làm:
-
-1. **Chiều sâu.** Không đảo được. Bóng mềm trên nền tối phải dùng alpha tăng dần
-   mới đọc ra; nét lệch cứng trên giấy trắng tự nó đã đọc. Xem §5.
-2. **Mint bị tách làm hai token.** Cùng một màu không thể vừa là chữ (5.6:1) vừa
-   là nền (1.6:1) trên cùng một nền giấy. Xem §2.4.
-3. **Nền tô đậm cần chữ trắng**, không phải mực. Vai trò này trước đây do
-   `text-sunken` đảm nhiệm; nay là token riêng `on-fill`. Xem §2.2.
+`theme_color` trong `app/layout.tsx` và `app/manifest.ts` phải trùng nhau và trùng
+`bg-sunken` (`#f7f7f7`): đó là màu splash PWA, lệch một bậc là thấy vệt trắng nháy
+trước khi shell kịp vẽ.
 
 ---
 
@@ -618,7 +302,7 @@ dùng.
 
 **Bất biến:** `approval < approvalCritical < navigation < system`
 (`lib/ui-z.ts:14-39`). Vi phạm từng gây lỗi thật — Cài đặt ở `z-50` nằm **dưới**
-modal phê duyệt, nên mở Cài đặt trong lúc có modal thì modal vẽ đè lên Cài đặt.
+modal phê duyện, nên mở Cài đặt trong lúc có modal thì modal vẽ đè lên Cài đặt.
 
 ---
 
@@ -628,191 +312,69 @@ modal phê duyệt, nên mở Cài đặt trong lúc có modal thì modal vẽ �
 codebase lúc này**, không phải mục tiêu. Nếu bạn đọc §1–§8 rồi thấy điều gì mâu
 thuẫn ở đây, hãy tin phần này — và sửa nó khi nó hết đúng.
 
-### 9.1 Alias tạm vẫn còn (188 lượt dùng, 16 alias)
+### 9.1 Alias tạm vẫn còn
 
-Toàn bộ bảng ở §6.1. Đợt migrate vừa rồi đã đưa con số này từ ~1.100 xuống còn
-**188 lượt trên 16 alias**; 13 alias còn lại trong bảng đã rỗng hoàn toàn — trong
-đó `border-border-subtle` từng là alias lớn nhất (185 lượt) và giờ là 0. Đây vẫn
-là phần lớn khối lượng việc còn lại. Chúng **không gây sai màu** (mỗi alias trỏ
-đúng giá trị token mới) — chúng gây **tên sai**, nên đọc code không phản ánh
-hệ thống.
+Toàn bảng ở §2.6. Chúng **không gây sai màu** (mỗi alias trỏ đúng giá trị token
+mới) — chúng gây **tên sai**, nên đọc code không phản ánh hệ thống.
 
-### 9.2 Hex thô còn sót — đã gần như gỡ sạch
+### 9.2 Số liệu của hệ mới
 
-Bảng màu mới **không** phải bảng màu cũ. Số liệu dưới đây đếm trong đúng danh sách
-hợp đồng 53 file của `tests/design-system.test.ts` và **không tính comment** (một
-tên màu nhắc trong comment là tài liệu, không phải màu được vẽ ra) — cùng cách mà
-assertion `bề mặt hợp đồng chỉ dùng hex trong bảng màu §2` đếm.
+- **24 key, 20 giá trị hex phân biệt.** Bảng sáng cố ý dùng lại một màu cho nhiều
+  vai trò — `#ffffff` cho `surface`/`overlay`/`on-fill`, `#18181b` cho
+  `primary`/`strong`, `#575757` cho `secondary`/`diff-ctx` — vì trên giấy trắng,
+  "nền" và "chữ trên nền tô đậm" là hai câu hỏi khác nhau về CÙNG một màu. Test
+  đếm **giá trị** sau khi khử trùng, nên con số 20 là đúng chứ không phải thiếu sót.
+- **Chiều sâu đi qua 4 class.** `.lift-sm` / `.lift-md` / `.lift-lg` / `.well` được
+  gọi thẳng ở nhiều file của `components/` + `app/`. Nhiều khối ghi **cả hai** dạng
+  — class CSS cho lớp recipe và `shadow-lift-*` cho cùng một khối — ví dụ
+  `components/composer.tsx`, `app/error.tsx`. Phần còn lại đi qua recipe trong
+  `app/globals.css`. Nếu một component tự dựng khối nổi bằng `className` thuần mà
+  không dùng recipe, nó phải tự thêm `shadow-lift-*`.
+- **Hex thô còn hợp lệ đúng ba chỗ**, tất cả đều thuộc bảng §2: `app/manifest.ts`
+  (`#f7f7f7`), và `app/global-error.tsx` (`#f7f7f7` + `#18181b` trong style inline —
+  cố ý hardcode vì phải có màu trước first-paint, lúc stylesheet chưa kịp về).
+- **Không có `dark:` variant nào** trong codebase (0 lượt) — đúng theo §7.
+- **Icon vẫn là lucide**, `strokeWidth` 2px mặc định. Nét mảnh hơn sẽ nhẹ hơn,
+  nhưng đổi nó là sửa ~220 call site và làm icon mất nét ở 11–13px.
 
-Trong danh sách hợp đồng **không còn hex nào thuộc bảng cũ**: toàn bộ 13 dòng dưới
-đây đã rỗng, assertion xanh.
+### 9.3 Cỡ chữ tuỳ ý vẫn còn
 
-| Hex cũ | Còn | Ở bao nhiêu file | Token tương ứng |
-|---|---|---|---|
-| `#6a9fcc` | 0 | 0 | `accent` |
-| `#e8704f` | 0 | 0 | `danger` |
-| `#0d1116` | 0 | 0 | `bg-sunken` |
-| `#e8993a` | 0 | 0 | `warning` |
-| `#5db87a` | 0 | 0 | `success` |
-| `#495059` | 0 | 0 | `border-subtle` |
-| `#4b607c` | 0 | 0 | `accent-dim` |
-| `#1a2330` | 0 | 0 | `bg-surface` (xấp xỉ) |
-| `#757d89` | 0 | 0 | `border-strong` |
-| `#1c2128` | 0 | 0 | `bg-base` |
-| `#5c6470` | 0 | 0 | `text-disabled` (xấp xỉ) |
-| `#a1a1aa` | 0 | 0 | màu chữ lỗi KaTeX — chưa có token |
-| `#12181f` | 0 | 0 | nền khối code — chưa có token |
+Đếm trên `components/` + `app/` (`.tsx` / `.ts` / `.css`), không tính comment:
+`text-[11px]` ~43 lượt, `text-[10px]` ~10, `text-[12px]` ~6, `text-[16px]` ~3 (đều
+là tiêu đề khối, gần `head` hơn bất kỳ bậc nào), cộng một số `text-[10.5px]` /
+`text-[11.5px]` / `text-[12.5px]` **không khớp bậc nào** — tức không thuộc hệ
+thống chứ không chỉ là gõ tắt. `text-xs` / `text-sm` của Tailwind vẫn đang dùng;
+xem §3.
 
-**Đây KHÔNG phải đề nghị thêm chúng vào bảng §2.** §2 là bảng token, và
-`tailwind.config.ts` khai đúng những giá trị đó — test `bảng màu trong test khớp
-tailwind.config.ts theo cả hai chiều` kiểm hai chiều, nên thêm một hex cũ vào §2
-sẽ làm hỏng chính hợp đồng đó. Bảng này ghi lại **drift đã được gỡ**: mỗi dòng là
-một class token đáng lẽ phải thay cho hex thô ở đúng chỗ đó.
+> **Đợt rà `ui-ux-pro-max` (10/2025) đã dọn phần còn lại.** Toàn bộ cỡ px tự chế
+> trong bề mặt hợp đồng nay đã về tên bậc: `text-[11px]` → `text-meta`,
+> `text-[10px]` → `text-micro`, `text-[12px]` → `text-ui`, `text-[13px]` →
+> `text-body`, `text-[15px]` → `text-read` (cùng số px, nên **không đổi một pixel
+> diện mạo nào** — chỉ đổi tên để đổi cỡ ở đây cũng kéo được cả app). Các cỡ
+> lệch nửa px (`10.5` / `11.5` / `12.5` / `9.5`) — vốn **không thuộc bậc nào** —
+> đã bấm về bậc gần nhất, nên lệch tối đa 0.5px và một chiều.
+>
+> Còn lại đúng 4 cỡ px tự chế, và đều là **cỡ trưng bày**, không phải cỡ chữ
+> nội dung: chữ wordmark `vyen-logo.tsx` (32 / 16 / 9.5px), `h1` màn hình trống
+> `message-list.tsx` (28px), và hai tiêu đề khối 16px (`staging-panel.tsx`,
+> `workspace-checkpoints.tsx`). Thang 6 bậc không có bậc nào cho chúng.
+> Test `không còn cỡ chữ px tự chế nào lệch bậc` miễn trừ đúng **cặp (file, cỡ
+> px)** này — miễn trừ nguyên file thì thêm `text-[19px]` vào logo cũng lọt, tức
+> im lặng đúng lúc cần đỏ. Nâng 16px lên `head` (20px) sẽ đổi diện mạo hai tiêu
+> đề khối nên **cố ý chưa làm** ở đợt này.
 
-Cột "Ở bao nhiêu file" là số file trong danh sách hợp đồng, **không** phải toàn
-bộ `components/` + `app/`. Các số này giảm mỗi khi có đợt migrate; muốn số mới
-thì đếm lại, đừng đoán.
+### 9.4 Vài thứ khác
 
-**Số lượng token: 24 key, 19 giá trị phân biệt.** Bảng sáng cố ý dùng lại một
-màu cho nhiều vai trò — `#ffffff` cho `surface`/`overlay`/`on-fill`, `#18181b` cho
-`primary`/`strong`. Test đếm **giá trị** sau khi khử trùng, nên con số 19 ấy là
-đúng chứ không phải thiếu sót.
-
-Một hex thô **ngoài** danh sách hợp đồng: `app/manifest.ts` khai `#f2f2ef` cho
-`background_color` / `theme_color`. Nó thuộc bảng §2 (`bg-sunken`) và phải trùng
-`viewport.themeColor` — đây là màu splash PWA, lệch một bậc là thấy vệt nháy lúc
-cài app. Xem §7.
-
-**Lỗ hổng của chính assertion trên đã được bịt:** nó chỉ soi component, nên token màu
-khai trong chính `app/globals.css` không bao giờ đi qua — và dạng channel RGB thì
-regex `#hex` cũng không thấy. Nay có assertion riêng quét thẳng file đó. Xem §9.8.
-
-Hai hex `#f2f2ef` / `#18181b` trong `app/global-error.tsx` (style inline) là **cố ý
-hardcode** — chúng phải có màu trước first-paint, lúc stylesheet chưa kịp về, và
-cùng bộ đó **thuộc** bảng §2 nên không nằm trong bảng drift ở trên.
-
-### 9.3 Cỡ chữ tuỳ ý — gần như hết, thang 6 bậc đã thắng
-
-Số đếm trên `components/` + `app/` (`.tsx` / `.ts` / `.css`), **không tính comment**:
-
-| Arbitrary | Còn | Bậc nào tương ứng |
-|---|---|---|
-| `text-[11px]` | 43 | `text-meta` |
-| `text-[10px]` | 10 | `text-micro` |
-| `text-[12px]` | 6 | `text-ui` |
-| `text-[10.5px]` | 6 | **không có bậc nào** |
-| `text-[11.5px]` | 4 | **không có bậc nào** |
-| `text-[16px]` | 3 | **không có bậc nào** |
-| `text-[13px]` | 2 | `text-body` |
-| `text-[9.5px]`, `text-[12.5px]`, `text-[14px]`, `text-[15px]`, `text-[24px]`, `text-[32px]` | mỗi cái 1 | lẫn lộn |
-| `text-[9px]`, `text-[13.5px]`, `text-[20px]` | 0 | đã gỡ sạch |
-
-Tệ nhất là `10.5px` / `11.5px` / `12.5px` / `16px`: chúng không khớp bậc nào, tức
-là **không thuộc hệ thống** chứ không chỉ là gõ tắt. Riêng `text-[16px]` xuất hiện
-3 lần, đều là tiêu đề chữ-vẽ-tay (`staging-panel.tsx`, `vyen-logo.tsx`,
-`workspace-checkpoints.tsx`) — gần `head` (20px) hơn là bậc nào.
-
-Còn `text-xs` (Tailwind mặc định 12px, 39 chỗ) và `text-sm` (14px, 9 chỗ) cũng đang
-dùng; config giữ nguyên giá trị mặc định của chúng (`tailwind.config.ts:255-257`)
-vì đổi số ở đó là đổi diện mạo toàn ứng dụng trong một lần, còn mỗi lần đổi tên
-class thì an toàn.
-
-### 9.4 Thang bo góc đã sống — số đếm giờ đo bán kính đang dùng thật
-
-Trước đây `lg` / `xl` / `2xl` bị gỡ khỏi cấu hình, nên mọi `rounded-lg` trong code là
-class **không sinh ra gì**; bảng này từng chỉ để truy ra 2 class rác sót lại. Nay
-chúng là bậc thật (§4.1), nên số đếm dưới đây là số chỗ **đang bo** — đếm trên
-`components/` + `app/` (`.tsx` / `.ts`), không tính comment:
-
-| Class | Lượt | Bậc |
-|---|---|---|
-| `rounded-lg` | 116 | 14px — nút icon, ô nhập nhỏ, menu item |
-| `rounded-md` | 16 | 10px — control |
-| `rounded-xl` | 17 | 20px — panel, hộp thoại |
-| `rounded-2xl` | 10 | 28px — bubble, khung modal, vỏ composer |
-| `rounded-3xl` | 0 | 36px — dự phòng, chưa dùng |
-| `rounded-sm` | 0 | 6px — chip nhỏ: chưa dùng, `lg` đang gánh thay |
-| `rounded-none` | 0 | 0px — ngoại lệ, chưa dùng lần nào |
-
-Hai dòng 0 ở cuối là kết quả cần nhìn: `rounded-none` đã rời khỏi vai trò mặc định
-**thật sự**, không chỉ trên giấy. Còn `rounded-sm` (6px) thì đang bị `rounded-lg` (14px)
-cạnh tranh — 116 lượt `lg` với 0 lượt `sm` nghĩa là chip nhỏ cũng đang bo 14px. Đó
-là chỗ lệch vai trò duy nhất còn lại trong thang bo góc.
-
-Khối override `[class*="rounded-lg"] { !important }` từng đè lên cấu hình, khiến cấu
-hình 0px chưa bao giờ có tác dụng; khối đó đã bị xoá (`app/globals.css:168-182`
-nay chỉ ghim `rounded-full`).
-
-### 9.5 Modifier opacity trên token chữ — đã gỡ xong (0 chỗ)
-
-Trước đây 13 chỗ (`text-text-muted/40`, `/50`, `/60`, `/70` ở `composer.tsx`,
-`diff-confirm.tsx`, `shell-confirm.tsx`, `hud/agent-hud.tsx`, `chat/tool-trace.tsx`,
-`settings-dialog.tsx`). Nay **0 chỗ** trong toàn bộ danh sách hợp đồng — assertion
-`không dùng modifier opacity trên token CHỮ` xanh. Đừng thêm lại: cấm theo §2.2.
-
-### 9.6 Thang z-index: tài liệu cũ thiếu một bậc
-
-`lib/ui-z.ts:34` khai `approvalCritical: 85` trong `Z_INDEX` (`lib/ui-z.ts:14-39`),
-và `Z_CLASS` ánh xạ nó thành `z-[85]` (`lib/ui-z.ts:44-55`). Bảng ở §8 đã đưa vào.
-Nếu bạn đọc bản cũ của tài liệu này và thấy thiếu bậc này, đó là lỗi của bản cũ.
-
-### 9.7 Vài thứ khác
-
-- **Theme cycler chết: đã gỡ xong.** `components/sidebar.tsx` nay có **0 lượt** chữ
-  `theme` — nút `light → dark → system` và các state nó đọc đã bị xoá hết. Xem §7.
-- **Chiều sâu nay đi qua 4 class, không phải 2.** `.lift-sm` / `.lift-md` /
-  `.lift-lg` / `.well` được gọi thẳng ở **19 file** của `components/` + `app/`
-  (đếm `.tsx` / `.ts`, không tính comment): 21 lượt `lift-sm` (9 file), 8 lượt
-  `lift-md` (8 file), 8 lượt `lift-lg` (8 file), 2 lượt `well` (2 file). Nhiều
-  khối ghi **cả hai** dạng — class CSS cho lớp recipe và `shadow-lift-*` cho cùng
-  một khối — ví dụ `components/composer.tsx:903`, `app/error.tsx:18`. Phần còn lại
-  đi qua recipe trong `app/globals.css` (`.surface-panel:367`, `.settings-card:439`,
-  `.btn-primary:398`, `.btn-secondary:403`; `.field:383` / `.field-sm:388` dùng
-  `.well`). Nếu một component tự dựng khối nổi bằng `className` thuần mà không
-  dùng recipe, nó phải tự thêm `shadow-lift-*`.
+- **Theme cycler chết: đã gỡ xong.** `components/sidebar.tsx` có 0 lượt chữ
+  `theme` — nút `light → dark → system` và các state nó đọc đã bị xoá hết.
 - **Khung góc còn sót: đã xoá xong.** Cả 8 `<span className="pi-corner-*">` rỗng ở
   `components/workspace-checkpoints.tsx` và `components/mcp/tool-approval-dialog.tsx`
-  đã bị gỡ, cùng `pi-frame` trên khung panel. Chuỗi `.vyen-frame` / `.pi-frame` +
-  8 ngoặc góc đã bị xoá khỏi `app/globals.css` từ trước nên chúng vốn đã không
-  sinh CSS nào — chỉ là markup rỗng. Giờ có assertion chặn tái phát.
-- **`shadow-reasoning-glow` là no-op: đã xoá xong.** `tailwind.config.ts:80` đặt
-  `'reasoning-glow': 'none'`; lượt gọi duy nhất ở `components/chat/stream-bubble.tsx`
-  đã đổi thành `shadow-lift-sm`.
-- **Khối suy luận trong `stream-bubble.tsx` — đã sửa.** Nó dùng `bg-reasoning`
-  **đặc** (`#a78bd4`) làm nền, rồi bên trong vẫn đặt token chữ của app:
-  `text-primary` chỉ còn 2.39:1 (fail WCAG AA) và icon `text-reasoning` trên
-  chính nền đó là 1.00:1 — vô hình. Nay dùng `bg-reasoning/10` + chữ
-  `text-primary`/`text-secondary`, khớp với `chat/message-item.tsx:28`. Sửa
-  được 14.15:1 và 5.92:1. `reasoning` là token **chữ**, không phải token nền —
-  xem §2.4.
-- **Hợp đồng đã được viết lại theo hướng nét vẽ tay.** Assertion cũ kiểm viền
-  hai tông, bo góc vuông và `rounded-none` bắt buộc đều đã bị thay bằng assertion
-  của hợp đồng mới: bảng màu sáng, ba bậc bóng lệch cứng, hai bậc bo bất đối
-  xứng phải **thật** bất đối xứng (không phải bo đều). Xem §10.1.
-- **Không có `dark:` variant nào** trong codebase (0 lượt) — đúng theo §7.
-- **Icon vẫn là lucide, `strokeWidth` vẫn 2px mặc định.** Ở phong cách nét vẽ,
-  nét mảnh hơn sẽ đọc ra "vẽ tay" hơn, nhưng đổi nó là sửa ~220 call site và
-  làm icon mất nét ở kích thước 11–13px. Chưa làm; xem §9.7.
-
-### 9.8 Màu cũ né được assertion hex — đã gỡ
-
-**Đã xử lý.** Cả `--border-hairline` và `--line` (`73 80 89` = `#495059`, màu
-viền của bảng màu cũ) đã bị xoá khỏi `app/globals.css`, kèm mapping
-`token('--border-hairline')` trong `tailwind.config.ts`. Lý do gỡ chứ không phải
-đổi màu: cả hai token đều **không component nào dùng** — `border-hairline` chỉ còn
-ở đúng 2 chỗ là dòng định nghĩa và dòng mapping, và `--line` không được map trong
-`tailwind.config.ts` lẫn không có lượt dùng nào. Nên sửa màu sẽ vô nghĩa, xoá mới
-đúng; đổi `--line` sang `border-strong` như gợi ý cũ là việc làm cho code chết.
-
-Lỗ hổng của assertion thì **vẫn còn và đã được bịt**. Nguyên nhân: assertion
-`bề mặt hợp đồng chỉ dùng hex trong bảng màu §2` chỉ soi **component**, còn token lạ
-nằm trong chính file định nghĩa nên không bao giờ đi qua nó — và dạng channel RGB
-thì regex `#[0-9a-fA-F]{3,8}` không thấy nữa. Nay có assertion
-`mọi giá trị màu khai báo trong globals.css đều thuộc bảng màu §2` quét thẳng
-`app/globals.css`, đổi hex của §2 sang kênh RGB rồi so trực tiếp — bắt được mọi
-token màu, kể cả token viết tay. Đã kiểm hai chiều: thêm lại `--border-hairline`
-thì assertion đỏ với đúng thông điệp.
-
+  đã bị gỡ. Chuỗi `.vyen-frame` / `.pi-frame` + 8 ngoặc góc đã bị xoá khỏi
+  `app/globals.css` từ trước nên chúng vốn đã không sinh CSS nào.
+- **Khối suy luận trong `stream-bubble.tsx` — đã sửa.** Nó từng dùng `bg-reasoning`
+  **đặc** làm nền, khiến `text-primary` trên đó chỉ còn 2.39:1 (fail AA) và icon
+  `text-reasoning` là 1.00:1 — vô hình. Nay dùng `bg-reasoning/10` + chữ
+  `text-primary`/`text-secondary`. Xem §2.4.
 
 ---
 
@@ -828,48 +390,156 @@ npx vitest run tests/design-system.test.ts
 
 | Assertion | Bắt được loại trôi nào |
 |---|---|
-| `@keyframes blink` có bước `opacity: 1` → `0` | Con trỏ terminal bị đổi thành fade mềm |
-| `.streaming-caret::after` / `.terminal-cursor` dùng `rgb(var(--accent))` + `var(--font-mono)` + `animation: blink 1s step-end infinite` | Con trỏ đổi màu hoặc đổi font khỏi hợp đồng |
-| `boxShadow` chỉ có `lift-sm` / `lift-md` / `lift-lg` là key **không-`'none'`**; `none` / `DEFAULT` / `inner` phải là `'none'` | Bóng thứ tư lọt vào qua `theme.extend.boxShadow` |
 | Đúng **4** khai báo `box-shadow` trong `app/globals.css`, và chúng là `.lift-sm` / `.lift-md` / `.lift-lg` / `.well` | Dán tay `box-shadow` ở một class riêng — bám ngoài bốn nguồn |
-| `borderRadius` định nghĩa đúng 11 bậc, thang px tăng dần, và `ink`/`wobble` phải **thật** bất đối xứng (có ít nhất một góc bo lớn xen kẽ góc bo nhỏ) | Đổi lệch quy tắc bo góc, gọi `rounded-lg` mà **không sinh ra class nào**, hoặc dán lại bo đều làm mất nét vẽ tay |
-| Giá trị `.lift-*` trong `globals.css` khớp **byte** với `boxShadow` trong `tailwind.config.ts` (kể cả thứ tự layer) | Bóng bị nhân bản / viết tay / lệch giữa hai nguồn |
-| Recipe `@apply` **một class `lift-*` hoặc `well`**, không có khối `rgba()` viết tay; `.lift-*` không được dùng `inset` | Quay lại tay dán bóng, hoặc biến khối nổi thành khối chìm |
+| `.lift-*` không được dùng `inset`; `.well` phải là `inset` | Biến khối nổi thành khối chìm |
+| Recipe `.surface-panel` / `.settings-card` → `lift-md`; `.field` / `.field-sm` → `well`. **Nút không nằm trong bảng này** — bóng không được quay lại nút | Quay lại tay dán bóng, hoặc làm mép nút nhoè đi trên nền sáng |
+| Giá trị `.lift-*` trong `globals.css` khớp **byte** với `boxShadow` trong `tailwind.config.ts` (kể cả thứ tự layer, số lớp 1/2/2) | Bóng bị nhân bản / viết tay / lệch giữa hai nguồn |
+| `boxShadow` chỉ có `lift-sm`/`lift-md`/`lift-lg` là key **không-`'none'`**; `sm`/`md`/`lg`/`xl`/`2xl` **không được định nghĩa** | Bóng mềm lọt vào app qua `theme.extend.boxShadow` |
+| `borderRadius` định nghĩa đúng 9 bậc, thang px tăng dần, và **mọi** giá trị phải là MỘT số px | Bo bất đối xứng quay lại dưới bất kỳ dạng nào; hoặc gọi `rounded-lg` mà **không sinh ra class nào** |
+| `ink` / `wobble` không được tồn tại trong `borderRadius` | Bo bất đối xứng quay lại |
 | Hex thô chỉ được dùng hex trong bảng màu §2 (bỏ qua comment) | Hex mới chui vào không ai duyệt |
+| Bảng màu trong test khớp `tailwind.config.ts` **theo cả hai chiều** | Thêm token mà test không biết, hoặc sửa một bên của nguồn sự thật |
+| Mọi token màu khai trong `globals.css` đều thuộc bảng §2 (đổi hex sang kênh RGB rồi so) | Token màu viết tay nằm trong chính file định nghĩa — lỗ hổng cũ của assertion hex |
 | Không Tailwind palette (`text-red-400`, `bg-zinc-800`, …) | Lọt họ màu mặc định |
 | Không `text-white` / `color: #fff` | Chữ trắng tinh thay cho `text-primary` |
-| Không modifier opacity trên token chữ | `text-text-muted/40` |
-| File trong danh sách phải dùng ít nhất một class token | File bị bỏ sót ngoài hệ thống |
-| Không `#55779b` (fail WCAG AA) | Màu chữ không đạt tương phản |
-| Không còn khối override `[class*="rounded-lg"]`; `.rounded-full` vẫn được ghim | Bo góc bị một khối CSS khác đè, hoặc hình tròn bị bo nhiều hơn |
-| Mọi `<button>` trong `sidebar.tsx` / `backup-reminder.tsx` dùng bán kính theo vai trò, **không** phải `rounded-none` | Bo góc lọt vào control chính, hoặc quay lại cạnh sắc |
-| Composer dùng chung token `thread`, không tự khai `max-w-4xl` | Ô nhập lấn 64px ra ngoài cột hội thoại (lỗi đo được @1360px) |
-| Mốc `rail:` khai đủ `screens.rail` + `maxWidth.rail` | Bật breakpoint mà token chưa có, hoặc lệch số với `RAIL_QUERY` |
-| Vùng chạm trigger 44px | Vùng chạm co lại dưới WCAG 2.5.5 |
-
-Bảng này liệt kê **bất biến**, không liệt kê tên hàm test — và đợt migrate đổi hợp
-đồng bo góc / bóng vừa để lại vài assertion cũ trong `tests/design-system.test.ts`.
-Xem §9.7.
+| Không modifier opacity trên token **chữ** | `text-tertiary/60` — 60% của một màu đã chọn để đạt AA thì không còn đạt |
+| Không HAI modifier opacity trên một class | `border-success/40/60` không sinh CSS nào → viền biến mất mà code vẫn còn `border-` |
+| Recipe `@apply` đặt độ rộng viền thì phải `@apply` kèm màu; class đặt độ rộng viền phải có class màu **cùng variant** | Kế thừa `#e5e7eb` từ Tailwind preflight — viền sáng hơn cả chữ nó bao quanh |
+| Không class chết: `rounded-ink`, `rounded-wobble`, `accent-mint`, `font-hand`, `pi-corner-*`, `glass-panel`, … | Class còn trong JSX nhưng không còn sinh CSS — mọi thứ trông đúng trừ đúng khối không vẽ gì |
+| Mọi recipe sinh bo góc đều khai báo bo góc thật; mọi `<button>` trong `sidebar.tsx` / `backup-reminder.tsx` khai báo bán kính tường minh | Nút rơi về 0px từ preflight |
+| File trong danh sách hợp đồng phải dùng ít nhất một class token | File bị bỏ sót ngoài hệ thống |
+| Composer dùng chung token `thread`, không tự khai `max-w-4xl`; gutter `px-5` khớp giữa list và composer | Ô nhập lấn 64px ra ngoài cột hội thoại (lỗi đo được @1360px) |
+| Mốc `rail:` khai đủ `screens.rail` + `maxWidth.rail`, ngưỡng đủ cho cả ba cột | Bật breakpoint mà token chưa có |
+| Vùng chạm trigger 44px (`after:-inset-[6px]`) | Vùng chạm co lại dưới WCAG 2.5.5 |
+| Không emoji trong `components/` + `app/` (ngoài comment) | Emoji làm icon quay lại — hình dáng/màu do font hệ điều hành, không theo hệ accent |
+| Không `dark:` variant | Dựng nhánh sáng nửa vời thứ hai |
 
 ### 10.2 Test KHÔNG kiểm gì — đừng hỏi nó
 
-- **Nó không kiểm thứ tự 5 tầng bề mặt** có sáng dần đều hay không. Ai sửa
-  `hex.surface` thành một màu tối hơn `hex.raised` sẽ không bị bắt.
+- **Nó không kiểm tương phản WCAG.** Các tỉ lệ ghi ở §2.2/§2.3 là **đo tay** một
+  lần khi thiết kế bảng màu, không phải thứ được test canh. Đổi `hex.tertiary`
+  thành một màu nhạt hơn sẽ KHÔNG làm test đỏ — hãy tự tính lại trước khi đổi.
+- **Nó không kiểm thứ tự 5 tầng bề mặt** có sáng dần đều hay không.
 - **Nó không kiểm 3 bậc viền có đúng vai trò** — không thể kiểm bằng regex, chỉ
   kiểm được bằng mắt. §2.3 là quy tắc để người đọc giữ.
 - **Nó không kiểm bao nhiêu component đã migrate.** Danh sách file là hợp đồng:
-  file có trong danh sách thì phải sạch, file không có trong danh sách thì **không ai
-  canh**. Mở rộng danh sách là việc của từng đợt migrate.
+  file có trong danh sách thì phải sạch, file không có thì **không ai canh**.
 - **Nó không kiểm nội dung.** Một component dùng đúng token sai vai trò vẫn xanh.
-- **Nó không kiểm tương phản WCAG** ngoài một màu đã biết.
 - **Nó không kiểm `z-index`** — thang đó có test riêng ở đâu đó khác.
-
-- **Nó không kiểm comment.** Mọi assertion soi mã đều cắt `/* … */` trước khi
-  so. Tên màu nhắc trong comment ("hairline #495059", "sửa `.lift-sm`…") là
-  tài liệu, không phải màu được vẽ ra — và tài liệu gọi tên màu cũ là điều ĐÚNG.
-  Nếu thấy một assertion đỏ vì comment, hãy sửa assertion theo mẫu này, đừng
-  xoá comment.
+- **Nó không kiểm comment.** Mọi assertion soi mã đều cắt `/* … */` trước khi so.
+  Tên màu nhắc trong comment là tài liệu, không phải màu được vẽ ra — và tài liệu
+  gọi tên màu cũ là điều ĐÚNG. Nếu thấy assertion đỏ vì comment, hãy sửa
+  assertion theo mẫu này, đừng xoá comment.
 
 Một tài liệu design system mà chỉ test được một nửa vẫn tốt hơn không tài liệu —
 miễn là phần không test được được viết ra thành quy tắc rõ ràng, đúng như §10.2
 này.
+
+---
+
+## 11. Kiểm chứng theo checklist `ui-ux-pro-max` (đợt 2)
+
+Sau khi hệ tối giản vào chỗ, UI được soi lại theo checklist 10 hạng của skill
+`ui-ux-pro-max`. Ba thứ phải sửa, phần còn lại đã đạt hoặc cố ý giữ:
+
+### 11.1 Đã sửa
+
+| Hạng | Phát hiện | Cách sửa |
+|---|---|---|
+| 1 — Accessibility | Hai chỗ `outline-none` tắt mất ring `:focus-visible` toàn cục: nút chọn chat trong `components/sidebar.tsx` và ô sửa tin nhắn trong `components/chat/message-item.tsx` | Bỏ `outline-none` (nút chọn chat dùng thêm `outline-offset-[-2px]` vì nằm trong danh sách `overflow-y-auto`, ring mặc định bị cắt mép) |
+| 2 — Touch | 9 nút icon 28px đứng một mình không có vùng chạm mở rộng (đóng hộp thoại, thu gọn/đóng sidebar, tuỳ chọn cuộc trò chuyện, cài đặt, copy diff, xoá ký ức) | Thêm `after:absolute after:-inset-[8px]` (28→44px); nút 32px dùng `-inset-[6px]` (→44px); nút xoá từ khoá trong ô search lên 28px + `-inset-[8px]`; nút xoá ký ức dùng `-inset-[6px]` (40px — đúng bằng khe `space-y-1.5`, không chồm sang hàng kế) |
+| 4 — Style | Emoji làm icon: `📏🔧⚠️💡📖📌` ở settings Ghi nhớ, `📁` ở Tự động sao lưu; thông điệp lỗi còn hướng dẫn "bấm 📁" | Thay bằng Lucide (`Ruler` / `Wrench` / `TriangleAlert` / `Lightbulb` / `BookOpen` / `FileText` / `Folder`); chữ trong `<option>` bỏ emoji (option không render được SVG); lỗi đổi thành "Bấm nút thư mục trên composer" |
+
+### 11.1b Đợt 3 — soi lại lần hai sau khi hệ đã ổn định
+
+Ba lỗ hổng còn sót, đều là thứ **không ai nhìn thấy bằng mắt** nên đợt 2 bỏ sót:
+
+| Hạng | Phát hiện | Cách sửa |
+|---|---|---|
+| 2 — Touch | **Con trỏ.** Tailwind preflight KHÔNG khai `cursor` cho `<button>` — UA stylesheet mặc định là mũi tên. Đo được: 180 call site `<button>`, chỉ **21** tự ghi `cursor-pointer`; phần còn lại đi qua recipe (`.icon-btn`, `.menu-item`, `.btn-*`) vốn không có cursor. Giao diện TRÔNG như bấm được còn chuột thì báo không bấm được | Một rule ở `@layer base` của `globals.css`: `button:not(:disabled)`, `[role='button']:not([aria-disabled='true'])`, `summary` → `cursor: pointer`. Sửa 1 chỗ thay vì 180. Đặt ở `base` nên `cursor-not-allowed` ở layer `utilities` vẫn thắng |
+| 1 — Accessibility | **Focus ring bị xoá ở mọi ô nhập.** `:focus-visible` toàn cục khai outline 2px accent ở `@layer base`, nhưng `outline-none` là utility ở layer `utilities`: cùng specificity, layer sau thắng → vòng focus biến mất, chỉ còn lại đổi màu viền. Recipe `.field` / `.field-sm` dính (Settings, sidebar), cùng 3 ô viết tay ở `sidebar.tsx` và `model-selector.tsx` | Bỏ `outline-none` khỏi `.field` / `.field-sm` và 3 ô viết tay; `focus:border-accent` giữ nguyên làm lớp nhấn thứ hai. Bỏ luôn `focus:ring-0`: không class `ring-*` nào tồn tại nên nó vô nghĩa, còn `box-shadow: none` lại xoá mất bóng `.well` đúng lúc người dùng đang gõ |
+| 7 — Animation | 2 chip đổi màu chạy `duration-100` (`status-line.tsx`, `orchestrator-badge.tsx`) — nhanh hơn dải 150–300ms mà hạng 7 chốt | Lên `duration-150`. Giữ nguyên 100ms cho mũi tên xoay và thanh fade — xem §11.2 |
+
+Ba test mới trong `tests/design-system.test.ts` khoá lại cả ba, và đã thử phá để
+bảo đảm chúng đỏ đúng lý do chứ không rỗng.
+
+### 11.1c Đợt 4 — lỗ nặng nhất nằm ở chỗ không ai nhìn thấy
+
+Đợt 3 dọn xong thì bề mặt đã đạt, nên đợt 4 đi tìm loại lỗi mà **test cũ không
+có khả năng bắt**: màu đến từ thư viện ngoài, và một rule CSS viết bằng cú pháp
+thuần thay vì class Tailwind.
+
+| Hạng | Phát hiện | Cách sửa |
+|---|---|---|
+| 1 — Accessibility | **Khối code gần như vô hình.** `components/syntax-highlight.tsx` dùng theme `vscDarkPlus` — theme **TỐI** của Visual Studio — trong khi nền ứng dụng là giấy trắng. Đo cả 14 màu trong theme đó trên nền code sáng: **không màu nào đạt AA**. Chữ gốc `#d4d4d4` chỉ 1.36:1, `string` `#ce9178` 2.42:1, `comment` 3.06:1. Tức phần được tô màu *rõ* nhất lại là phần *mờ* nhất. Nguyên nhân: đổi nền sang sáng ở đợt redesign mà quên đổi theme tô màu — nền đổi, bảng màu của nó không | Theme tự dựng từ bảng màu §2, mỗi vai trò trong code một token. Mọi token đạt AA trên **cả ba** nền code có thể xảy ra: `--bg-base` #fcfcfc, `--bg-sunken` #f7f7f7, `--surface-code` #f5f5f5 (nền nhạt nhất là nghiêm nhất) |
+| 1 — Accessibility | **`PlainCode` 1.38:1.** Nhánh chờ nạp chunk ghi `text-[rgb(212,212,216)]` — màu chữ theme tối còn sót, đúng cái lúc `loading: () => null` đang chờ, người dùng thấy khối code trắng trơn | Về `text-primary` (16.25:1) |
+| 7 — Animation | `.claude-prose a` ghi `transition: color 100ms ease` — đúng cái mà §11.1b cấm, nhưng test chỉ quét `.tsx` nên **CSS thuần nằm ngoài tầm**. Đây là lỗ hổng của chính bộ test: rule chỉ soi nửa bề mặt thì nửa kia không được canh | Lên `150ms`; thêm một test riêng quét `transition:` trong `globals.css` |
+| 6 — Typography | Cỡ chữ px tự chế còn sót, gồm cả loại **không thuộc bậc nào** (`10.5` / `11.5` / `12.5px`) | Về tên bậc — chi tiết ở §9.3 |
+
+**Vì sao không dùng theme sáng có sẵn của thư viện** (`one-light`, `a11y-one-light`,
+`vs`, `solarizedlight`…): đo hết, không theme nào sạch trên nền này — `one-light`
+tốt nhất vẫn còn 7 màu dưới 4.5:1 (chúng được thiết kế cho nền `#fafafa` với bảng
+màu riêng). Dùng theme có sẵn còn là để giao diện tự mang một bảng màu **thứ hai**
+song song với §2, đúng thứ §9 cấm. Ở đây màu nguồn vẫn là §2.
+
+**Đổi theme có làm mất tô màu không?** Không — đo lại bằng cách render thật 8 ngôn
+ngữ (ts / py / sql / bash / css / json / html / jsx, 308 token span) ra HTML rồi
+so **cùng một markup** dưới hai theme:
+
+| | span có màu | màu phân biệt được | màu dưới AA |
+|---|---|---|---|
+| `vscDarkPlus` (cũ) | 192/308 (62%) | 12 | **12/12** |
+| theme tự dựng (mới) | **193/308 (63%)** | 8 (đều là token §2) | **0/8** |
+
+Ngoài ra, **không token class nào mà theme cũ tô được mà theme mới bỏ sót** — rà
+tên class của mọi span trong cả hai lượt, phần chồng khác là rỗng. Phần span không
+được tô (khoảng 37%) là khoảng trắng và văn bản thuần, chúng thừa kế màu của
+`code[class*="language-"]` tức `text-primary` 16.25:1 — đọc tốt, và giống hệt
+hành vi của theme cũ.
+
+**Ba test mới** trong `tests/design-system.test.ts`:
+`mọi màu tô màu cú pháp đều đạt WCAG AA trên nền code sáng` (đo từ chính source
+qua `:root`, trên cả ba nền, và chặn luôn việc quay về nạp theme có sẵn),
+`hover đổi màu trong globals.css cũng chạy 150ms trở lên`, và
+`không còn cỡ chữ px tự chế nào lệch bậc trong thang 6 bậc`. Cả ba đã thử phá để
+chắc chúng đỏ **đúng lý do**:
+
+- Cắt bỏ `BACKGROUND_TOKENS` khỏi test tương phản → đỏ (nó bắt đúng cái nhầm
+  lẫn mình vừa gây: đem token *nền* đi đo như token *chữ*).
+- Để lọc import bằng regex khớp luôn `import type` → đỏ (guard tự bắt chính dòng
+  khai báo kiểu của nó — lỗ hổng thật, vì `one-dark` cũng lọt nếu chỉ soi tên file).
+- Nạp lại `vscDarkPlus` → đỏ. Trả `text-[rgb(212,212,216)]` cho `PlainCode` → đỏ.
+  Đặt lại `transition: color 100ms` → đỏ. Đặt lại `text-[10.5px]` → đỏ.
+
+### 11.2 Cố ý giữ
+
+- **`micro` 10px / `meta` 11px** (§3, hạng 6). Hai bậc nhỏ nhất chỉ dùng cho số
+  đếm, nhãn trạng thái và metadata trong khối — không dùng cho câu đọc. Nâng
+  chúng lên 12px sẽ xoá mất phân cấp 6 bậc mà §3 đã chốt, và không sửa được vấn
+  đề nào của người đọc.
+- **Timing 100ms cho micro-interaction** (mũi tên xoay trong `thinking-menu`,
+  fade của thanh dưới bubble khi cuộn — hạng 7). Đây là "timing theo ngữ cảnh"
+  mà hạng 7 yêu cầu, không phải một duration cho mọi transition: hover đổi màu
+  dùng 150ms, panel 200ms, chuyển động cơ học 100ms. Test chỉ bắt
+  `transition-colors` dưới 150ms và CỐ Ý bỏ qua `transform`/`opacity` ở 100ms.
+- **`outline-none` ở `textarea` của composer** (hạng 1). Ô này CỐ Ý không dùng
+  vòng focus: focus của nó hiện ở VỎ form — `isFocused` dựng viền accent +
+  `PulseGlow` (`composer.tsx:1081`). Vòng quanh `textarea` sẽ là dư. Test khoá
+  danh sách ô nhập buộc phải có ring, và composer là ngoại lệ được ghi rõ.
+- **`border-default` cho viền control** (§2.3): 3.03:1 — đạt WCAG 1.4.11 cho ranh
+  giới control, dù dưới 4.5:1 của chữ.
+
+### 11.3 Chưa kiểm được ở đây
+
+- **Chưa nhìn bằng mắt trên trình duyệt.** Mọi kết luận ở mục này là đọc mã +
+  phép tính khoảng cách/tương phản, không phải ảnh chụp.
+- **Chưa đo ở 375 / 768 / 1024 / 1440px thật.** Các lớp chống vỡ (`min-w-0`,
+  `truncate`, `max-w-[85vw]`, `flex-wrap`) đã có mặt trong mã, nhưng chưa có
+  phép đo layout thực tế.
+- **Hạng 3 (Performance) không đổi gì**: không có ảnh raster để lazy-load, logo
+  và avatar đều là SVG inline.
+- **Chưa chạy `freebuff-preview` để nhìn app thật.** Riêng đợt 4 (theme tô màu
+  cú pháp) thì con số tương phản là phép tính trên `:root`, nhưng **diện mạo thực
+  tế của bảng màu cú pháp mới** — màu nào đứng cạnh màu nào, có đọc được không khi
+  quét mắt nhanh — thì chỉ nhìn trong trình duyệt mới kết luận được. Đổi theme xong
+  mà không nhìn thì mới phải chỉnh tay, và mức chỉnh tay có thể là đổi token.

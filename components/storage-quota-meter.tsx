@@ -98,7 +98,7 @@ export function StorageQuotaMeter() {
         </div>
 
         {/* Persistence Status */}
-        <div className="flex items-center justify-between pt-1 text-[11px]">
+        <div className="flex items-center justify-between pt-1 text-meta">
           <div className="flex items-center gap-1.5">
             {persisted ? (
               <span className="text-status-success flex items-center gap-1">
@@ -114,7 +114,7 @@ export function StorageQuotaMeter() {
           {!persisted && (
             <button
               onClick={handleRequestPersist}
-              className="text-[10px] text-primary hover:underline font-medium"
+              className="text-micro text-primary hover:underline font-medium"
             >
               Yêu cầu bảo vệ
             </button>

@@ -177,7 +177,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
           type="button"
           disabled={busy || running}
           onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 rounded-full border border-subtle bg-raised px-3 py-1 font-mono text-[11px] text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-bg hover:text-text-primary disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-full border border-subtle bg-raised px-3 py-1 font-mono text-meta text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-bg hover:text-text-primary disabled:opacity-40"
           title="Khôi phục các file agent vừa sửa về trạng thái trước đó"
         >
           <History size={12} className="text-accent-steel" aria-hidden />
@@ -205,7 +205,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                 <span className="text-accent-steel">undo</span>
                 <span>· Khôi phục {ops.length} file về trước lượt sửa của AI</span>
               </div>
-              <div className="mt-0.5 text-[11px] text-text-muted">
+              <div className="mt-0.5 text-meta text-text-muted">
                 Lượt sửa lúc {new Date(target.createdAt).toLocaleString('vi-VN')}
               </div>
             </div>
@@ -225,9 +225,9 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                           if (el.open && pv.status === 'idle') void loadPreview(f);
                         }}
                       >
-                        <summary className="cursor-pointer select-none font-mono text-[12px] text-text-primary">
+                        <summary className="cursor-pointer select-none font-mono text-ui text-text-primary">
                           <span
-                            className={`mr-2 rounded-full px-2 py-0.5 font-mono text-[10px] ${
+                            className={`mr-2 rounded-full px-2 py-0.5 font-mono text-micro ${
                               f.existedBefore
                                 ? 'border border-accent/40 bg-accent/10 text-accent-steel'
                                 : 'border border-danger/40 bg-danger/10 text-status-error'
@@ -238,23 +238,23 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                           {f.path}
                         </summary>
                         {pv.status === 'idle' && (
-                          <p className="mt-2 text-[11px] text-text-muted">Mở để xem diff…</p>
+                          <p className="mt-2 text-meta text-text-muted">Mở để xem diff…</p>
                         )}
                         {pv.status === 'loading' && (
-                          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-accent-steel">
+                          <p className="mt-2 flex items-center gap-1.5 text-meta text-accent-steel">
                             <Loader2 size={11} className="animate-spin" /> Đang đọc file hiện tại…
                           </p>
                         )}
                         {pv.status === 'unavailable' && (
-                          <p className="mt-2 text-[11px] text-status-error">{pv.note}</p>
+                          <p className="mt-2 text-meta text-status-error">{pv.note}</p>
                         )}
                         {pv.status === 'ready' && (
                           <>
-                            <p className="mt-2 text-[11px] text-text-muted">
+                            <p className="mt-2 text-meta text-text-muted">
                               <span className="text-status-success">+{pv.adds}</span>{' '}
                               <span className="text-status-error">-{pv.dels}</span> — nội dung sẽ khôi phục:
                             </p>
-                            <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-subtle bg-bg-deep p-3 font-mono text-[11px] leading-relaxed text-text-primary">
+                            <pre className="mt-1 max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-subtle bg-bg-deep p-3 font-mono text-meta leading-relaxed text-text-primary">
                               {pv.text}
                             </pre>
                           </>
@@ -267,7 +267,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
             </div>
 
             <div className="flex items-center justify-between gap-2 border-t border-subtle bg-raised px-4 py-2.5">
-              <span className="text-[11px] text-text-muted">
+              <span className="text-meta text-text-muted">
                 $ Esc to cancel
               </span>
               <div className="flex gap-2">

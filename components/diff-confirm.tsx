@@ -341,7 +341,7 @@ export function DiffConfirm({
               onClick={handleCopy}
               title="Sao chép TOÀN BỘ diff (kể cả phần đang bị ẩn)"
               aria-label="Sao chép toàn bộ diff, kể cả phần đang bị ẩn"
-              className="flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-raised text-secondary transition-colors hover:border-strong hover:bg-overlay hover:text-primary"
+              className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-raised text-secondary transition-colors after:absolute after:-inset-[8px] after:content-[''] hover:border-strong hover:bg-overlay hover:text-primary"
             >
               {copied ? (
                 <CheckCheck className="h-3.5 w-3.5 text-success" />

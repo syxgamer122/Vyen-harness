@@ -12,7 +12,7 @@
  *
  *  2. TƯƠNG PHẢN. Chữ băng là `text-xs` (12px) tức chữ THƯỜNG, ngưỡng
  *     WCAG AA là 4.5:1. Cặp cũ `text-warning` (#9a6206) trên nền
- *     `bg-warning/10` phủ lên `bg-sunken` (#f2f2ef) ra #e9e4d8 → 4.01:1.
+ *     `bg-warning/10` phủ lên `bg-sunken` (#f7f7f7) ra #f4f0e4 → 4.06:1.
  *     Nút dùng `text-warning` trên `bg-warning/20` → 3.50:1.
  *
  *  3. Đo bằng công thức WCAG thật, không chép số. Token đọc từ
@@ -202,7 +202,7 @@ describe('băng quan sát — tương phản WCAG AA', () => {
 
   /**
    * Khoá lại CÁI CŨ, và khoá luôn lý do: `text-warning` (#9a6206) trên nền
-   * `#f2f2ef` trần đã chỉ 4.54:1, nên bất kỳ nét phủ nào cũng đẩy nó xuống
+   * `#f7f7f7` trần đã chỉ 4.58:1, nên bất kỳ nét phủ nào cũng đẩy nó xuống
    * dưới 4.5:1. Đổi bảng màu đủ nhiều để token này lại đạt thì test đỏ và
    * nhắc xem lại chỗ này thay vì âm thầm giữ một cặp chữ không bao giờ đạt.
    */

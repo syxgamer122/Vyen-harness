@@ -438,7 +438,7 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
               <div key={group.key} role="presentation">
                 <div
                   aria-hidden="true"
-                  className="px-2 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-accent"
+                  className="px-2 pb-1 pt-1.5 text-micro font-semibold uppercase tracking-wide text-accent"
                 >
                   {group.label}
                 </div>
@@ -466,11 +466,11 @@ function TaskMenu({ groups }: { groups: TaskGroupSpec[] }) {
                         className={`flex-none ${t.active ? 'text-success' : 'text-tertiary'}`}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] text-primary">
+                        <span className="block truncate text-body text-primary">
                           {t.shortLabel ?? t.label}
                         </span>
                         {t.description && (
-                          <span className="block truncate text-[10.5px] leading-tight text-tertiary">
+                          <span className="block truncate text-micro leading-tight text-tertiary">
                             {t.description}
                           </span>
                         )}
@@ -1077,11 +1077,11 @@ export const Composer = memo(function Composer({
             setDragging(false);
             acceptFiles(e.dataTransfer?.files ?? null);
           }}
-          className={`group relative lift-md rounded-ink bg-surface shadow-lift-md transition-all duration-200 ${
+          className={`group relative lift-md rounded-2xl bg-surface shadow-lift-md transition-all duration-200 ${
             isFocused
-              ? 'border-2 border-accent'
-              : 'border-2 border-default'
-          } ${dragging ? 'border-2 border-accent' : ''}`}
+              ? 'border border-accent'
+              : 'border border-default'
+          } ${dragging ? 'border border-accent' : ''}`}
         >
           <PulseGlow active={isFocused} />
 
@@ -1097,10 +1097,9 @@ export const Composer = memo(function Composer({
            * có gì, và dòng đó còn viết tiếng Anh trên giao diện tiếng Việt.
            * Nay dùng chỗ trống đó cho chip file đang chờ duyệt. Gợi ý `/` còn
            * ở dòng hướng dẫn phím dưới ô nhập.
-           */}
-          {/* Bo góc phải khớp `rounded-ink` của vỏ form, nếu không dải này bo
-              kiểu control trong khi vỏ bo kiểu vẽ tay — thấy ngay mép lệch. */}
-          <div className="flex items-center justify-between rounded-t-[15px_6px_0_0] bg-raised/60 px-4 py-2.5">
+           */}{/* Bo góc phải khớp `rounded-2xl` của vỏ form, nếu không dải này bo
+               kiểu control trong khi vỏ bo kiểu khối — thấy ngay mép lệch. */}
+          <div className="flex items-center justify-between rounded-t-[15px_15px_0_0] bg-raised/60 px-4 py-2.5">
             <div className="flex items-center gap-2 flex-nowrap overflow-x-auto no-scrollbar min-w-0">
               <ModelSelector
                 models={models}
@@ -1160,7 +1159,7 @@ export const Composer = memo(function Composer({
                 type="button"
                 onClick={onOpenStaging}
                 title={`${stagedChip.title}. Bấm để xem thay đổi trước khi ghi đĩa`}
-                className="lift-sm ml-2 inline-flex flex-none items-center gap-1.5 rounded-wobble border border-warning bg-warning/10 px-2.5 py-1 text-ui font-medium text-primary transition-colors hover:border-strong hover:bg-warning/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                className="ml-2 inline-flex flex-none items-center gap-1.5 rounded-md border border-warning bg-warning/10 px-2.5 py-1 text-ui font-medium text-primary transition-colors hover:border-strong hover:bg-warning/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
               >
                 <FileText size={12} aria-hidden="true" className="flex-none" />
                 {stagedChip.label}
@@ -1213,7 +1212,7 @@ export const Composer = memo(function Composer({
                     onClick={() => applyPrompt(p)}
                     onMouseEnter={() => setSlashIndex(i)}
                     className={`flex w-full flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent ${
-                      i === slashIndex ? 'bg-panel-soft text-primary' : 'text-primary hover:bg-accent-mint/40'
+                      i === slashIndex ? 'bg-panel-soft text-primary' : 'text-primary hover:bg-raised'
                     }`}
                   >
                     {/*
@@ -1227,7 +1226,7 @@ export const Composer = memo(function Composer({
                      * tham số gì. `p.argumentHint` là TUỲ CHỌN — thiếu thì
                      * không vẽ gì, không để lại khoảng trống.
                      */}
-                    <span className="flex w-full min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-primary">
+                    <span className="flex w-full min-w-0 items-center gap-1.5 text-ui font-medium text-primary">
                       {p.kind === 'recipe' ? (
                         <ChefHat size={11} aria-hidden="true" className="flex-none text-accent" />
                       ) : null}
@@ -1241,7 +1240,7 @@ export const Composer = memo(function Composer({
                         </span>
                       ) : null}
                     </span>
-                    <span className="line-clamp-2 w-full text-[11px] leading-snug text-tertiary">
+                    <span className="line-clamp-2 w-full text-meta leading-snug text-tertiary">
                       {p.kind === 'recipe'
                         ? 'workflow · mở panel để chạy'
                         : p.kind === 'command'
@@ -1257,7 +1256,7 @@ export const Composer = memo(function Composer({
                * bao nhiêu; con số + gợi ý gõ thêm là cách tự lấy lại.
                */}
               {slashHiddenLine && (
-                <p className="border-t border-subtle px-4 py-2 text-[11px] text-tertiary">
+                <p className="border-t border-subtle px-4 py-2 text-meta text-tertiary">
                   {slashHiddenLine}
                 </p>
               )}
@@ -1292,7 +1291,7 @@ export const Composer = memo(function Composer({
           )}
 
           {webBusy && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-3 font-mono text-[12px] leading-relaxed">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-3 font-mono text-ui leading-relaxed">
               <span className="flex min-w-0 items-center gap-1.5 text-tertiary">
                 <span aria-hidden="true" className="terminal-cursor" />
                 <span className="truncate">Đang tra cứu web…</span>
@@ -1329,7 +1328,7 @@ export const Composer = memo(function Composer({
                 slashOpen ? `slash-opt-${slashMatches[slashIndex]?.id}` : undefined
               }
               placeholder="Soạn thảo prompt hoặc tác vụ, gõ / để mở danh sách lệnh..."
-              className="w-full resize-none border-none bg-transparent p-0 font-sans text-[15px] leading-relaxed text-primary outline-none focus:ring-0 placeholder:text-tertiary"
+              className="w-full resize-none border-none bg-transparent p-0 font-sans text-read leading-relaxed text-primary outline-none focus:ring-0 placeholder:text-tertiary"
             />
           </div>
 
@@ -1351,13 +1350,13 @@ export const Composer = memo(function Composer({
               <ToolbarButton
                 icon={Paperclip}
                 label="Đính kèm tệp"
-                className="rounded-lg hover:bg-accent-mint/50"
+                className="rounded-lg hover:bg-raised"
                 onClick={() => fileInputRef.current?.click()}
               />
               {onPickWorkspace && (
                 <ToolbarButton
                   icon={pickPending ? Loader2 : FolderOpen}
-                  className={`rounded-lg hover:bg-accent-mint/50 ${pickPending ? 'animate-spin' : ''}`}
+                  className={`rounded-lg hover:bg-raised ${pickPending ? 'animate-spin' : ''}`}
                   active={workspace?.connected}
                   label={
                     workspace?.connected

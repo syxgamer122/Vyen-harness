@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, JetBrains_Mono, Patrick_Hand } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import { PWARegister } from '@/components/pwa-register';
 import './globals.css';
 
@@ -7,20 +7,6 @@ const inter = Inter({
   subsets: ['latin', 'vietnamese'],
   display: 'swap',
   variable: '--font-sans',
-});
-
-/**
- * Chữ vẽ tay — nét kẻ cho nhãn, nút, tiêu đề.
- *
- * CHỈ có weight 400: font-data.json của `next/font` liệt kê `weights: ['400']`
- * cho Patrick Hand. Nên phân cấp đậm/nhạt trong UI không đến từ `font-bold` mà
- * đến từ cỡ chữ + độ đậm của nét mực — xem `.uic` trong globals.css.
- */
-const patrickHand = Patrick_Hand({
-  subsets: ['latin', 'vietnamese'],
-  display: 'swap',
-  weight: '400',
-  variable: '--font-hand',
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -48,7 +34,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   interactiveWidget: 'resizes-content',
   colorScheme: 'light',
-  themeColor: '#f2f2ef',
+  themeColor: '#f7f7f7',
 };
 
 /**
@@ -63,16 +49,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="vi"
-      className={`${inter.variable} ${patrickHand.variable} ${jetbrainsMono.variable}`}
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      {/*
-        KHÔNG còn `<head>` với preconnect tới fonts.googleapis.com: cả ba họ font
+      {/* KHÔNG còn `<head>` với preconnect tới fonts.googleapis.com: cả hai họ font
         đều đi qua `next/font/google`, tức được tải và TỰ HOST lúc build. Trình
         duyệt không hề gọi ra Google Fonts lúc chạy, nên preconnect chỉ là một
         DNS+TLS tới một host không bao giờ được dùng.
       */}
-      <body className="relative min-h-dvh bg-sunken font-sans text-primary antialiased overscroll-none selection:bg-accent-mint/40 selection:text-primary">
+      <body className="relative min-h-dvh bg-sunken font-sans text-primary antialiased overscroll-none selection:bg-accent-soft selection:text-primary">
         <PWARegister />
         {children}
       </body>

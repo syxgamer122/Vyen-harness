@@ -445,21 +445,24 @@ describe('L11 — file đang staged phải thấy được, không chôn sau men
     expect(code).toMatch(/stagedFilesChip\(stagedFileCount \?\? 0\)/);
   });
 
-  it('chip khai bo góc theo vai trò: control nhỏ thì `rounded-wobble`', () => {
+  it('chip khai bo góc theo vai trò: control nhỏ thì `rounded-md`, không bo pill', () => {
     /*
-     * DESIGN.md §4.1: `rounded-wobble` dành cho control nhỏ (nút bấm),
-     * `rounded-full` dành cho viên thuốc (chấm trạng thái, avatar, nút gửi).
-     * Chip này là NÚT BẤM nên bo góc bất đối xứng nhẹ, không phải viên thuốc —
-     * bo kiểu pill sẽ dính vào hàng pill bên cạnh và mất vai trò điều hướng.
+     * DESIGN.md §4.1: thang bo góc nay ĐỀU, `rounded-md` (8px) là bậc của
+     * control nhỏ; `rounded-full` dành cho viên thuốc (chấm trạng thái,
+     * avatar, nút gửi). Chip này là NÚT BẤM nên bo control, không phải viên
+     * thuốc — bo kiểu pill sẽ dính vào hàng pill bên cạnh và mất vai trò
+     * điều hướng.
      * Ghi rõ ở đây vì RADIUS_ANY của tests/design-system.test.ts chỉ quét
      * sidebar.tsx và backup-reminder.tsx, không canh composer.
      */
     const chip = code.match(/\{stagedChip && onOpenStaging && \(\s*<button[\s\S]*?<\/button>\s*\)\}/);
     expect(chip, 'không tìm được khối chip staged — regex chắc hỏng').toBeTruthy();
-    expect(chip![0]).toMatch(/rounded-wobble/);
+    expect(chip![0]).toMatch(/rounded-md/);
     expect(chip![0]).not.toMatch(/rounded-full/);
-    // Chip nhỏ thì `lift-sm` (chip, nút icon, nút bấm), không phải lift-md.
-    expect(chip![0]).toMatch(/lift-sm/);
+    // Control KHÔNG sinh bóng trong hệ này (DESIGN.md §5): bóng là chiều sâu
+    // dành cho khối nội dung. Nếu `lift-sm` quay lại chip thì mép nút trên nền
+    // trắng lại nhoè đi — đúng thứ §5 đã cắt.
+    expect(chip![0]).not.toMatch(/lift-sm/);
     // Cỡ chữ lấy từ thang 6 bậc, không tự chế px lạ (DESIGN.md §3).
     expect(chip![0]).toMatch(/text-ui/);
     expect(chip![0]).not.toMatch(/text-\[/);

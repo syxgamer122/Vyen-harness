@@ -21,16 +21,16 @@ describe('DESIGN.md — Vyen design-system contract', () => {
    * VIỀN MỰC và bóng lệch cứng, không phải từ độ sáng của nền.
    */
   const PALETTE_TOKENS = new Set([
-    /* Bề mặt — 5 tầng */
-    '#f2f2ef', '#fafaf8', '#ffffff', '#eeeeeb', '#ffffff',
-    /* Chữ — 4 tầng */
-    '#18181b', '#52525b', '#6b6b73', '#a1a1aa',
-    /* Viền — 3 tầng, đều là mực ở ba bậc đậm nhạt */
-    '#dcdcd8', '#2a2a2e', '#18181b',
+    /* Bề mặt — 5 tầng, đều nhau trên nền trắng */
+    '#f7f7f7', '#fcfcfc', '#ffffff', '#f5f5f5', '#ffffff',
+    /* Chữ — 4 tầng, đều đạt WCAG AA trên nền trắng */
+    '#18181b', '#575757', '#6f6f6f', '#a3a3a3',
+    /* Viền — 3 tầng; `default` đạt 3.03:1 cho ranh giới control */
+    '#e5e5e5', '#949494', '#525252',
     /* Nhấn & trạng thái */
-    '#2a7360', '#8fc7b8', '#98d8c8', '#ffffff', '#2a7347', '#9a6206', '#b3261e', '#0369a1', '#6d4aa8',
+    '#2a7360', '#7fb8a6', '#f0f4f3', '#ffffff', '#167a4a', '#9a6206', '#b3261e', '#0369a1', '#6d4aa8',
     /* Diff */
-    '#1f7a3d', '#b3261e', '#6b6b73',
+    '#1f7a3d', '#b3261e', '#575757',
   ]);
 
   /**
@@ -154,7 +154,7 @@ describe('DESIGN.md — Vyen design-system contract', () => {
    * tailwind.config.ts (hai key `'none'`).
    */
   const DEAD_CLASSES =
-    /\b(?:pi-corner-[a-z-]+|pi-frame|vyen-frame|vyen-corner-[a-z-]+|shadow-reasoning-glow|shadow-ambient-glow|glass-panel|custom-scrollbar)\b/g;
+    /\b(?:pi-corner-[a-z-]+|pi-frame|vyen-frame|vyen-corner-[a-z-]+|shadow-reasoning-glow|shadow-ambient-glow|glass-panel|custom-scrollbar|rounded-ink|rounded-wobble|accent-mint|font-hand)\b/g;
 
   function collectStyleFiles(dir: string, out: string[] = []): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -281,13 +281,17 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     const css = read(globalsCssPath);
     /*
      * `.surface-panel`/`.settings-card` nổi (lift-md); `.field` & `.field-sm`
-     * chìm (well); `.btn-primary`/`.btn-secondary` nổi nhẹ (lift-sm).
+     * chìm (well).
+     *
+     * `.btn-primary`/`.btn-secondary` KHÔNG còn nằm trong bảng này: chúng
+     * không sinh bóng nữa. Nút trên nền trắng không cần đổ bóng để tách —
+     * nền tô đậm (primary) hoặc viền 1px (secondary) đã đủ, và thêm bóng
+     * chỉ làm mép nút nhoè đi trên nền sáng. Bỏ chúng khỏi bảng là CHỐNG
+     * việc bóng quay lại nút, không phải nới lỏng kiểm tra.
      */
     const expected: Array<[string, string]> = [
       ['.surface-panel', 'lift-md'],
       ['.settings-card', 'lift-md'],
-      ['.btn-primary', 'lift-sm'],
-      ['.btn-secondary', 'lift-sm'],
       ['.field', 'well'],
       ['.field-sm', 'well'],
     ];
@@ -365,21 +369,26 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     const keys = [...block.matchAll(/^\s*'?([\w-]+)'?:\s*/gm)].map((m) => m[1]);
 
     /*
-     * Đủ 11 bậc. Một bậc thiếu nghĩa là code gọi tên đó không sinh class nào.
-     * `ink` và `wobble` là hai bậc BẤT ĐỐI XỨNG — dấu hiệu nhận dạng của phong
-     * cách nét vẽ tay, nên chúng bắt buộc phải tồn tại cùng thang px.
+     * Đủ 9 bậc. Một bậc thiếu nghĩa là code gọi tên đó không sinh class nào.
+     *
+     * `ink`/`wobble` (bo BẤT ĐỐI XỨNG kiểu vẽ tay) đã bị GỠ khỏi hệ. Nếu
+     * chúng quay lại thì mọi chỗ còn gọi `rounded-ink` sẽ vẽ ra bo lệch,
+     * phá đúng thứ ta muốn: một bán kính cho cả bốn góc.
      */
-    for (const key of ['none', 'sm', 'DEFAULT', 'md', 'lg', 'xl', '2xl', '3xl', 'ink', 'wobble', 'full']) {
+    for (const key of ['none', 'sm', 'DEFAULT', 'md', 'lg', 'xl', '2xl', '3xl', 'full']) {
       expect(keys, `borderRadius.${key} phải tồn tại`).toContain(key);
+    }
+    for (const gone of ['ink', 'wobble']) {
+      expect(keys, `borderRadius.${gone} đã bị gỡ — bo bất đối xứng không thuộc hệ này`).not.toContain(gone);
     }
 
     /*
      * THANG PX PHẢI TĂNG DẦN. Nếu ai đó sửa `xl` thành 4px thì giao diện co
      * lại mà không test nào đỏ.
      *
-     * `ink`/`wobble` KHÔNG so theo thang này: chúng là dạng 8 giá trị
-     * (`A B C D / E F G H`), nên bậc lớn nhất của chúng là 255px — lớn hơn
-     * `full` là chuyện bình thường và không phải lỗi.
+     * Mọi bậc phải là MỘT số px. Bất kỳ giá trị nào chứa dấu `/` (dạng 8 bán
+     * kính `A B C D / E F G H` của hệ cũ) hoặc nhiều số là bo bất đối xứng
+     * quay lại — và `px()` ở trên sẽ đọc ra `NaN` làm test đỏ.
      */
     const px = (key: string) => {
       const v = block.match(new RegExp(`^\\s*'?${key}'?:\\s*'([\\d.]+)px'`, 'm'))?.[1];
@@ -397,26 +406,20 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     expect(px('none'), 'rounded-none = 0px').toBe(0);
 
     /*
-     * BẤT ĐỐI XỨNG phải THẬT bất đối xứng — dạng `A B C D / E F G H` với hai
-     * góc bo to xen kẽ hai góc bo nhỏ. Nếu ai đó dán lại một bán kính đều
-     * (bo tròn mềm) thì nét vẽ tay biến mất mà test này vẫn xanh, vì nó chỉ
-     * kiểm key tồn tại chứ không kiểm HÌNH DẠNG.
+     * BO GÓC PHẢI ĐỀU — đây là bất biến MỚI, đảo ngược bất biến cũ.
+     *
+     * Hệ cũ bắt buộc bo bất đối xứng (`ink`/`wobble`, dạng 8 giá trị). Hệ này
+     * bỏ hẳn chúng vì bán kính lệch nhau làm mép chữ dịch khi chiều cao khối
+     * đổi — cùng một nội dung mà hai lần hiển thị lệch nhau. Assertion này
+     * bắt BẤT ĐỐI XỨNG quay lại dưới dạng bất kỳ key nào trong thang.
      */
-    for (const key of ['ink', 'wobble']) {
-      const v = block.match(new RegExp(`^\\s*'?${key}'?:\\s*'([^']+)'`, 'm'))?.[1];
-      expect(v, `borderRadius.${key} phải khai báo`).toBeTruthy();
-      const [h, vAxis] = v!
-        .split('/')
-        .map((x) => x.trim().split(/\s+/).map((n) => Number(n.replace('px', ''))));
-      expect(h, `${key} phải có 4 bán kính ngang`).toHaveLength(4);
-      expect(vAxis, `${key} phải có 4 bán kính dọc`).toHaveLength(4);
-      /* Có ít nhất MỘT cặp khác nhau — đó mới là "bất đối xứng". */
-      const distinct = new Set([...h, ...vAxis]);
-      expect(distinct.size, `${key} mọi bán kính bằng nhau → bo tròn đều, mất nét vẽ tay`).toBeGreaterThan(1);
+    for (const key of keys) {
+      const v = block.match(new RegExp(`^\\s*'?${key}'?:\\s*'([^']*)'`, 'm'))?.[1];
+      if (v === undefined) continue;
       expect(
-        h[0],
-        `${key} phải có ít nhất một góc bo lớn (255px-class) xen kẽ góc bo nhỏ`,
-      ).toBeGreaterThan(h[1]!);
+        v,
+        `borderRadius.${key} = "${v}" — phải là MỘT số px, không phải dạng 8 bán kính`,
+      ).toMatch(/^\d+(\.\d+)?px$/);
     }
   });
 
@@ -456,11 +459,12 @@ describe('DESIGN.md — Vyen design-system contract', () => {
      * Đếm theo GIÁ TRỊ hex đã khử trùng, không theo số key.
      *
      * Bảng sáng cố ý dùng lại một vài màu cho nhiều vai trò — `#ffffff` cho
-     * cả `surface`/`overlay`/`on-fill`, `#18181b` cho cả `primary`/`strong` —
-     * vì trên giấy trắng, "nền" và "chữ trên nền tô đậm" là hai câu hỏi khác
-     * nhau về CÙNG một màu. 24 key → 19 giá trị phân biệt.
+     * cả `surface`/`overlay`/`on-fill`, `#18181b` cho cả `primary`/`strong`,
+     * `#575757` cho cả `secondary`/`diff-ctx` — vì trên giấy trắng, "nền" và
+     * "chữ trên nền tô đậm" là hai câu hỏi khác nhau về CÙNG một màu.
+     * 24 key → 20 giá trị phân biệt.
      */
-    expect(configHexes.size, 'không đọc được mảng `hex` trong tailwind.config.ts').toBe(19);
+    expect(configHexes.size, 'không đọc được mảng `hex` trong tailwind.config.ts').toBe(20);
 
     /* Mỗi hex trong PALETTE_TOKENS phải tồn tại thật trong config. */
     for (const h of PALETTE_TOKENS) {
@@ -822,7 +826,7 @@ describe('DESIGN.md — Vyen design-system contract', () => {
      * phải thoả — nếu chỉ nhận tên mới thì các file đang migrate sẽ đỏ giả.
      */
     const tokenUse =
-      /\b(?:bg|text|border|ring|from|to|via|decoration|outline|fill|stroke|divide|placeholder|shadow)-(?:sunken|base|surface|raised|overlay|primary|secondary|tertiary|disabled|subtle|default|strong|accent|accent-dim|success|warning|danger|info|reasoning|diff-add|diff-del|diff-ctx|diff-(?:added|removed|context)|bg-deep|bg-canvas|panel-bg|panel-soft|surface-elevated|surface-subtle|surface-code|text-primary|text-muted|border-hairline|border-subtle|border-control|border-hover|accent-steel|status-success|status-warning|status-error)\b/g;
+      /\b(?:bg|text|border|ring|from|to|via|decoration|outline|fill|stroke|divide|placeholder|shadow)-(?:sunken|base|surface|raised|overlay|primary|secondary|tertiary|disabled|subtle|default|strong|accent|accent-dim|accent-soft|success|warning|danger|info|reasoning|diff-add|diff-del|diff-ctx|diff-(?:added|removed|context)|bg-deep|bg-canvas|panel-bg|panel-soft|surface-elevated|surface-subtle|surface-code|text-primary|text-muted|border-hairline|border-subtle|border-control|border-hover|accent-steel|status-success|status-warning|status-error)\b/g;
 
     const missing: string[] = [];
     for (const rel of TOKENIZED_COMPONENTS) {
@@ -874,11 +878,11 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     'field',
     'field-sm',
   ];
-  const RADIUS_DIRECT = /className=[\s\S]*?rounded-(?:none|sm|md|lg|xl|2xl|3xl|ink|wobble|full)\b/;
+  const RADIUS_DIRECT = /className=[\s\S]*?rounded-(?:none|sm|md|lg|xl|2xl|3xl|full)\b/;
   /* Dấu nháy kép và backtick phải escape trong regex source. */
   const CLASSNAME_BOUNDARY = '[\\s"\'`]';
   const RADIUS_ANY = new RegExp(
-    `className=[\\s\\S]*?(?:rounded-(?:none|sm|md|lg|xl|2xl|3xl|ink|wobble|full)\\b|(?:^|${CLASSNAME_BOUNDARY})(?:${RADIUS_RECIPES.join('|')})\\b)`,
+    `className=[\\s\\S]*?(?:rounded-(?:none|sm|md|lg|xl|2xl|3xl|full)\\b|(?:^|${CLASSNAME_BOUNDARY})(?:${RADIUS_RECIPES.join('|')})\\b)`,
   );
 
   it('mọi recipe sinh bo góc trong globals.css đều khai báo bo góc thật', () => {
@@ -889,7 +893,7 @@ describe('DESIGN.md — Vyen design-system contract', () => {
       expect(
         block![1],
         `.${recipe} phải @apply một bậc bo góc — nếu không, mọi nút dùng nó sẽ rơi về 0px`,
-      ).toMatch(/@apply[^;]*rounded-(?:sm|md|lg|xl|2xl|3xl|ink|wobble|full)\b/);
+      ).toMatch(/@apply[^;]*rounded-(?:sm|md|lg|xl|2xl|3xl|full)\b/);
     }
   });
 
@@ -1029,6 +1033,324 @@ describe('DESIGN.md — Vyen design-system contract', () => {
       .map((file) => path.relative(root, file));
 
     expect(offenders, `còn dùng #55779b: ${offenders.join(', ')}`).toEqual([]);
+  });
+
+  it('không dùng emoji làm icon trong components/ và app/ (ngoài comment)', () => {
+    /*
+     * Checklist `ui-ux-pro-max` hạng 4: icon phải là SVG (Lucide), không emoji.
+     * Hình dáng/màu của emoji do font hệ điều hành quyết định — khác nhau giữa
+     * macOS / Windows / Linux — và không theo được hệ màu accent của ứng dụng.
+     *
+     * Cắt comment trước khi soi: comment nhắc emoji như tài liệu lịch sử ("nút
+     * 📁 cũ", "khỏi bấm 🔄") là tài liệu, không phải icon hiển thị. Cắt cả hai
+     * kiểu comment (dòng và khối) trước khi soi.
+     */
+    const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u;
+    const stripped = (code: string) =>
+      stripComments(code).replace(/\/\/[^\n]*/g, (line) => line.replace(/[^\n]/g, ' '));
+
+    const offenders: string[] = [];
+    for (const file of componentFiles()) {
+      const lines = stripped(readFromRoot(file)).split('\n');
+      for (const [index, line] of lines.entries()) {
+        if (EMOJI.test(line)) offenders.push(`${file}:${index + 1}`);
+      }
+    }
+
+    expect(offenders, `emoji làm icon — thay bằng SVG Lucide: ${offenders.join(', ')}`).toEqual([]);
+  });
+
+  it('mọi phần tử bấm được đều đổi con trỏ tay (không trông như bấm được mà chuột báo không bấm)', () => {
+    /*
+     * Checklist `ui-ux-pro-max` hạng 2 (Touch & Interaction).
+     *
+     * Tailwind preflight KHÔNG khai `cursor` cho `<button>` — UA stylesheet mặc
+     * định là mũi tên. Đo được trước khi sửa: 180 call site `<button>` trong
+     * components+app, chỉ 21 tự ghi `cursor-pointer`; phần còn lại đi qua recipe
+     * (`.icon-btn`, `.menu-item`, `.btn-*`) vốn không có cursor.
+     *
+     * Rule phải nằm ở `@layer base` (trước `@layer components`) để utility
+     * `cursor-not-allowed` / `cursor-text` ở layer `utilities` vẫn thắng được.
+     */
+    const css = read(globalsCssPath);
+    const baseEnd = css.indexOf('@layer components');
+    expect(baseEnd, 'globals.css thiếu @layer components — regex chắc hỏng').toBeGreaterThan(-1);
+
+    const base = css.slice(0, baseEnd);
+    expect(
+      base,
+      'globals.css layer base phải đặt cursor: pointer cho button:not(:disabled)',
+    ).toMatch(/button:not\(:disabled\)[\s\S]*?cursor:\s*pointer/);
+    /* Nút tắt giữ con trỏ mũi tên: bấm vào thứ không dùng được không nên trông như bấm được. */
+    expect(base, 'cursor phải loại :disabled khỏi <button>').toMatch(/button:not\(:disabled\)/);
+  });
+
+  it('ô nhập KHÔNG được xoá dấu hiệu focus (outline-none là anti-pattern hạng 1)', () => {
+    /*
+     * Checklist `ui-ux-pro-max` hạng 1 (Accessibility — CRITICAL): "xoá focus
+     * ring" nằm trong cột CHỐNG.
+     *
+     * `:focus-visible` ở `@layer base` khai outline 2px accent cho cả app, nhưng
+     * `outline-none` là utility ở layer `utilities`: cùng specificity, layer sau
+     * thắng → vòng focus biến mất hoàn toàn, chỉ còn lại đổi màu viền. Người điều
+     * hướng bàn phím mất dấu hiệu vị trí ở mọi ô nhập trong Settings.
+     *
+     * `composer.tsx` là ngoại lệ CỐ Ý: focus của nó hiện ở vỏ form
+     * (`isFocused` → viền accent + `PulseGlow`) nên vòng quanh textarea là
+     * dư. Danh sách dưới đây là các ô nhập KHÔNG có dấu hiệu focus nào khác.
+     */
+    const css = read(globalsCssPath);
+    expect(css, 'globals.css phải giữ :focus-visible toàn cục').toMatch(
+      /:focus-visible\s*\{\s*outline:\s*2px solid/,
+    );
+    expect(
+      css,
+      'recipe `.field` không được dùng outline-none (xoá focus ring của mọi ô nhập Settings)',
+    ).not.toMatch(/\.field\b[^{]*\{[^}]*outline-none/);
+    expect(
+      css,
+      'recipe `.field` không được dùng focus:ring-0 (xoá mất bóng .well lúc focus)',
+    ).not.toMatch(/\.field\b[^{]*\{[^}]*focus:ring-0/);
+
+    /*
+     * Ô nhập viết tay trong component — cùng lý do, phải theo.
+     *
+     * Quét MỌI thẻ mở `<input` / `<textarea` trong hợp đồng, KHÔNG ghim số dòng
+     * và KHÔNG soi từng dòng: đo được 52/53 thẻ mở nằm nhiều dòng (`className`
+     * ở dòng kế), nên quét theo dòng sẽ im lặng bỏ sót gần hết.
+     *
+     * `openingTags` cắt tới dấu `>` KHÔNG nằm trong `{}` hay trong nháy — đó mới
+     * là thẻ mở thật, kể cả khi thuộc tính là biểu thức template.
+     *
+     * Ngoại lệ liệt kê TƯỜNG MINH, mỗi cái một lý do:
+     *   composer.tsx        — focus hiện ở vỏ form (`isFocused` → viền accent
+     *                         + `PulseGlow`); vòng quanh textarea là dư.
+     *   settings-dialog.tsx — container của modal, focus-trap đặt focus vào nó
+     *                         lúc mở; vòng bao quanh cả modal là rác.
+     * Ô nào khác mất focus ring thì đã là lỗi.
+     */
+    const EXEMPT = new Set(['composer.tsx', 'settings-dialog.tsx']);
+    const openingTags = (code: string) =>
+      [...code.matchAll(/<(?:input|textarea)\b/g)].map((m) => {
+        let depth = 0;
+        let quote = '';
+        for (let i = m.index; i < code.length; i++) {
+          const ch = code[i];
+          if (quote) {
+            if (ch === quote) quote = '';
+            continue;
+          }
+          if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+          else if (ch === '{') depth++;
+          else if (ch === '}') depth--;
+          else if (ch === '>' && depth === 0) return code.slice(m.index, i);
+        }
+        return code.slice(m.index);
+      });
+
+    const offenders: string[] = [];
+    let scanned = 0;
+    for (const rel of TOKENIZED_COMPONENTS) {
+      if (!rel.endsWith('.tsx')) continue;
+      if (EXEMPT.has(rel.split('/').pop()!)) continue;
+      const code = readRel(rel);
+      for (const tag of openingTags(code)) {
+        scanned++;
+        if (!/outline-none/.test(tag)) continue;
+        offenders.push(`${rel}:${code.slice(0, code.indexOf(tag)).split('\n').length}`);
+      }
+    }
+
+    /* Bảo đảm quét thật sự thấy thứ — không phải regex hỏng lặng lẽ xanh. */
+    expect(scanned, 'quét <input>/<textarea> không thấy thẻ nào — regex chắc hỏng').toBeGreaterThan(20);
+    expect(
+      offenders,
+      `ô nhập mất focus ring — bỏ outline-none (xem danh sách ngoại lệ ở test này): ${offenders.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('hover đổi màu chạy 150–300ms; 100ms chỉ dành cho chuyển động cơ học', () => {
+    /*
+     * Checklist `ui-ux-pro-max` hạng 7 (Animation): hover phải có transition
+     * mượt trong khoảng 150–300ms, nhưng "một duration cho mọi transition" cũng
+     * bị chê — timing phải theo ngữ cảnh.
+     *
+     * Nên test này bắt đúng `transition-colors` (phản hồi hover) và CỐ Ý bỏ qua
+     * `transition-transform` / `transition-opacity` ở 100ms: đó là mũi tên xoay
+     * và thanh fade, phải nhanh và cơ học thì mới không bị cảm giác dính.
+     */
+    const SLOW = /\btransition-colors\b[^\n]*?\bduration-(0|50|75|100)\b/g;
+    const offenders: string[] = [];
+    for (const rel of TOKENIZED_COMPONENTS) {
+      if (!rel.endsWith('.tsx')) continue;
+      const code = readRel(rel);
+      for (const [index, line] of code.split('\n').entries()) {
+        if (SLOW.test(line)) offenders.push(`${rel}:${index + 1}`);
+        SLOW.lastIndex = 0;
+      }
+    }
+
+    expect(offenders, `hover đổi màu dưới 150ms — lên duration-150: ${offenders.join(', ')}`).toEqual([]);
+  });
+
+  it('mọi màu tô màu cú pháp đều đạt WCAG AA trên nền code sáng', () => {
+    /*
+     * Checklist `ui-ux-pro-max` hạng 1 (Accessibility — CRITICAL), và đây là
+     * chỗ vỡ nặng nhất tìm được trong lần rà này.
+     *
+     * `components/syntax-highlight.tsx` từng dùng `vscDarkPlus` — theme TỐI
+     * của Visual Studio — trong khi nền ứng dụng là giấy trắng. Cả 14 màu
+     * trong theme đó dưới ngưỡng AA trên nền code sáng: chữ gốc 1.36:1,
+     * `string` 2.42:1, `comment` 3.06:1. Tức phần được tô màu RÕ nhất lại là
+     * phần MỜ nhất. Nguyên nhân: đổi nền sang sáng mà quên đổi theme tô màu.
+     *
+     * Nay theme tự dựng từ bảng màu §2, nên mọi màu đều là token đã có. Test
+     * này đo lại đúng con số đó từ CHÍNH source, nên đổi lại theme có sẵn
+     * (hoặc thêm một màu lạ) là test đỏ chứ không phải im lặng.
+     *
+     * Đo trên CẢ BA nền code có thể xảy ra: `.claude-code-block` dùng
+     * `--bg-base` (#fcfcfc), `PlainCode` dùng `bg-sunken` (#f7f7f7), còn theme
+     * tự khai `--surface-code` (#f5f5f5) cho `customStyle`. Nền sáng hơn thì
+     * tương phản thấp hơn, nên lấy đúng nền nhạt nhất là nghiêm nhất.
+     */
+    const AA = 4.5;
+    const readToken = (name: string) => {
+      const m = read(globalsCssPath).match(new RegExp(`^\\s*${name}:\\s*(\\d{1,3})\\s+(\\d{1,3})\\s+(\\d{1,3})`, 'm'));
+      if (!m) throw new Error(`globals.css không khai ${name}`);
+      return [Number(m[1]), Number(m[2]), Number(m[3])] as const;
+    };
+    const srgb = (c: number) => {
+      const v = c / 255;
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = ([r, g, b]: readonly number[]) =>
+      0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+    const ratio = (a: readonly number[], b: readonly number[]) => {
+      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+      return (hi + 0.05) / (lo + 0.05);
+    };
+
+    /* Theme tô màu chỉ được dùng token ĐÃ KHAI trong `:root`. */
+    const themeSrc = readRel('../components/syntax-highlight.tsx');
+    const tokenUse = [...themeSrc.matchAll(/var\(--([\w-]+)\)/g)].map((m) => m[1]!);
+    expect(
+      tokenUse.length,
+      'theme tô màu không dùng token nào — regex chắc hỏng, hoặc theme đã quay về hex thô',
+    ).toBeGreaterThan(20);
+
+    const BACKGROUNDS = [
+      ['--bg-base', readToken('--bg-base')],
+      ['--bg-sunken', readToken('--bg-sunken')],
+      ['--surface-code', readToken('--surface-code')],
+    ] as const;
+
+    /* Mỗi token CHỮ trong theme phải đạt AA trên mọi nền code.
+     *
+     * Loại trừ theo vai trò, không theo tên: `accent-soft` và `surface-code` là
+     * token NỀN (nền nhấn nhạt cho `.line-highlight`, nền khối code), đem
+     * đi đo tương phản chữ thì vô nghĩa — nó tự đối chiếu với chính nó được
+     * 1.00:1. `on-fill` là chữ trên nền bão hòa đậm, không liên quan khối code.
+     * Test này đã bắt đúng cái nhầm lẫn đó ở lần chạy đầu. */
+    const BACKGROUND_TOKENS = new Set(['accent-soft', 'surface-code', 'on-fill']);
+    const textTokens = [...new Set(tokenUse.filter((t) => !BACKGROUND_TOKENS.has(t)))];
+    expect(textTokens.length, 'không tìm được token chữ nào trong theme').toBeGreaterThan(5);
+
+    const failures: string[] = [];
+    for (const token of textTokens) {
+      const fg = readToken(`--${token}`);
+      for (const [bgName, bg] of BACKGROUNDS) {
+        const r = ratio(fg, bg);
+        if (r < AA) failures.push(`--${token} trên ${bgName}: ${r.toFixed(2)}:1 (< ${AA})`);
+      }
+    }
+    expect(failures, `màu tô màu cú pháp dưới WCAG AA:\n  ${failures.join('\n  ')}`).toEqual([]);
+
+    /* Chốt lại: theme KHÔNG được quay về theme có sẵn của thư viện.
+     *
+     * Chỉ soi import GIÁ TRỊ. `import type { PrismTheme }` là kiểu, không kéo
+     * theme nào về — lọc theo `import type` để guard này không tự bắt chính
+     * dòng khai báo kiểu của nó (đã xảy ra ở lần chạy đầu). Theme tối luôn được
+     * nạp qua `.../styles/prism` (barrel) hoặc `.../styles/prism/<tên>`; còn
+     * 18 import ngôn ngữ đi qua `.../languages/prism/...` nên không lẫn vào. */
+    const valueImports = [
+      ...themeSrc.matchAll(/^import\s+(?!type\b)[^;]*?from\s+'([^']+)'/gm),
+    ].map((m) => m[1]!);
+    const themeImports = valueImports.filter((u) => /\/styles\/prism(?:\/[\w-]+)?$/.test(u));
+    expect(
+      themeImports,
+      'theme tô màu lại nạp theme có sẵn của thư viện (vd vscDarkPlus) — màu nguồn phải là §2',
+    ).toEqual([]);
+
+    /* `PlainCode` (lúc chờ nạp chunk) cũng phải đủ tương phản — nó từng ghi
+     * màu chữ theme tối còn sót, chỉ 1.38:1 trên nền #f7f7f7. Cắt comment
+     * trước khi soi: chính chú thích giải thích lỗi đó có ghi lại giá trị cũ,
+     * và đó là tài liệu chứ không phải chỗ đang đặt màu. */
+    const plain = readRel('../components/markdown-renderer.tsx')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/[^\n]*/g, '');
+    expect(plain, 'PlainCode còn màu chữ hex/rgb thô thay vì token').not.toMatch(
+      /text-\[(?:rgb|rgba|hsl|hsla|#)/,
+    );
+  });
+
+  it('hover đổi màu trong globals.css cũng chạy 150ms trở lên', () => {
+    /*
+     * Test trên chỉ quét `.tsx`. Nó SỐNG SÓT qua `.claude-prose a` ghi
+     * `transition: color 100ms ease` — đúng cái mà test kia cấm, chỉ là viết
+     * bằng CSS thuần nên nằm ngoài tầm. Đây là lỗ hổng của chính bộ test:
+     * một rule chỉ soi nửa bề mặt thì bề mặt kia không được canh.
+     *
+     * `globals.css` là nơi DUY NHẤT viết transition dạng thuần, nên quét file
+     * đó là đủ phủ — không cần mở rộng sang file khác.
+     */
+    const css = read(globalsCssPath);
+    const offenders: string[] = [];
+    for (const m of css.matchAll(/transition:[^;}]*?(\d+)ms/g)) {
+      const line = css.slice(0, m.index).split('\n').length;
+      /* 100ms hợp lệ cho chuyển động cơ học — nhưng ở đây mọi `transition:`
+       * trong globals.css đều là phản hồi hover, nên lấy ngưỡng 150ms. */
+      if (Number(m[1]) < 150) offenders.push(`globals.css:${line} — ${m[0].trim()}`);
+    }
+    expect(offenders, `hover đổi màu trong CSS dưới 150ms: ${offenders.join(', ')}`).toEqual([]);
+  });
+
+  it('không còn cỡ chữ px tự chế nào lệch bậc trong thang 6 bậc', () => {
+    /*
+     * Checklist `ui-ux-pro-max` hạng 6: cỡ chữ phải theo thang có tên, không
+     * gõ px rời. Cỡ tự chế nằm ngoài thang thì không ai nhớ được có đúng một
+     * cỡ hay không — `text-[10.5px]` là ví dụ, lệch nửa px so với `meta`.
+     *
+     * Ngoại lệ HẸP — ghi theo CẶP (file, cỡ px), không theo cả file. Nếu miễn
+     * trừ nguyên file thì thêm `text-[19px]` vào `vyen-logo.tsx` cũng lọt, tức
+     * test im lặng đúng lúc cần nó đỏ. Danh sách này là CỠ TRƯNG BÀY (chữ
+     * wordmark, h1 màn hình trống, tiêu đề khối 16px) — thang 6 bậc không có
+     * bậc nào cho chúng, và nâng 16px lên `head` (20px) sẽ đổi diện mạo hai
+     * tiêu đề khối nên không tự ý làm trong lần rà checklist này. Xem
+     * DESIGN.md §9.3.
+     */
+    const DISPLAY_SIZES = new Map<string, Set<string>>([
+      ['../components/vyen-logo.tsx', new Set(['32', '16', '9.5'])],
+      ['../components/chat/message-list.tsx', new Set(['28'])],
+      ['../components/staging-panel.tsx', new Set(['16'])],
+      ['../components/workspace-checkpoints.tsx', new Set(['16'])],
+    ]);
+    const SCALE_PX = new Set(['10', '11', '12', '13', '15', '20']);
+    const offenders: string[] = [];
+    for (const rel of TOKENIZED_COMPONENTS) {
+      const allowed = DISPLAY_SIZES.get(rel) ?? new Set<string>();
+      /* Cắt comment: nhắc tên cỡ cũ trong chú thích là tài liệu, không phải
+       * chỗ đang đặt cỡ chữ. */
+      const code = readRel(rel)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/[^\n]*/g, '');
+      for (const m of code.matchAll(/\btext-\[(\d+(?:\.\d+)?)px\]/g)) {
+        if (!SCALE_PX.has(m[1]!) && !allowed.has(m[1]!)) {
+          const line = code.slice(0, m.index).split('\n').length;
+          offenders.push(`${rel}:${line} — text-[${m[1]}px]`);
+        }
+      }
+    }
+    expect(offenders, `cỡ chữ lệch thang 6 bậc:\n  ${offenders.join('\n  ')}`).toEqual([]);
   });
 
   it('app là dark-only: không có biến thể dark: nào trong component', () => {

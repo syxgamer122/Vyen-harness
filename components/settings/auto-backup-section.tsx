@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Folder, Loader2 } from 'lucide-react';
 import {
   backupNow,
   chooseBackupDirectory,
@@ -98,7 +98,11 @@ export function AutoBackupSection() {
         <div className="space-y-2">
           {dirName ? (
             <div className="flex items-center justify-between gap-2 border border-subtle bg-surface px-3 py-2 text-ui text-primary">
-              <span className="min-w-0 truncate">📁 {dirName}</span>
+              <span className="flex min-w-0 items-center gap-1.5">
+                {/* Icon SVG thay emoji 📁 — xem ghi chú ở memories-section.tsx. */}
+                <Folder size={13} aria-hidden="true" className="flex-shrink-0 text-tertiary" />
+                <span className="truncate">{dirName}</span>
+              </span>
               <button
                 type="button"
                 onClick={() => {

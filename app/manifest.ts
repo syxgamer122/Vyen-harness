@@ -2,12 +2,12 @@ import type { MetadataRoute } from 'next';
 
 /**
  * App LIGHT-ONLY (một theme, xem globals.css). `background_color` và
- * `theme_color` phải trùng `viewport.themeColor` của layout — cùng `#f2f2ef`.
+ * `theme_color` phải trùng `viewport.themeColor` của layout — cùng `#f7f7f7`.
  *
  * Đây là màu splash khi mở bằng "install as app", nên nó PHẢI khớp nền app:
  * lệch một bậc là thấy một vệt trắng/vàng nháy trước khi shell kịp vẽ.
  */
-const APP_BACKGROUND = '#f2f2ef';
+const APP_BACKGROUND = '#f7f7f7';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

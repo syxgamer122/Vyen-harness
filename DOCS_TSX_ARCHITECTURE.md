@@ -1,7 +1,7 @@
 # TÀI LIỆU THIẾT KẾ KIẾN TRÚC MÃ NGUỒN UI & FRONTEND (TSX) — DỰ ÁN VYEN
 > **Phiên bản**: v6.0 (Đồng bộ tuyệt đối sau Phase 6: OS-Level Sandboxing, CapBAC Subagent Mesh, Hardware Keyring & Standby OPFS, 65 file TSX, 183 test files — xem §3, §4, §6)  
 > **Cập nhật lúc**: 2026-09-26 (Phase 5: Direct Node bypass, Storage Fencing, Zombie cleanup, Dedicated Web Worker, SQLite WASM, OpenTelemetry Waterfall, 65 files TSX)  
-> **Mục đích tài liệu**: Cung cấp bản đặc tả kỹ thuật toàn diện, tuyệt đối chính xác về thiết kế mã nguồn, cấu trúc Component, luồng dữ liệu (Data Flow), cơ chế quản lý trạng thái (State Management), cơ chế an toàn duyệt mã (Human-in-the-Loop & Guardrails) của toàn bộ **67 file `.tsx`** (tổng cộng **17,073 dòng code** loại trừ trailing newlines, tương đương **17,140 dòng** khi tính cả dòng rỗng cuối file) trong dự án Vyen. Tài liệu này được thiết kế chuyên biệt để các hệ thống AI (Claude, GPT, Gemini...) phân tích, phản biện kiến trúc và đánh giá chất lượng kỹ thuật mà không cần truy cập trực tiếp vào hệ thống file.
+> **Mục đích tài liệu**: Cung cấp bản đặc tả kỹ thuật toàn diện, tuyệt đối chính xác về thiết kế mã nguồn, cấu trúc Component, luồng dữ liệu (Data Flow), cơ chế quản lý trạng thái (State Management), cơ chế an toàn duyệt mã (Human-in-the-Loop & Guardrails) của toàn bộ **67 file `.tsx`** (tổng cộng **17,184 dòng code** loại trừ trailing newlines, tương đương **17,251 dòng** khi tính cả dòng rỗng cuối file) trong dự án Vyen. Tài liệu này được thiết kế chuyên biệt để các hệ thống AI (Claude, GPT, Gemini...) phân tích, phản biện kiến trúc và đánh giá chất lượng kỹ thuật mà không cần truy cập trực tiếp vào hệ thống file.
 
 ---
 
@@ -135,17 +135,17 @@ RootLayout (app/layout.tsx)
 
 | # | Module | Đường Dẫn File | Số Dòng | Vai Trò Chính |
 |---|---|---|---|---|
-| 1 | **M1: Root** | `app/layout.tsx` | 81 | Root HTML, fonts, Dark-theme script chống FOUC, PWA registration |
+| 1 | **M1: Root** | `app/layout.tsx` | 66 | Root HTML, fonts (Inter + JetBrains Mono), PWA registration |
 | 2 | | `app/page.tsx` | 156 | Main page layout, phím tắt toàn cục, dynamic import Settings, `storage.persist()` |
 | 3 | | `app/error.tsx` | 78 | Route-level error boundary của App Router: bắt lỗi dựng trang, in lỗi kèm digest, nút Thử lại / Tải lại trang |
 | 4 | | `app/global-error.tsx` | 85 | Error boundary tầng gốc thay root layout: tự mang html/body và nạp global.css, hardcode màu nền inline để crash screen đọc được trước first-paint |
 | 5 | **M2: Core Harness** | `components/chat-interface.tsx` | 390 | Container điều phối tầng 3 (Presentational Container): Layout Grid, HUD, MessageList (gồm StreamBubble), StatusLine, Composer, và các Modal duyệt; thực thi client tool ủy thác cho orchestration (2.29%) |
-| 6 | | `components/sidebar.tsx` | 628 | Quản lý phiên chat, tìm kiếm fulltext tiếng Việt, workspace link |
-| 7 | | `components/composer.tsx` | 1,427 | Ô nhập đa năng, voice STT, slash commands, Draft Persist vào localStorage, 3-layer IME guard |
+| 6 | | `components/sidebar.tsx` | 633 | Quản lý phiên chat, tìm kiếm fulltext tiếng Việt, workspace link |
+| 7 | | `components/composer.tsx` | 1,426 | Ô nhập đa năng, voice STT, slash commands, Draft Persist vào localStorage, 3-layer IME guard |
 | 8 | | `components/context-meter.tsx` | 50 | Thước đo ngữ cảnh token (presentational `memo`, nhận `used`/`max` từ chat-interface) |
 | 9 | | `components/model-selector.tsx` | 462 | Dropdown chọn model phân nhóm theo nhà cung cấp & khả năng |
 | 10 | **M3: Message Tree** | `components/chat/message-list.tsx` | 608 | Danh sách tin nhắn ảo hóa TanStack Virtual, tách stream message ra ngoài virtualizer, width-aware LRU cache |
-| 11 | | `components/chat/message-item.tsx` | 641 | Hàng tin nhắn đơn lẻ, thinking block, inline edit, actions |
+| 11 | | `components/chat/message-item.tsx` | 642 | Hàng tin nhắn đơn lẻ, thinking block, inline edit, actions |
 | 12 | | `components/branch-switcher.tsx` | 74 | Nút chuyển đổi qua lại giữa các nhánh anh em (`< 1/3 >`) |
 | 13 | | `components/chat/tool-trace.tsx` | 957 | Hiển thị chi tiết gọi tool (args, execution state, output fold) |
 | 14 | | `components/chat/status-line.tsx` | 332 | Thanh trạng thái hoạt động: model, hints, tokens, telemetry |
@@ -153,9 +153,9 @@ RootLayout (app/layout.tsx)
 | 16 | | `components/chat/orchestrator-badge.tsx` | 151 | Huy hiệu phân biệt tin nhắn sinh ra từ Orchestrator Sweep |
 | 17 | | `components/message-status-badge.tsx` | 50 | Badge trạng thái tin nhắn (sending, delivered, error, aborted) |
 | 18 | | `components/evidence-badge.tsx` | 63 | Huy hiệu minh chứng bậc thang (Zero-Mem Evidence Level) |
-| 19 | | `components/chat/stream-bubble.tsx` | 141 | Khung hiển thị tin nhắn streaming độc lập nằm ngoài TanStack Virtualizer, loại bỏ layout measurement thrashing |
-| 20 | **M4: Rich Content** | `components/markdown-renderer.tsx` | 443 | Bộ dựng Markdown chuẩn GFM, KaTeX math, dynamic syntax gate |
-| 21 | | `components/syntax-highlight.tsx` | 77 | Tô màu code Prism 18 ngôn ngữ, nạp lười giảm bundle |
+| 19 | | `components/chat/stream-bubble.tsx` | 140 | Khung hiển thị tin nhắn streaming độc lập nằm ngoài TanStack Virtualizer, loại bỏ layout measurement thrashing |
+| 20 | **M4: Rich Content** | `components/markdown-renderer.tsx` | 451 | Bộ dựng Markdown chuẩn GFM, KaTeX math, dynamic syntax gate |
+| 21 | | `components/syntax-highlight.tsx` | 158 | Tô màu code Prism 18 ngôn ngữ, nạp lười giảm bundle |
 | 22 | | `components/highlight.tsx` | 28 | Highlight từ khóa tìm kiếm tiếng Việt không dấu |
 | 23 | **M5: Human-In-The-Loop** | `components/diff-confirm.tsx` | 508 | Modal duyệt diff dòng (unified diff) trước khi ghi đĩa |
 | 24 | | `components/shell-confirm.tsx` | 183 | Modal duyệt chạy lệnh terminal shell, cảnh báo lệnh phá hủy |
@@ -178,8 +178,8 @@ RootLayout (app/layout.tsx)
 | 41 | | `components/mcp/mcp-settings-panel.tsx` | 576 | Quản lý máy chủ MCP trong Desktop: kết nối stdio/SSE/HTTP, expose mode |
 | 42 | | `components/settings/memory-tab.tsx` | 62 | Quản lý ký ức 3 giai đoạn (Reviewer gate, Approved, Zero-Mem) |
 | 43 | | `components/settings/data-tab.tsx` | 213 | Backup/Restore JSON & MD, định kỳ tự động, hạn ngạch storage, thống kê token |
-| 44 | | `components/settings/auto-backup-section.tsx` | 147 | Cấu hình tự động sao lưu ngầm qua File System Access API |
-| 45 | | `components/settings/memories-section.tsx` | 328 | Danh sách ký ức dài hạn theo category, tags và xóa/sửa |
+| 44 | | `components/settings/auto-backup-section.tsx` | 151 | Cấu hình tự động sao lưu ngầm qua File System Access API |
+| 45 | | `components/settings/memories-section.tsx` | 357 | Danh sách ký ức dài hạn theo category, tags và xóa/sửa |
 | 46 | | `components/settings/slash-commands-section.tsx` | 190 | Quản lý danh sách lệnh gõ tắt `/` tùy biến |
 | 47 | | `components/settings/vision-model-section.tsx` | 70 | Chọn model thị giác phân tích ảnh cho workspace và MCP |
 | 48 | | `components/settings/section-loading.tsx` | 17 | Skeleton placeholder hiển thị khi tab đang nạp |
@@ -208,7 +208,7 @@ RootLayout (app/layout.tsx)
 ## 4. ĐẶC TẢ CHI TIẾT 65 FILE TSX THEO 8 MODULE & NÂNG CẤP TRỌNG YẾU
 
 ### Module 1: Next.js App Router Root Layer (4 files)
-- **`app/layout.tsx` (81 dòng)**:
+- **`app/layout.tsx` (66 dòng)**:
   - Khởi tạo khung HTML root, fonts hệ thống, inject inline theme script chống hiện tượng nhấp nháy giao diện (FOUC).
   - Mount component `PWARegister` (`components/pwa-register.tsx`) để đăng ký Service Worker và lắng nghe cập nhật phiên bản client.
 - **`app/page.tsx` (156 dòng)**:
@@ -232,10 +232,10 @@ RootLayout (app/layout.tsx)
   - **Funnel Deny & Shell Safety**: cổng deny policy `isToolDenied(toolCall.toolName, toolPermissions)` chặn trước desktop-only gate và switch thực thi, ngay trong `rawHandleClientToolCall` (canh bởi `tests/tool-deny.test.ts`).
   - **Approval Bridge**: Trọng tài duyệt tập trung `ApprovalQueue` (`useApprovalBridge`), một modal tại một thời điểm, tự động hủy bỏ khi chuyển nhánh (`activeLeafId`) hoặc dừng lượt.
   - **Audit Logging Tamper-Evident**: Ghi nhật ký kiểm toán hash chain cho mọi hành động duyệt/từ chối kèm payload, đối soát anchor đĩa ngoài workspace.
-- **`components/sidebar.tsx` (628 dòng)**:
+- **`components/sidebar.tsx` (633 dòng)**:
   - Quản lý cây danh sách phiên chat, tìm kiếm full-text tiếng Việt có fold dấu (`foldText`), nhóm lịch sử theo ngày (`date-groups.ts`).
   - Hỗ trợ đổi tên inline, ghim cuộc trò chuyện, xuất dữ liệu và banner tự động nhận diện kết nối lại thư mục workspace tương ứng.
-- **`components/composer.tsx` (1,427 dòng)**:
+- **`components/composer.tsx` (1,426 dòng)**:
   - **Draft Persistence Engine (P2)**: Tự động lưu bản nháp vào `localStorage['vyen:draft:${chatId}']` với debounce 300ms. Đồng bộ flush draft khi đổi `chatId`, khi đóng tab/refresh (`beforeunload`), và khi unmount. Khôi phục hoàn hảo bản nháp kể cả khi `ChatErrorBoundary` reset.
   - **3-Layer IME Composition Guard**: Kiểm soát chặt chẽ 3 tầng điều kiện (`composingRef`, `nativeEvent.isComposing`, `keyCode === 229`) loại bỏ triệt để lỗi vô tình gửi tin nhắn sớm khi gõ phím Enter để bỏ dấu tiếng Việt Telex/VNI (tại dòng 626-630).
   - Tích hợp voice STT Web Speech API, menu gõ tắt `/`, TaskMenu và bộ chọn model.
@@ -249,7 +249,7 @@ RootLayout (app/layout.tsx)
   - **Virtualizer Stream Separation (P2)**: Tách tin nhắn trợ lý đang stream (`isLoading && lastMsg.role === 'assistant'`) ra khỏi `rowVirtualizer`, cố định ở sticky container độc lập nhằm triệt tiêu hoàn toàn layout thrashing đo đạc chiều cao liên tục theo từng token ký tự.
   - **Width-Aware LRU `HEIGHT_CACHE` (P2)**: Bộ nhớ đệm chiều cao tin nhắn bổ sung bucket chiều rộng container (`${chatId}:${id}:${widthBucket}`) với dung lượng LRU 2,000 mục, loại bỏ rung giật cuộn trang khi co giãn sidebar.
   - **Smooth Stream Transition**: Sử dụng hook `prevLoadingRef` để bắt thời điểm kết thúc stream (`isLoading: true -> false`), tự động kích hoạt `rowVirtualizer.measure()` và `pin(400)` ghim mượt mà.
-- **`components/chat/message-item.tsx` (641 dòng)**:
+- **`components/chat/message-item.tsx` (642 dòng)**:
   - Hiển thị từng turn hội thoại (user/assistant), khối suy luận collapsible, các nút hành động (sao chép, sửa tin nhắn cũ, rẽ nhánh mới, retry).
 - **`components/branch-switcher.tsx` (74 dòng)**:
   - Điều hướng giữa các nhánh hội thoại song song (`< 1/3 >`), hỗ trợ phím tắt và swipe.
@@ -265,13 +265,13 @@ RootLayout (app/layout.tsx)
   - Trạng thái tin nhắn: đang gửi, đã nhận, lỗi mạng, hoặc đã hủy (`aborted`).
 - **`components/evidence-badge.tsx` (63 dòng)**:
   - Huy hiệu hiển thị cấp độ bằng chứng ngữ cảnh từ bộ nhớ Zero-Mem (`<zero-mem-evidence>`).
-- **`components/chat/stream-bubble.tsx` (141 dòng)**:
+- **`components/chat/stream-bubble.tsx` (140 dòng)**:
   - Khung hiển thị tin nhắn streaming độc lập nằm ngoài TanStack Virtualizer, loại bỏ layout measurement thrashing khi nhận token liên tục từ model; tích hợp Handoff Grace Period triệt tiêu CLS giật khung nhìn khi hoàn tất stream; hỗ trợ khối suy luận collapsible và nút dừng trực tiếp.
 
 ### Module 4: Rich Content, Markdown & Code Rendering (3 files)
-- **`components/markdown-renderer.tsx` (443 dòng)**:
+- **`components/markdown-renderer.tsx` (451 dòng)**:
   - Bộ dựng Markdown chuẩn GitHub Flavored Markdown (GFM), hỗ trợ công thức toán học KaTeX (`remark-math`, `rehype-katex`), bảng biểu, và nạp code block qua dynamic gate.
-- **`components/syntax-highlight.tsx` (77 dòng)**:
+- **`components/syntax-highlight.tsx` (158 dòng)**:
   - Tô màu cú pháp Prism cho 18 ngôn ngữ lập trình phổ biến, nạp lười theo yêu cầu để tối ưu bundle size ban đầu.
 - **`components/highlight.tsx` (28 dòng)**:
   - Tô màu từ khóa tìm kiếm tiếng Việt không phân biệt dấu trong danh sách chat và nội dung tin nhắn.
@@ -331,13 +331,13 @@ RootLayout (app/layout.tsx)
   - Quản lý danh sách lệnh gõ tắt `/` tùy biến (custom macros/prompts), thêm/sửa/xóa mẫu lệnh gõ nhanh trong ô soạn thảo composer.
 - **`components/settings/memory-tab.tsx` (62 dòng)**:
   - Tab trung tâm quản trị bộ nhớ, nhúng danh sách ký ức dài hạn `MemoriesSection` và panel ký ức cấu trúc `AgentMemorySection`.
-- **`components/settings/memories-section.tsx` (328 dòng)**:
+- **`components/settings/memories-section.tsx` (357 dòng)**:
   - Quản lý danh sách ký ức dài hạn lưu trong IndexedDB: phân loại category, tìm kiếm, lọc tags, chỉnh sửa nội dung và xóa từng mục.
 - **`components/settings-agent-memory.tsx` (278 dòng)**:
   - Panel quản lý bộ nhớ agent cấu trúc chuyên sâu: xem tóm tắt bộ nhớ, trần token cho injection memory, và xóa cache ký ức.
 - **`components/settings/data-tab.tsx` (213 dòng)**:
   - Tab quản lý dữ liệu: Sao lưu/phục hồi JSON & MD toàn bộ chat/settings, cấu hình tự động sao lưu `AutoBackupSection`, nhúng `StorageQuotaMeter` và `UsageStats`.
-- **`components/settings/auto-backup-section.tsx` (147 dòng)**:
+- **`components/settings/auto-backup-section.tsx` (151 dòng)**:
   - Cấu hình tự động sao lưu dữ liệu ngầm ra file đĩa máy khách định kỳ qua File System Access API.
 - **`components/settings/section-loading.tsx` (17 dòng)**:
   - Skeleton loading placeholder hiển thị chuyển tiếp mượt mà khi nạp lười các tab và section cài đặt.

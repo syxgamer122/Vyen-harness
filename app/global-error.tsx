@@ -33,9 +33,9 @@ export default function GlobalError({
       */}
       <body
         className="flex h-dvh flex-col items-center justify-center rounded-xl bg-sunken p-4 font-sans text-primary"
-        style={{ backgroundColor: '#f2f2ef', color: '#18181b' }}
+        style={{ backgroundColor: '#f7f7f7', color: '#18181b' }}
       >
-        <div className="w-full max-w-md lift-lg rounded-ink border-2 border-default bg-surface p-6 text-center shadow-lift-lg">
+        <div className="w-full max-w-md lift-lg rounded-xl border border-subtle bg-surface p-6 text-center shadow-lift-lg">
           <h1 className="mb-1 text-base font-semibold text-primary">
             Sự cố ứng dụng ngoài dự kiến
           </h1>

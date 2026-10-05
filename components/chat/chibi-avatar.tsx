@@ -39,7 +39,7 @@ export function ChibiAvatar({
         {isUser ? (
           <>
             {/* Đầu tròn hơi lệch — tròn hoàn hảo thì thành icon app, không thành vẽ tay */}
-            <path d="M12 4.2c4.1 0 7 2.8 7 6.4 0 3.6-3.1 6.3-7 6.3-3.9 0-7-2.7-7-6.3 0-3.6 2.9-6.4 7-6.4Z" fill="rgb(var(--accent-mint) / 0.35)" />
+            <path d="M12 4.2c4.1 0 7 2.8 7 6.4 0 3.6-3.1 6.3-7 6.3-3.9 0-7-2.7-7-6.3 0-3.6 2.9-6.4 7-6.4Z" fill="rgb(var(--accent-soft))" />
             {/* Mắt: hai chấm nghiêng nhẹ, như mắt khi đang nhìn */}
             <path d="M9.4 11.1h.01M14.6 11.1h.01" strokeWidth="2.6" />
             {/* Cười: một nét cong duy nhất */}
@@ -48,7 +48,7 @@ export function ChibiAvatar({
         ) : (
           <>
             {/* Vuông-vòng: một nét góc vát ở gáy, khác hẳn hình tròn của user */}
-            <path d="M6.6 7.4 9 5.2h6l2.4 2.2v8.4l-2.4 2.2H9l-2.4-2.2V7.4Z" fill="rgb(var(--accent-mint) / 0.5)" />
+            <path d="M6.6 7.4 9 5.2h6l2.4 2.2v8.4l-2.4 2.2H9l-2.4-2.2V7.4Z" fill="rgb(var(--accent-soft))" />
             {/* Mắt: hai chấm đặc, "máy" hơn "người" */}
             <path d="M9.3 11.6h.01M14.7 11.6h.01" strokeWidth="2.6" />
             {/* Miệng: nét ngang, không cười — bot không diễn cảm */}
