@@ -995,17 +995,40 @@ async function launch() {
     const fallbackOpen = () => {
       try {
         console.log(`[vyen-launcher] Mở trình duyệt mặc định: ${targetUrl}`);
+        /* Gán biến trước để dùng chung cho cả ba nhánh bên dưới. */
+        let proc;
         if (process.platform === 'win32') {
-          spawn('cmd.exe', ['/c', 'start', '""', targetUrl], {
+          proc = spawn('cmd.exe', ['/c', 'start', '""', targetUrl], {
             detached: true,
             stdio: 'ignore',
             windowsVerbatimArguments: true,
           });
         } else if (process.platform === 'darwin') {
-          spawn('open', [targetUrl], { detached: true, stdio: 'ignore' });
+          proc = spawn('open', [targetUrl], { detached: true, stdio: 'ignore' });
         } else {
-          spawn('xdg-open', [targetUrl], { detached: true, stdio: 'ignore' });
+          proc = spawn('xdg-open', [targetUrl], { detached: true, stdio: 'ignore' });
         }
+
+        /*
+         * `spawn` KHÔNG throw khi thiếu binary — nó trả về ChildProcess rồi
+         * emit `'error'` ở tick sau. Nên `try/catch` bao quanh KHÔNG bắt được
+         * lỗi này, và không có handler thì Node ném `Unhandled 'error' event`
+         * rồi GIẾT CẢ TIẾN TRÌNH — tức là mở được server Next.js rồi vẫn
+         * chết vì không mở được cửa sổ trình duyệt.
+         *
+         * Đúng trong container/SSH/CI (không có GUI): `xdg-open` không tồn
+         * tại. Server đã sẵn sàng, in "Server đã sẵn sàng", rồi chết — người
+         * dùng tưởng app lỗi trong khi app đang chạy tốt.
+         *
+         * Không mở được cửa sổ KHÔNG phải lỗi chí mạng: chỉ cảnh báo rồi để
+         * server chạy tiếp. Nhánh `browserBin` ở dưới đã làm đúng thế này.
+         */
+        proc.on('error', (err) => {
+          console.warn(
+            '[vyen-launcher] Không mở được cửa sổ trình duyệt (bỏ qua, server vẫn chạy):',
+            err?.message || err,
+          );
+        });
       } catch (err) {
         console.warn('[vyen-launcher] Lỗi khi mở fallback browser:', err?.message || err);
       }
