@@ -38,10 +38,10 @@ Ba cái bẫy ngôn ngữ, đều đã gặp và đã sửa — đừng "sửa n
   components/ và app/`): còn nằm trong JSX nhưng không còn sinh CSS. Danh sách cấm
   là hằng số `DEAD_CLASSES` trong test — class mới chết mà không có tên trong danh
   sách thì lọt. Đừng tin một class chỉ vì nó còn trong code.
-- **Ba chỗ ghi chữ "dark-only"** (`tailwind.config.ts` phần đầu, tên assertion ở
-  ràng buộc 6, khối `.dark` no-op `globals.css:121`): chúng đều mang nghĩa **"không
-  có nhánh tối"**, không phải "giao diện màu tối". Ứng dụng có nền trắng. Đọc sai
-  từ này là dựng lại cả nhánh sáng mà không ai đòi.
+- **Khối `.dark` trong `globals.css:121` là no-op có chủ đích.** Nó khai
+  `color-scheme: light`, không phải `dark`, để một class `dark` rơi sót chỉ làm
+  form control của trình duyệt đổi bảng màu chứ không dựng lại cả theme. Đừng xoá
+  khối đó và đừng biến nó thành theme tối.
 - **`--panel-bg`, `--status-warning`, `--text-primary`** là alias của §2.6, đều trỏ
   đúng giá trị token thật. Chúng không phải màu mới; đổi tên không đổi màu.
 
@@ -62,7 +62,8 @@ Ba cái bẫy ngôn ngữ, đều đã gặp và đã sửa — đừng "sửa n
 | [8](#8-z-index) | Thang z-index (`lib/ui-z.ts`) + [8.1](#81-bề-mặt-overlay--menu-popover-dialog-toast) bề mặt overlay |
 | [9](#9-drift-đã-biết--chưa-migrate) | **Drift đã biết / chưa migrate** — mục quan trọng nhất |
 | [10](#10-hợp-đồng-được-kiểm-chứng-bằng-gì) | Test kiểm chứng cái gì, và cái nó **không** kiểm |
-| [11](#11-kiểm-chứng-theo-checklist-ui-ux-pro-max-đợt-2) | Kiểm chứng theo checklist `ui-ux-pro-max` — mục nào sửa, mục nào cố ý giữ |
+| [11](#11-nhật-ký-rà-soát-giao-diện-checklist-ui-ux-pro-max) | **Nhật ký rà soát** `ui-ux-pro-max` — lịch sử, không phải spec |
+| [12](#12-nghiệm-thu-giao-diện) | Nghiệm thu giao diện — phần không test tự động |
 
 ---
 
@@ -109,10 +110,15 @@ trắng; `sunken` và `base` lệch 2–4 điểm.
 
 | Token | HEX | Tương phản trên `#fff` | Dùng cho |
 |---|---|---|---|
-| `text-primary` | `#18181b` | **16.4:1** | nội dung chính |
+| `text-primary` | `#18181b` | **17.7:1** | nội dung chính |
 | `text-secondary` | `#575757` | **7.2:1** | mô tả, nhãn phụ, metadata |
 | `text-tertiary` | `#6f6f6f` | **5.0:1** | nhãn nhóm, gợi ý, dấu thời gian |
-| `text-disabled` | `#a3a3a3` | 2.6:1 | control bị vô hiệu — WCAG miễn trừ |
+| `text-disabled` | `#a3a3a3` | 2.5:1 | control bị vô hiệu — WCAG miễn trừ |
+
+Số trong bảng đo trên `#fff`. Chữ không phải lúc nào cũng nằm trên nền trắng, nên
+đo lại trên nền nó thật sự nằm: `tertiary` 4.69:1 trên `#f7f7f7`, 4.61:1 trên
+`#f5f5f5` — vẫn qua AA nhưng dưới 5:1. Chữ nào tiến sát ngưỡng thì đừng đặt lên
+nền xám; `secondary` và `primary` thì dư sức ở mọi nền của hệ.
 
 `text-disabled` không phải "mờ hơn tertiary" mà là **"không dùng được"** — đừng
 dùng nó cho nội dung.
@@ -125,13 +131,20 @@ không mang thông tin chữ.
 
 | Token | HEX | Tương phản | Dùng cho |
 |---|---|---|---|
-| `subtle` | `#e5e5e5` | 1.2:1 | đường phân cách **giữa các dòng trong một khối** |
-| `default` | `#949494` | **3.03:1** | ranh giới **control** — input, nút, ô chọn |
-| `strong` | `#525252` | 6.4:1 | hover / focus / selected |
+| `subtle` | `#e5e5e5` | 1.26:1 | đường phân cách **giữa các dòng trong một khối** |
+| `default` | `#949494` | **3.03:1** trên nền trắng, **2.78:1** trên `#f5f5f5` | ranh giới **control** — input, nút, ô chọn |
+| `strong` | `#525252` | 7.8:1 | hover / focus / selected |
 
 `default` đạt 3:1 là yêu cầu của WCAG 1.4.11 cho ranh giới control. Đây là lý do
  nó không xuống `#d4d4d4` cho "nhẹ hơn": viền input nhạt hơn 3:1 là **không nhìn
 thấy**, mà ô nhập không nhìn thấy thì không phải ô nhập.
+
+**Nhưng 3:1 chỉ đúng trên nền trắng.** `default` trên `#f5f5f5` là 2.78:1, trên
+`#f7f7f7` là 2.83:1 — tức dưới ngưỡng. Nên luật thực dụng của hệ là: control trên
+nền `surface` / `overlay` (trắng) dùng `default`; control trên nền `raised` /
+`sunken` dùng `subtle` và **phải** có khác biệt nền đi kèm — đó là thứ phân
+ranh giới thật, vì WCAG 1.4.11 đòi tín hiệu nhận diện, không đòi riêng viền đạt 3:1
+khi control đã có nền khác. Đo lại khi thêm control mới, đừng copy 3.03:1 từ đây.
 
 Viền luôn **1px**. Viền 2px là dấu hiệu của hệ cũ (nét mực) và đã bị gỡ khỏi toàn
 bộ recipe trong `globals.css` cùng 7 call site trong component.
@@ -141,7 +154,7 @@ bộ recipe trong `globals.css` cùng 7 call site trong component.
 | Token | HEX | Dùng cho |
 |---|---|---|
 | `accent` | `#2a7360` | nhấn chủ đạo: link, con trỏ, viền focus — 5.6:1 |
-| `accent-dim` | `#7fb8a6` | nhấn bị tắt, cột biểu đồ — 4.0:1 (đạt 3:1 cho vật thể đồ hoạ) |
+| `accent-dim` | `#7fb8a6` | nhấn bị tắt, cột biểu đồ, chấm trạng thái — **2.26:1** trên trắng, 2.07:1 trên `#f5f5f5`: **dưới** ngưỡng 3:1 cho vật thể đồ hoạ. Xem §9.5 |
 | `accent-soft` | `#f0f4f3` | **nền** nhấn nhạt — tag active, bubble người dùng |
 | `on-fill` | `#ffffff` | chữ trên nền tô đậm |
 | `success` / `warning` / `danger` / `info` | `#167a4a` / `#9a6206` / `#b3261e` / `#0369a1` | trạng thái |
@@ -176,8 +189,15 @@ và đó chính là thứ làm bảng màu loãng.
 
 | Họ | Font | Dùng cho |
 |---|---|---|
-| `sans` | Inter | **toàn bộ** nhãn, nút, tiêu đề, prose dài của assistant |
-| `mono` | JetBrains Mono | mọi thứ do máy sinh ra: code, token, id, đường dẫn, hash, timestamp |
+| `mono` | JetBrains Mono | **mặc định cho control và nhãn** trong khối công cụ, và mọi thứ do máy sinh ra: code, token, id, đường dẫn, hash, timestamp |
+| `sans` | Inter | prose đọc dài (`.claude-prose` kế thừa từ preflight) và chữ trang trí — wordmark, avatar |
+
+Sai lệch này từng được ghi ngược trong tài liệu: bảng cũ nói sans cho "toàn bộ
+nhãn, nút", nhưng code thì ngược lại — `font-mono` có mặt ở 48 file
+`components/` + `app/`, `font-sans` chỉ 10 file, và các recipe `.menu-item`,
+`.field-label`, `.btn-primary` đều khai `font-mono`. Sửa bảng cho đúng code, không
+đổi code: mono là lựa chọn có chủ đích cho giao diện công cụ, sans dành cho chữ
+đọc. Nếu đổi chiều này thì đổi cả hai bên cùng lúc, không sửa riêng bảng.
 
 Chữ vẽ tay (Patrick Hand) **đã bị gỡ khỏi hệ**. Lý do đo được, không phải thẩm
 mỹ: Patrick Hand chỉ có **một nét** (weight 400), nên phân cấp đậm/nhạt buộc
@@ -213,13 +233,28 @@ còn mỗi lần đổi tên class thì an toàn.
 |---|---|---|
 | `none` | 0 | — |
 | `sm` | 4 | chip nhỏ, badge, ô inline |
-| `DEFAULT` | 6 | control nhỏ, ô nhập một dòng |
-| `md` | 8 | control: nút, menu item |
-| `lg` | 10 | control: nút, input, menu item |
-| `xl` | 12 | khối nội dung: thẻ settings, panel |
+| `DEFAULT` | 6 | control nhỏ, chip |
+| `md` | 8 | nút icon (`.icon-btn`) |
+| `lg` | 10 | **control chính**: nút (`.btn-*`), ô nhập (`.field`), hàng menu (`.menu-item`) |
+| `xl` | 12 | khối nội dung: thẻ settings, panel, vỏ overlay (`.surface-panel`) |
 | `2xl` | 16 | khối lớn: bubble, khung modal, vỏ composer |
 | `3xl` | 20 | dự phòng, lớn hơn mọi khối đang dùng |
 | `full` | 9999 | hình tròn |
+
+**Mặc định theo component** — đọc bảng trên khi phân vị, còn đây là câu trả lời
+cho câu hỏi "control này bo bao nhiêu":
+
+| Loại | Bo góc | Recipe |
+|---|---|---|
+| Chip, badge, ô inline | 4px (`sm`) | — |
+| Nút icon | 8px (`md`) | `.icon-btn` |
+| Nút, ô nhập, hàng menu, trigger | 10px (`lg`) | `.btn-primary`, `.field`, `.menu-item` |
+| Khối nội dung, vỏ overlay | 12px (`xl`) | `.surface-panel` |
+| Khung modal, vỏ composer | 16px (`2xl`) | `settings-dialog.tsx` |
+
+Ba bậc `DEFAULT` / `md` / `lg` trước đây đều được ghi là "control", nên không ai
+biết chọn bậc nào. Bảng trên chốt lại: **control chính là `lg` 10px**, và đó là
+thứ code đang làm — đừng "sửa" recipe về 8px chỉ vì 8px tròn hơn.
 
 **Dạng bất đối xứng (`ink`/`wobble`) đã bị gỡ khỏi hệ.** Hai lý do:
 
@@ -373,8 +408,10 @@ overlay là sửa điện mạo của nhiều màn hình cùng lúc: đọc hế
 
 **Hàng trong menu:**
 
-- Recipe `.menu-item` là mặc định: `rounded-lg px-3 py-2 text-ui font-mono`, hover
-  `bg-raised`, chuyển màu `duration-150`. Hàng nguy hiểm thêm `.menu-item-danger`.
+- Recipe `.menu-item` là mặc định: `rounded-lg px-3 py-2 text-ui font-mono`,
+  hover `bg-raised`, chuyển màu `duration-150`. Hàng nguy hiểm thêm `.menu-item-danger`.
+  (`font-mono` ở đây là quy ước chung của hệ — xem §3, không phải ngoại lệ riêng
+  của menu.)
 - Hàng cần vùng chạm 44px thì viết tay và **ghi rõ vì sao**:
   `min-h-11 rounded-lg px-2.5 py-2` (`model-selector.tsx:275`).
 - Chọn / hover dùng `bg-raised` — hệ này không có token `menu-hover` riêng. Đừng tô
@@ -420,8 +457,8 @@ mới) — chúng gây **tên sai**, nên đọc code không phản ánh hệ th
 ### 9.2 Số liệu của hệ mới
 
 - **24 key, 20 giá trị hex phân biệt.** Bảng sáng cố ý dùng lại một màu cho nhiều
-  vai trò — `#ffffff` cho `surface`/`overlay`/`on-fill`, `#18181b` cho
-  `primary`/`strong`, `#575757` cho `secondary`/`diff-ctx` — vì trên giấy trắng,
+  vai trò — `#ffffff` cho `surface`/`overlay`/`on-fill`, `#575757` cho
+  `secondary`/`diff-ctx`, `#b3261e` cho `danger`/`diff-del` — vì trên giấy trắng,
   "nền" và "chữ trên nền tô đậm" là hai câu hỏi khác nhau về CÙNG một màu. Test
   đếm **giá trị** sau khi khử trùng, nên con số 20 là đúng chứ không phải thiếu sót.
 - **Chiều sâu đi qua 4 class.** `.lift-sm` / `.lift-md` / `.lift-lg` / `.well` được
@@ -479,6 +516,23 @@ xem §3.
   đúng (40 = `dropdown`), nên màn hình không sai — nhưng nó vi phạm §8 và là hàng
   thứ 12 trong số overlay nên lấy số từ `lib/ui-z.ts` (11 component còn lại đều gọi
   `Z_CLASS`). Sửa là đổi một chữ, không đổi diện mạo.
+
+### 9.5 Vòng đo lại tương phản — phát hiện được, đợt này KHÔNG sửa code
+
+Các tỉ lệ trong §2 được đo tay và **không test canh** (§10.2). Một vòng đo lại bằng
+công thức WCAG trên bảng màu thật bắt được bốn điều. Đợt này chỉ sửa **tài liệu**,
+nên ba điều đầu vẫn nằm nguyên trong code và được ghi lại ở đây làm việc còn treo:
+
+| Phát hiện | Trạng thái |
+|---|---|
+| `accent-dim` `#7fb8a6` chỉ **2.26:1** trên trắng, 2.07:1 trên `#f5f5f5`. Comment trong `globals.css:59` vẫn ghi "4.0:1, đạt 3:1 cho vật thể đồ hoạ" — sai. Token đang tô cột biểu đồ (`usage-stats.tsx:109`, `telemetry-tab.tsx:209`) và chấm trạng thái (`status-line.tsx:80`), tức đúng loại vật thể mà 1.4.11 đòi 3:1 | **Chưa sửa.** Hướng đã đo thử: hạ xuống `#519a85` → 3.05:1 trên `#f5f5f5`, 3.33:1 trên trắng, giữ nguyên tông. Khi nào sửa thì phải sửa đồng bộ `tailwind.config.ts`, `:root`, bảng màu của test và §2.4 |
+| Chấm trí đầu vỏ Settings vẽ `bg-accent-dim` với `text-accent` → **2.50:1**, fail AA ở chữ cỡ `micro` (`settings-dialog.tsx:196`) | **Chưa sửa.** Hướng đã đo thử: nền `bg-accent-soft` → `accent` trên đó là 5.09:1 |
+| Số trong bảng §2 đo trên nền khác với nhãn cột: `primary` ghi 16.4:1 "trên `#fff`" nhưng trên `#fff` thật là 17.72:1 (con số 16.4 khớp `#f7f7f7`); `strong` ghi 6.4:1, thật là 7.81:1 | **Đã sửa trong §2** — nhưng comment cũ ở `globals.css:44,55` vẫn ghi số cũ, vì đợt này không đụng code |
+| `border-default` trên nền `bg-raised` là 2.78:1 (`shell-confirm.tsx:159`, `branch-switcher.tsx:39`) | **Cố ý để nguyên.** Ở đó viền không phải tín hiệu nhận diện duy nhất — control có nền `raised` khác nền trang và có chữ bên trong — nên vẫn thoát 1.4.11 theo nghĩa "có tín hiệu nhận diện". Đổi sang `strong` sẽ thắt chặt hơn thiết kế hiện tại |
+
+Cùng đợt đó, comment trong `tests/design-system.test.ts` cũng còn ghi `#18181b` dùng
+cho cả `primary` lẫn `strong` — `hex.strong` thật là `#525252`. §9.2 đã sửa; test thì
+để nguyên.
 
 ---
 
@@ -545,7 +599,12 @@ này.
 
 ---
 
-## 11. Kiểm chứng theo checklist `ui-ux-pro-max` (đợt 2)
+## 11. Nhật ký rà soát giao diện (checklist `ui-ux-pro-max`)
+
+> Đây là **lịch sử rà soát**, không phải spec. Spec nằm ở §1–§10 và §12; giữ mục
+> này nguyên trạng vì nó là bằng chứng cho các quyết định đã gỡ (bóng lệch cứng,
+> bo bất đối xứng, chữ vẽ tay, theme tô màu sai nền). Tách nó sang một file nhật ký
+> riêng là một commit dịch chuyển thuần, không có gì thay đổi nội dung.
 
 Sau khi hệ tối giản vào chỗ, UI được soi lại theo checklist 10 hạng của skill
 `ui-ux-pro-max`. Ba thứ phải sửa, phần còn lại đã đạt hoặc cố ý giữ:
@@ -651,3 +710,26 @@ chắc chúng đỏ **đúng lý do**:
   tế của bảng màu cú pháp mới** — màu nào đứng cạnh màu nào, có đọc được không khi
   quét mắt nhanh — thì chỉ nhìn trong trình duyệt mới kết luận được. Đổi theme xong
   mà không nhìn thì mới phải chỉnh tay, và mức chỉnh tay có thể là đổi token.
+
+## 12. Nghiệm thu giao diện
+
+Phần này là phần test tự động **không** soi: nó cần mắt người và phép đo layout thật.
+§11.3 ghi rõ chưa làm được những gì dưới đây, nên đây là danh sách việc còn treo,
+không phải bằng chứng đã đạt.
+
+| # | Kiểm | Chuẩn | Ở đâu |
+|---|---|---|---|
+| 1 | Bề rộng cột hội thoại | `maxWidth.thread = 48rem` (768px), composer dùng **cùng** token nên không thể lệch | `tailwind.config.ts` + assertion gutter khớp (§4.2) |
+| 2 | Ngưỡng bật cột phụ | `screens.rail = 1432px`; dưới ngưỡng thì cột phụ rơi vào giữa cột hội thoại | `chat-interface.tsx` |
+| 3 | Vùng chạm | ≥ 44px. Vùng mở rộng bằng pseudo-element (`after:-inset-[Npx]`) **không được bị cắt** bởi khối cha có `overflow`, và không được chồm sang nút kế | §11 (đợt 2) |
+| 4 | Chuyển động tôn trọng hệ điều hành | `prefers-reduced-motion: reduce` tắt hiệu ứng; setting `html[data-animations='off']` làm tương tự | `globals.css:182`, `components/effects/index.tsx:67` |
+
+Việc phải làm bằng mắt, mỗi lần đổi layout:
+
+- Mở app ở **375 / 768 / 1024 / 1440px** và ở zoom **200%**: không tràn ngang, không
+  chữ đè nhau, không thanh cuộn kép.
+- Xem hết các trạng thái: chat dài, code dài (ngang phải cuộn được), đang stream,
+  empty state, lỗi, modal phê duyệt, Settings.
+- Tab qua một dialog rồi đóng bằng Esc: focus phải quay về đúng chỗ.
+- `freebuff-preview start` rồi nhìn app thật. Mọi tỉ lệ trong §2 là phép tính trên
+  mã, không phải ảnh chụp — không kết luận được "đẹp" bằng phép tính.
