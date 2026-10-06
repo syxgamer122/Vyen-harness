@@ -66,7 +66,7 @@ Ba cái bẫy ngôn ngữ, đều đã gặp và đã sửa — đừng "sửa n
 | [12](#12-nghiệm-thu-giao-diện) | Nghiệm thu giao diện — phần không test tự động |
 | [13](#13-thiết-kế-đích-và-kế-hoạch-chuyển-tới) | **Thiết kế đích + migration** — không phải spec, chưa triển khai |
 | [14](#14-trải-nghiệm-sản-phẩm--cái-phải-xây) | Trải nghiệm sản phẩm: bố cục, hội thoại, tool, composer, ưu tiên P0–P3 |
-| [15](#15-yêu-cầu-thiết-kế--18-điểm-để-chấm) | **18 yêu cầu thiết kế** chi tiết hoá §13–§14 — yêu cầu, không phải kế hoạch |
+| [15](#15-yêu-cầu-thiết-kế--18-điểm-để-chấm) | **18 yêu cầu thiết kế** chi tiết hoá §13–§14, kèm [định nghĩa lượt](#151-bố-trí-tin-nhắn--điểm-15) và [bảng trạng thái](#155-trạng-thái--chốt-tên-và-nghĩa) — yêu cầu, không phải kế hoạch |
 
 ---
 
@@ -925,7 +925,8 @@ chưa thành năm lớp. Đích là thẻ tool năm lớp:
 5. **Nhóm theo phase**: PLAN → IMPLEMENT → REVIEW. Đây là thứ tạo cảm giác agent
    có phương pháp thay vì spam tool.
 
-Trạng thái phải có cả icon **và** chữ: màu đơn độc là vi phạm §6.
+Trạng thái phải có cả icon **và** chữ: màu đơn độc là vi phạm §6. Năm tên liệt kê
+ở trên là bản cũ; tên hiển thị và nghĩa của mọi trạng thái chốt ở §15.5.
 
 ### 14.4 Composer
 
@@ -941,7 +942,9 @@ Không cần màu mới hay gradient. Bốn thứ này đủ:
 
 1. **Trạng thái agent rõ nghĩa.** Danh sách đích: `Planning` · `Inspecting` ·
    `Editing` · `Running` · `Waiting for approval` · `Verifying` · `Completed` ·
-   `Blocked`. Hiện `status-line.tsx` chỉ có một lớp trạng thái mảnh.
+   `Blocked`. Hiện `status-line.tsx` chỉ có một lớp trạng thái mảnh. Đây là **việc
+   đang làm** — một cụm động từ, không phải trạng thái; tên và nghĩa của trạng thái
+   chốt ở §15.5.
 2. **Bằng chứng trước lời nói.** Mỗi kết quả quan trọng kèm: số file đổi, test
    chạy, mức rủi ro, và mở được ra diff / log test / danh sách file. Nền tảng đã có
    (`evidence-badge.tsx` dùng ở `plan-panel.tsx` và `hud/agent-hud.tsx`).
@@ -981,8 +984,8 @@ làm số chỗ hiển thị chữ tăng lên.
 Cùng bộ ảnh như §12 — 375 / 768 / 1024 / 1440px, cộng mobile — cho **bốn** vùng:
 composer, một lượt hội thoại có tool chạy, một diff/approval, và Settings. Ảnh phải
 chụp cả trạng thái đang chạy và trạng thái lỗi. Không có ảnh thì không đánh giá được
-bố cục, khoảng trắng và mật độ — và đây là mục cuối cùng của tài liệu vì mọi thứ
-trước đó chỉ là điều kiện cần.
+bố cục, khoảng trắng và mật độ. Đây vẫn là điều kiện cần cho mọi thứ khác trong tài
+liệu, kể cả §15: §15 là đặc tả chấm được, không phải bằng chứng giao diện đã tốt lên.
 
 ## 15. Yêu cầu thiết kế — 18 điểm để chấm
 
@@ -991,21 +994,44 @@ trước đó chỉ là điều kiện cần.
 > chứng phải nộp nằm ở §12 và §14.9. Mục này không nói sửa file nào, theo thứ tự nào.
 
 §13.1 hỏi ba câu: agent đang làm gì · có gì cần mình quyết · kết quả thay đổi ở đâu.
-18 điểm dưới đây chia ba câu đó thành thứ chấm được. Tất cả đều nói về **cách thông
-tin được trình bày**, không phải màu, font hay bóng — đó là lý do chúng không thay
-thế §2–§8 mà đứng trên đó.
+18 điểm dưới đây chia ba câu đó thành thứ chấm được. §15.1–§15.2 và §15.4 nói về
+**cách thông tin được trình bày**; điểm 12–14 nói thẳng về diện mạo (typography,
+phân cấp, vùng xem), nên chúng vẫn phải tuân §2–§8. §15 không thay thế §2–§8, và chỗ
+nào §15 cụ thể hơn §13–§14 thì §15 là bản chốt — điều kiện đó §14 đã ghi sẵn.
 
-Ba chỗ §15 sửa lại §14 cho khỏi hai bản song song: điểm 4 thu lại turn header mà
+Bốn chỗ §15 sửa lại §14 cho khỏi hai bản song song: điểm 4 thu lại turn header mà
 §14.2 đang liệt kê quá nhiều thứ ngang nhau; điểm 6 định nghĩa lại "năm lớp" của
 §14.3 thành **năm tầng thông tin**, không phải năm vùng luôn hiện; điểm 14 bổ sung
-vế còn thiếu của §14.1 (cột phải là tóm tắt trạng thái, không phải kho chứa).
+vế còn thiếu của §14.1 (cột phải là tóm tắt trạng thái, không phải kho chứa); và
+§15.5 chốt tên hiển thị của trạng thái, thay cho năm tên ở §14.3 và cách gọi ở §14.5.
 
 ### 15.1 Bố trí tin nhắn — điểm 1–5
 
-**1. Một lượt có cấu trúc nhận ra được.** Thứ tự bắt buộc: **yêu cầu → cập nhật
-ngắn → nhóm thao tác → kết quả → bằng chứng**. Lời giải thích, tool và kết luận
-không được cùng một độ nổi, vì như thế người đọc phải tự đi tìm thông tin quan
-trọng.
+**Chốt trước — "một lượt" là gì.** Lượt là đơn vị công việc người dùng giao và agent
+theo đuổi tới lúc dừng, không phải "một khoảng thời gian" hay "một tin nhắn". Ranh
+giới lượt phải là **dữ liệu gắn theo sự kiện**, không suy đoán lúc vẽ: nếu mỗi chỗ
+render tự gom lại thì hai màn hình sẽ gom khác nhau. Bốn tình huống dễ mơ hồ, chốt
+như sau:
+
+| Tình huống | Thuộc lượt nào | Vì sao |
+|---|---|---|
+| Người dùng gửi tin mới khi agent **đang chạy** | Lượt đang mở, như một đoạn điều chỉnh | Chưa có điểm dừng nào, nên đây là ngữ cảnh bổ sung cho cùng một việc |
+| Người dùng **Stop** rồi gửi tiếp | Lượt mới; lượt cũ đóng ngay tại chỗ bấm Stop với trạng thái **đã hủy** | Stop là điểm kết thúc do người dùng đặt, không phải tạm dừng |
+| Bấm **Retry** sau lỗi | **Không** tạo lượt mới — thêm một lần thử trong cùng lượt | Lỗi cũ phải còn nhìn thấy được; lượt mang trạng thái của lần thử cuối |
+| Tin nhắn đến khi lượt **đang chờ quyền** | Lượt đang mở | Lượt chưa kết thúc, chỉ đang chờ người dùng quyết định |
+
+Lượt **kết thúc** khi agent đã dừng và không còn tool nào đang chạy hay chờ quyền —
+tức ở một trong các trạng thái cuối của bảng §15.5. Lượt chỉ có trả lời mà không có
+tool, và lượt bị hủy giữa chừng, vẫn là lượt hợp lệ: không được hiển thị khung rỗng
+hay mục trống cho đủ khuôn.
+
+**1. Một lượt có cấu trúc đọc nhận ra được.** Phần tổng kết của một lượt đọc theo
+thứ tự **yêu cầu → cập nhật ngắn → nhóm thao tác → kết quả → bằng chứng**. Đây là
+**thứ tự đọc của bản tổng kết**, không phải trình tự bắt buộc của mọi sự kiện: agent
+được quyền lặp kiểm tra → sửa → test lỗi → sửa tiếp (điểm 8), và lượt không có tool
+hay lượt bị hủy vẫn phải trình bày tự nhiên. Điều bắt buộc chỉ là: lời giải thích,
+tool và kết luận không được cùng một độ nổi, vì như thế người đọc phải tự đi tìm
+thông tin quan trọng.
 Đang có: chưa. `components/chat/message-item.tsx` render từng tin rời rạc; không có
 khái niệm "lượt" trong dữ liệu, nên thứ tự hiện tại là do model viết ra quyết định.
 
@@ -1026,8 +1052,8 @@ thời gian, số tool, số file là **thông tin phụ**. Header không đư�
 hàng đầy badge. Nhìn lướt lịch sử phải phân biệt được lượt nào sửa tính năng, lượt
 nào điều tra lỗi, lượt nào bị chặn.
 Đang có: chưa có turn header. §14.2 liệt kê năm thứ ngang nhau (số thứ tự, tên việc,
-giờ, số hành động, số file) — điểm này thu lại: chỉ hai thứ đầu là nội dung của
-header, ba thứ sau là phụ.
+giờ, số hành động, số file) — điểm này thu lại: nội dung header **chỉ** là tên việc +
+trạng thái; số thứ tự, giờ, số hành động, số file là thông tin phụ.
 
 **5. Nhịp khoảng trắng phải biểu đạt quan hệ thông tin.** Khoảng cách **trong** một
 nhóm nhỏ hơn khoảng cách **giữa** các lượt; phần kết luận thở rộng hơn cập nhật tiến
@@ -1109,20 +1135,43 @@ chưa triển khai. Điểm này là **yêu cầu**, không phải gợi ý: th�
 không tự tạo ra chiều sâu, và **không được khắc phục bằng cách thêm viền và shadow
 khắp nơi**. Phân nhóm bằng vị trí, khoảng trắng, độ đậm chữ và nền nhẹ; bóng dành cho
 overlay. Xanh trầm là **tín hiệu đúng lúc**, không phải màu phủ mọi control.
-Đang có: đo được, và đây là lý do yêu cầu này không phải sở thích — `raised` `#f5f5f5`
-so với nền trắng chỉ **1.09:1**, `raised` so với `sunken` **1.018:1** (§2.3). Ở tỉ lệ
-đó mắt không đọc ra lớp nền, nên cách duy nhất tạo lớp hiện nay là viền. Muốn bỏ viền
-thì phải đổi **cách** phân cấp, không phải tăng bóng.
+Đang có: `raised` `#f5f5f5` so với nền trắng chỉ **1.09:1**, `raised` so với `sunken`
+**1.018:1** (§2.3). Đọc đúng con số này: đây là **nguy cơ phân lớp quá nhẹ, cần nhìn
+UI thật để xác nhận**, không phải một kết luận thị giác đã đo. Tỉ lệ tương phản WCAG
+không chứng minh hai nền không phân biệt được bằng mắt — diện tích, khoảng cách và
+các yếu tố quanh nó đều ảnh hưởng. Điều chắc chắn là: các tầng nền gần trắng **không
+đủ để một mình tạo lớp**, nên cách duy nhất hiện nay là viền; muốn bỏ viền thì phải
+đổi **cách** phân cấp, chứ không phải tăng bóng. Việc xác nhận bằng mắt thuộc
+§12/§14.9 (cần ảnh), không thuộc phép tính trên mã.
 
 **14. Tách nhu cầu đọc prose khỏi nhu cầu xem code/diff.** Cột hội thoại giữ ổn định
 (`maxWidth.thread`), nhưng nội dung kỹ thuật dài cần **vùng xem mở rộng**. Cột phải
 phải là **tóm tắt trạng thái công việc**, không đồng thời chứa toàn bộ plan, file,
-test, approval và diff. Và dưới `screens.rail` (1432px), Plan nằm trên composer đang
-làm co vùng chat — cần một cách hiển thị gọn hơn.
+test, approval và diff.
 Đang có: thứ tự thật ở `components/chat-interface.tsx:150/183/292`: MessageList →
 `<aside>` (checkpoint bar + PlanPanel) → Composer, và cột phải chỉ có từ `screens.rail`
-trong `tailwind.config.ts`. Yêu cầu: vai trò cột phải được chốt **trước** khi nhét
-thêm gì vào nó, nếu không nó sẽ thành kho chứa mọi thứ phụ của app.
+trong `tailwind.config.ts`.
+
+Hai điểm dưới đây trước đây để mở; chốt luôn, vì chúng quyết định vùng chat có bị co,
+có cuộn lồng, và người dùng có mất vị trí đọc hay không.
+
+**Chốt A — vùng xem mở rộng.** Một vùng duy nhất, nhiều ngăn (Plan · File · Test log ·
+Diff), mỗi lần mở một ngăn. Nó **phủ lên** chứ không đẩy: cột hội thoại giữ nguyên
+768px nên danh sách tin nhắn không bị đo lại và không co. Khi mở, trang nền khoá cuộn
+và **chỉ vùng xem cuộn** — một ngữ cảnh cuộn duy nhất, không cuộn lồng. Đóng bằng
+`Esc` hoặc nút đóng, và khi đóng thì **trả nguyên vị trí đọc** của hội thoại (nối tiếp
+điểm 16). Vùng xem thuộc tầng dialog của §8.1 — không thêm tầng z mới, không thêm
+breakpoint mới. Bề rộng: từ `screens.rail` (1432px) trở lên chiếm cột giữa + cột phải
+(đủ rộng hơn 768px để xem diff); dưới ngưỡng đó chiếm phần còn lại của cửa sổ; dưới
+768px chiếm toàn màn hình.
+
+**Chốt B — Plan dưới `screens.rail`.** Plan **không** còn hiển thị thường trực trong
+cột giữa. Chỗ của nó là một **dải tóm tắt một dòng, cao cố định** — tên việc · trạng
+thái · số bước xong/tổng — đặt trong turn header của lượt đang chạy; bấm vào dải thì
+mở ngăn Plan trong vùng xem của Chốt A. Vì dải cao cố định, chiều cao cột hội thoại
+**không** phụ thuộc việc Plan đóng hay mở, nên không cần drawer riêng và không cần
+ngưỡng mới. Ngoại lệ duy nhất được phép chiếm chỗ: khi lượt đang chờ quyết định
+(§15.5), dải tóm tắt phải hiện dấu hiệu "cần bạn quyết định".
 
 ### 15.4 Cảm giác thông minh và chất lượng tương tác — điểm 15–18
 
@@ -1161,7 +1210,60 @@ chứng minh** — không phải qua nền trắng + Inter + icon Lucide + xanh 
 Đang có: §14.6 đã nêu đúng hướng, nhưng chưa điểm nào ở §15.1–§15.4 hoàn thành, nên
 hiện chưa có gì để nhận ra.
 
-### 15.5 Chốt: thế nào là đủ tốt
+### 15.5 Trạng thái — chốt tên và nghĩa
+
+Ba trục trạng thái khác nhau và **không được gộp**: **tool** (một lần gọi công cụ),
+**lượt** (việc người dùng giao) và **bằng chứng** (mức đã kiểm chứng). Một lượt có
+thể "xong" trong khi bằng chứng mới ở mức "đã báo xong"; một tool "xong" hoàn toàn có
+thể nằm trong một lượt "lỗi". Năm tên ở §14.3 và danh sách ở §14.5 là bản cũ — bảng
+dưới là bản chốt.
+
+**Tool** — nhãn hiển thị trùng copy đang có ở `components/chat/tool-trace.tsx:693`:
+
+| Khoá | Hiển thị | Nghĩa chính xác |
+|---|---|---|
+| `queued` | trong hàng | đã nhận, chưa bắt đầu chạy |
+| `running` | đang chạy | đang thực thi; chờ hệ thống bên ngoài (mạng, tiến trình con) **vẫn là đang chạy** |
+| `waiting_approval` | chờ bạn cho phép | đã dừng, không tự tiếp tục cho tới khi người dùng cấp quyền |
+| `done` | xong | lệnh đã kết thúc, **không** nói kết quả đúng hay sai |
+| `failed` | lỗi | kết thúc bằng lỗi thực thi |
+| `abandoned` | bị bỏ dở | đã bắt đầu mà lượt dừng giữa chừng — không phải lỗi, không phải xong |
+
+**Lượt** — trạng thái của cả nhiệm vụ:
+
+| Khoá | Hiển thị | Nghĩa chính xác | Không dùng khi |
+|---|---|---|---|
+| `queued` | đang chờ | đã nhận yêu cầu, chưa bắt đầu | — |
+| `running` | đang làm | còn tiến triển | đang chờ người dùng |
+| `waiting_approval` | chờ bạn quyết định | agent đã dừng, không có tiến triển cho tới khi người dùng trả lời: cấp quyền, chọn phương án, hoặc bổ sung thông tin | còn tool đang chạy |
+| `completed` | xong | agent đã dừng và báo hoàn tất | muốn nói kết quả đã được kiểm chứng |
+| `blocked` | bị chặn | không tiếp tục được và agent nói được **thiếu gì**; người dùng phải đổi điều kiện rồi chạy lại | lỗi đã xảy ra mà không cần ai làm gì |
+| `failed` | lỗi | đã thử và hỏng | chỉ thiếu quyền hoặc thiếu thông tin |
+| `cancelled` | đã hủy | người dùng bấm Stop | agent tự dừng vì lỗi |
+
+**Bằng chứng** — sáu bậc đã có ở `lib/evidence.ts`, nhãn badge là copy của
+`describeEvidence`; chốt dùng đúng nhãn đó, không tự đặt tên khác: `Kế hoạch · chưa
+chạy` · `Code · đang chạy` · `Code · đã báo xong` · `Kiểm thử · đã xác minh` · `Bị
+chặn` · `Thất bại`.
+
+**Ba cặp dễ lẫn — quy tắc phân biệt:**
+
+- **Đang chạy vs Chờ bạn quyết định.** Chờ hệ thống (mạng, tiến trình con, model) là
+  *đang chạy*; chờ **người dùng** mới là *chờ bạn quyết định*. Không có nhãn "đang
+  chờ" trơ một mình — luôn phải nói chờ ai, chờ gì.
+- **Bị chặn vs Lỗi.** *Bị chặn* là biết vì sao và còn lối ra: câu hỏi kèm theo là
+  "cần gì để mở". *Lỗi* là đã thử và hỏng: câu hỏi kèm theo là "hỏng ở đâu". Chặn
+  không tự biến thành lỗi sau vài lần thử, và lỗi không được hiển thị như chặn.
+- **Xong vs Đã xác minh.** *Xong* chỉ nói agent đã dừng và báo hoàn tất (tương ứng
+  `reported_done`). *Đã xác minh* đòi biên nhận kiểm thử thật (`verified`). Vì vậy
+  nhãn "xong" **không bao giờ** đi kèm dấu tick xanh.
+
+**Tên việc vs trạng thái.** Danh sách ở §14.5 (`Planning`, `Inspecting`, `Editing`,
+`Running`, `Verifying`…) là **việc đang làm** — một cụm động từ, không phải trạng
+thái. Hai thứ là hai trường riêng: việc đang làm không chứa từ trạng thái, và trạng
+thái không chứa động từ.
+
+### 15.6 Chốt: thế nào là đủ tốt
 
 Yêu cầu để chấm cả 18 điểm: UI đẹp theo kiểu **ít nhiễu nhưng nhiều thông tin hữu
 ích**. Nhìn nhanh phải trả lời được bốn câu: **agent đang làm gì · thay đổi ở đâu ·
@@ -1170,3 +1272,10 @@ kết quả có được kiểm chứng không · có cần mình quyết địn
 "Bắt mắt hơn Codex" không phải mục tiêu, và cũng không phải thứ đánh giá được bằng
 phép tính trên mã: khi chưa có UI render thật để nhìn thì **không được khẳng định đã
 vượt đối thủ**. Điều kiện để câu đó trở thành sự thật vẫn là bộ ảnh ở §12 và §14.9.
+
+**§15 là cải thiện đặc tả, không phải cải thiện UI.** Thêm được 18 điểm chấm không
+làm giao diện tốt hơn. Ba việc ở §13.2 vẫn còn nguyên sau mục này: `accent-dim`
+`#7fb8a6` chỉ **2.26:1**; chữ trên nền nhấn ở đầu Settings
+(`components/settings-dialog.tsx:196`) chỉ **2.50:1**; typography Inter 14px/16px chưa
+triển khai. Chừng nào ba việc đó chưa xong, "đã thêm §15" không được tính là tiến bộ
+về giao diện.
