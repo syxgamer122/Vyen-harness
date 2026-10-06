@@ -783,21 +783,32 @@ quyết · kết quả thay đổi ở đâu.**
 - Đụng 4 file: `tailwind.config.ts`, `app/globals.css`, `tests/design-system.test.ts`,
   `components/settings-dialog.tsx`. Sửa một bên là test đỏ — đó là ý muốn.
 
-**2. Quyết định typography.** Đây là câu hỏi mở, chưa có đáp án, và nó **đảo ngược**
-thứ §3 đang mô tả: trong 67 file `.tsx` ở `components/` + `app/`, có 48 file gọi
-`font-mono` và chỉ 10 file gọi `font-sans`; `.menu-item` / `.field-label` /
-`.btn-*` đều mono. Có hai hướng:
+**2. Typography — ĐÃ CHỐT, chưa triển khai.** Hướng: **Inter cho lớp điều hướng,
+`JetBrains Mono` chỉ cho nội dung kỹ thuật.** Cụ thể:
 
-- **Giữ nguyên.** Mono phủ nhãn tạo bản sắc kỹ thuật, chiều ngang chật, phù hợp
-  công cụ dày thông tin. Không tốn công.
-- **Đảo về sans cho control.** Inter cho nhãn, nút, menu; mono chỉ cho code, lệnh,
-  đường dẫn, ID, số liệu. Trông "cao cấp" hơn nhưng phải trả giá: chạm gần như mọi
-  control trong repo.
+| Vai trò | Font | px |
+|---|---|---|
+| Nhãn, nút, menu, điều hướng | Inter | 14 |
+| Hội thoại dài | Inter | 16 |
+| Metadata, timestamp | Inter | 12 |
+| Code, lệnh, đường dẫn, ID, số liệu | JetBrains Mono | theo bối cảnh |
 
-Nếu chọn hướng 2, kèm bảng cỡ chữ đề xuất: nhãn/control 14px, hội thoại 16px,
-metadata 12px, và phải đo lại vì `tertiary` mới chỉ còn 4.69:1 trên `#f7f7f7` —
-nâng cỡ chữ làm dày thêm chữ, càng sát ngưỡng AA. Cần cả hai: phép đo **và** nhìn
-thật ở §12.
+Mono **vẫn giữ vai trò**, nhưng chỉ ở đúng chỗ — không phải mọi nút đều trông như
+terminal.
+
+Việc này **đảo ngược** thứ §3 đang mô tả: trong 67 file `.tsx` ở `components/` +
+`app/`, có 48 file gọi `font-mono` và chỉ 10 file gọi `font-sans`; `.menu-item` /
+`.field-label` / `.btn-*` đều mono. Khi triển khai, phải đi theo thứ tự đọc —
+composer → sidebar → menu/dialog → phần còn lại — chứ không lướt 48 file một lượt.
+Xem bảng kế hoạch ở §13.3.
+
+**Về tương phản thì cỡ chữ không vào cuộc.** Tỉ lệ tương phản phụ thuộc màu, không
+phụ thuộc cỡ chữ; WCAG chỉ *hạ* ngưỡng cho "large text" (≥24px, hoặc ≥18.66px đậm)
+chứ không hạ theo cảm nhận. Nên câu "nâng cỡ chữ thì tỉ lệ sát ngưỡng hơn" là sai.
+Điều cần đo lại là mảng chữ, không phải ngưỡng: `tertiary` hiện 4.69:1 trên
+`#f7f7f7` — qua AA cho chữ thường nhưng biên chỉ còn 0.19, nên phải giữ nó trên
+nền sáng, không đặt lên nền xám. Chữ 14–16px vẫn kiểm theo ngưỡng 4.5:1 như mọi
+chữ thường.
 
 **3. Chiều sâu.** Đang là "mặc định phẳng" rồi, chỉ là chưa chủ đích: `lift-md` ở độ
 mờ 6% trên nền gần trắng gần như vô hình, nên bóng không phải thứ tạo chiều sâu.
