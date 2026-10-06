@@ -66,6 +66,7 @@ Ba cái bẫy ngôn ngữ, đều đã gặp và đã sửa — đừng "sửa n
 | [12](#12-nghiệm-thu-giao-diện) | Nghiệm thu giao diện — phần không test tự động |
 | [13](#13-thiết-kế-đích-và-kế-hoạch-chuyển-tới) | **Thiết kế đích + migration** — không phải spec, chưa triển khai |
 | [14](#14-trải-nghiệm-sản-phẩm--cái-phải-xây) | Trải nghiệm sản phẩm: bố cục, hội thoại, tool, composer, ưu tiên P0–P3 |
+| [15](#15-yêu-cầu-thiết-kế--18-điểm-để-chấm) | **18 yêu cầu thiết kế** chi tiết hoá §13–§14 — yêu cầu, không phải kế hoạch |
 
 ---
 
@@ -869,6 +870,9 @@ thành luật.
 
 > Cùng điều kiện với §13: mục này **không** mô tả code đang chạy. Mỗi mục ghi rõ
 > **đang có** hay **đích**, để không ai đọc nhầm thành hợp đồng.
+>
+> §15 chi tiết hoá mục này thành 18 yêu cầu chấm được. Chỗ nào §15 nói cụ thể hơn
+> thì §15 là bản chốt.
 
 ### 14.1 Bố cục
 
@@ -979,3 +983,190 @@ composer, một lượt hội thoại có tool chạy, một diff/approval, và 
 chụp cả trạng thái đang chạy và trạng thái lỗi. Không có ảnh thì không đánh giá được
 bố cục, khoảng trắng và mật độ — và đây là mục cuối cùng của tài liệu vì mọi thứ
 trước đó chỉ là điều kiện cần.
+
+## 15. Yêu cầu thiết kế — 18 điểm để chấm
+
+> Cùng điều kiện với §13 và §14: đây là **yêu cầu**, không phải mô tả code đang
+> chạy — và cũng **không** phải kế hoạch triển khai. Thứ tự làm nằm ở §14.8, bằng
+> chứng phải nộp nằm ở §12 và §14.9. Mục này không nói sửa file nào, theo thứ tự nào.
+
+§13.1 hỏi ba câu: agent đang làm gì · có gì cần mình quyết · kết quả thay đổi ở đâu.
+18 điểm dưới đây chia ba câu đó thành thứ chấm được. Tất cả đều nói về **cách thông
+tin được trình bày**, không phải màu, font hay bóng — đó là lý do chúng không thay
+thế §2–§8 mà đứng trên đó.
+
+Ba chỗ §15 sửa lại §14 cho khỏi hai bản song song: điểm 4 thu lại turn header mà
+§14.2 đang liệt kê quá nhiều thứ ngang nhau; điểm 6 định nghĩa lại "năm lớp" của
+§14.3 thành **năm tầng thông tin**, không phải năm vùng luôn hiện; điểm 14 bổ sung
+vế còn thiếu của §14.1 (cột phải là tóm tắt trạng thái, không phải kho chứa).
+
+### 15.1 Bố trí tin nhắn — điểm 1–5
+
+**1. Một lượt có cấu trúc nhận ra được.** Thứ tự bắt buộc: **yêu cầu → cập nhật
+ngắn → nhóm thao tác → kết quả → bằng chứng**. Lời giải thích, tool và kết luận
+không được cùng một độ nổi, vì như thế người đọc phải tự đi tìm thông tin quan
+trọng.
+Đang có: chưa. `components/chat/message-item.tsx` render từng tin rời rạc; không có
+khái niệm "lượt" trong dữ liệu, nên thứ tự hiện tại là do model viết ra quyết định.
+
+**2. Trợ lý là nội dung biên tập, không phải bong bóng chat.** Văn bản trả lời đặt
+trực tiếp trên nền hội thoại; **chỉ** code, diff, bằng chứng và yêu cầu quyết định
+mới có khung riêng. Tin người dùng compact, nền nhấn nhẹ.
+Đang có: ngược lại. `.bubble` bo `2xl` (`app/globals.css:528`) và mỗi tin đều có
+avatar riêng, kể cả trợ lý (`components/chat/message-item.tsx:486`). Yêu cầu này
+không chỉ đổi bo góc — nó đổi việc khối nào **được** có khung.
+
+**3. Gom cập nhật liên tiếp.** Một agent đang làm một việc thì không tạo "tin nhắn
+mới" cho từng thao tác nhỏ. Các cập nhật thuộc cùng một khối tiến trình; chỉ kết quả
+cuối có điểm ngắt rõ. Avatar và tiêu đề không lặp ở mỗi dòng.
+Đang có: chưa — không có mã nhóm/lượt, avatar vẽ theo từng tin.
+
+**4. Turn header gọn, và giúp đọc lại lịch sử.** Nổi bật **tên việc + trạng thái**;
+thời gian, số tool, số file là **thông tin phụ**. Header không được biến thành một
+hàng đầy badge. Nhìn lướt lịch sử phải phân biệt được lượt nào sửa tính năng, lượt
+nào điều tra lỗi, lượt nào bị chặn.
+Đang có: chưa có turn header. §14.2 liệt kê năm thứ ngang nhau (số thứ tự, tên việc,
+giờ, số hành động, số file) — điểm này thu lại: chỉ hai thứ đầu là nội dung của
+header, ba thứ sau là phụ.
+
+**5. Nhịp khoảng trắng phải biểu đạt quan hệ thông tin.** Khoảng cách **trong** một
+nhóm nhỏ hơn khoảng cách **giữa** các lượt; phần kết luận thở rộng hơn cập nhật tiến
+trình. Khoảng trắng không được chia đều cho "đẹp".
+Đang có: §4.2 chỉ ghim gutter ngang `px-5` và thang 4px của Tailwind; chưa có bậc
+khoảng cách nào mã hoá "trong nhóm" khác "giữa lượt". Đây là yêu cầu còn thiếu hẳn,
+không phải việc tinh chỉnh.
+
+### 15.2 Hiển thị tool — điểm 6–11
+
+**6. Mặc định là dòng gọn; mở ra mới thành thẻ chi tiết.** Dạng gọn phải đọc được
+một mạch kiểu `Đọc cấu hình build · 8 file · Đang chạy · 2,4s`: tên hành động bằng
+ngôn ngữ người dùng hiểu đứng trước, raw command / payload / log nằm sau thao tác mở.
+Năm lớp của §14.3 là **năm tầng thông tin**, không phải năm vùng luôn chiếm màn hình.
+Đang có: đúng một nửa. `components/chat/tool-trace.tsx:662` mở ở trạng thái gấp
+(`expanded = false`), chân thẻ đã có chevron (`:751`), thân chi tiết chỉ vẽ khi mở
+(`:794`). Thiếu: dòng gọn hiện chỉ có `nhãn · tham số` cộng nhãn trạng thái — không
+có số file, không có thời gian chạy, tức chưa nói được "đã làm gì, bao nhiêu, mất
+bao lâu" trên một dòng.
+
+**7. Mỗi loại tool một cách trình bày.** Không dùng một khuôn chung cho tất cả:
+
+| Loại | Phải cho thấy |
+|---|---|
+| Đọc / tìm kiếm | Đối tượng đã tìm, kết quả liên quan |
+| Sửa file | Đường dẫn, phạm vi thay đổi, diff |
+| Chạy lệnh | Lệnh chính, trạng thái kết thúc, kết quả đáng chú ý |
+| Chạy test | Pass / fail / skip, lỗi quan trọng |
+| Phê duyệt | Hành động, phạm vi quyền, rủi ro |
+
+Đang có: một khuôn chung, và cả dòng gọn bọc trong `font-mono text-meta`
+(`tool-trace.tsx:758`) nên mọi loại tool đọc giống hệt nhau. Đây là điểm quyết định
+UI trông như **hiểu công việc** hay chỉ như đang đổ dữ liệu.
+
+**8. Gom tool theo mục đích, và thể hiện được vòng lặp.** Nhóm phải gọi được tên
+công việc ("Điều tra lỗi đăng nhập"), không phải một dãy `search`, `read_file`,
+shell. Khung PLAN → IMPLEMENT → REVIEW là tốt, nhưng phải chứa được
+**kiểm tra → sửa → test lỗi → sửa tiếp**, và cả thao tác chạy song song.
+Đang có: `tool-trace.tsx:123` chỉ đọc `phase: 'start' | 'done'` — hai giá trị này
+không đủ để vẽ vòng lặp, càng không đủ để vẽ hai nhánh chạy song song.
+
+**9. Trạng thái tool khác trạng thái nhiệm vụ.** Tool hoàn tất **không** có nghĩa
+việc thành công. Phải phân biệt đang chạy / chờ quyền / bị chặn / thất bại / bị hủy,
+và tách "lệnh test đã kết thúc" khỏi "test đã pass".
+Đang có: khác biệt này **đã có trong dữ liệu, chưa được dùng đủ ở UI**. `lib/evidence.ts`
+phân biệt sáu bậc, trong đó `reported_done` nghĩa là "model báo xong, chưa ai kiểm
+chứng" còn `verified` đòi biên nhận kiểm thử thật; ở cấp tool, `tool-trace.tsx:682`
+chỉ có `running` / `failed` / `abandoned`, thiếu "chờ quyền" và "bị chặn có lý do".
+Yêu cầu: hai cấp trạng thái này phải nhìn ra khác nhau, không gộp thành một màu.
+
+**10. Bằng chứng phải mở được đúng nguồn.** Badge "5 file đổi" hay "12 test pass"
+phải dẫn tới **đúng diff/log và đúng phiên bản** thay đổi. Ba trạng thái phải khác
+nhau rõ: **đã kiểm chứng · chưa kiểm chứng · kiểm chứng thất bại**. Không dùng dấu
+tick xanh chung chung để tạo cảm giác đáng tin.
+Đang có: thang bằng chứng sáu bậc ở `lib/evidence.ts`, badge ở
+`components/evidence-badge.tsx` (dùng ở năm chỗ, kể cả `message-item.tsx:583`), và
+biên nhận kiểm thử ở `lib/verification.ts`. Thiếu: đường đi từ badge tới nguồn —
+bấm vào badge hiện chưa mở ra diff hay log tương ứng.
+
+**11. Lỗi và yêu cầu can thiệp phải nổi lên khỏi luồng bình thường.** Tool thành
+công thì được gấp lại; **lỗi thì không được chìm trong nhóm đã đóng**. Phần lỗi phải
+trả lời bốn câu, theo thứ tự: **lỗi ở đâu → ảnh hưởng gì → agent có tiếp tục được
+không → người dùng cần quyết định gì**.
+Đang có: chip lỗi đã có tông riêng và hover riêng (`tool-trace.tsx:719`) nên trạng
+thái lỗi không bị nuốt khi rê chuột; nhưng một lỗi nằm trong nhóm đã gấp vẫn chìm,
+và bốn câu trên chưa được viết ở đâu cả.
+
+### 15.3 Diện mạo — điểm 12–14
+
+**12. Hoàn thiện phân vai typography.** Inter cho hội thoại, điều hướng, nút và nhãn;
+JetBrains Mono **chỉ** cho code, lệnh, đường dẫn và ID. Toàn UI không được trông như
+terminal. Và: metadata nhỏ không được chứa thông tin quyết định.
+Đang có: ngược — §3 ghi mono là mặc định cho control và nhãn, 48 trong 67 file
+`.tsx` gọi `font-mono`, bậc `ui` là 12px. §13.2 đã chốt hướng Inter 14px/16px nhưng
+chưa triển khai. Điểm này là **yêu cầu**, không phải gợi ý: thứ người dùng phải đọc
+để quyết định không được nằm ở `micro` (10px) hay `meta` (11px).
+
+**13. Giảm "hộp trong hộp", tăng phân cấp bằng bố cục.** Các tầng nền gần trắng
+không tự tạo ra chiều sâu, và **không được khắc phục bằng cách thêm viền và shadow
+khắp nơi**. Phân nhóm bằng vị trí, khoảng trắng, độ đậm chữ và nền nhẹ; bóng dành cho
+overlay. Xanh trầm là **tín hiệu đúng lúc**, không phải màu phủ mọi control.
+Đang có: đo được, và đây là lý do yêu cầu này không phải sở thích — `raised` `#f5f5f5`
+so với nền trắng chỉ **1.09:1**, `raised` so với `sunken` **1.018:1** (§2.3). Ở tỉ lệ
+đó mắt không đọc ra lớp nền, nên cách duy nhất tạo lớp hiện nay là viền. Muốn bỏ viền
+thì phải đổi **cách** phân cấp, không phải tăng bóng.
+
+**14. Tách nhu cầu đọc prose khỏi nhu cầu xem code/diff.** Cột hội thoại giữ ổn định
+(`maxWidth.thread`), nhưng nội dung kỹ thuật dài cần **vùng xem mở rộng**. Cột phải
+phải là **tóm tắt trạng thái công việc**, không đồng thời chứa toàn bộ plan, file,
+test, approval và diff. Và dưới `screens.rail` (1432px), Plan nằm trên composer đang
+làm co vùng chat — cần một cách hiển thị gọn hơn.
+Đang có: thứ tự thật ở `components/chat-interface.tsx:150/183/292`: MessageList →
+`<aside>` (checkpoint bar + PlanPanel) → Composer, và cột phải chỉ có từ `screens.rail`
+trong `tailwind.config.ts`. Yêu cầu: vai trò cột phải được chốt **trước** khi nhét
+thêm gì vào nó, nếu không nó sẽ thành kho chứa mọi thứ phụ của app.
+
+### 15.4 Cảm giác thông minh và chất lượng tương tác — điểm 15–18
+
+**15. Composer phải nói ngữ cảnh thật đang được dùng.** Context pill phải phân biệt
+**file đã gắn** / **đường dẫn không hợp lệ** / **phạm vi project đang chọn**. Model
+selector và tùy chọn phụ lùi sau nội dung nhập. Focus rõ, nhưng không làm cả hội
+thoại dịch chuyển hay phát sáng gây phân tâm.
+Đang có: `components/composer.tsx` đã có chỗ gắn ngữ cảnh (`Paperclip` ở `:1273`,
+`Globe` và `FolderOpen` ở `:1351`/`:1358`), nhưng chưa có pill nói đường dẫn vừa gắn
+có phân giải được hay không — nên "đã gắn" và "gắn sai" hiện trông giống nhau.
+
+**16. Streaming ổn định và tôn trọng vị trí đọc.** Đang đọc tin cũ thì không tự kéo
+xuống cuối; có cập nhật mới thì **báo nhẹ** và cho quay lại tiến trình đang chạy. Tool
+mở rộng, log dài ra và markdown xuất hiện không được làm bố cục nhảy liên tục.
+Đang có: phần lớn. `components/chat/message-list.tsx` chỉ ghim đáy khi người dùng
+đang ở đáy (`:346`), có nút "Xuống tin nhắn mới nhất" khi đã cuộn lên (`:594`), và
+`HEIGHT_CACHE` cộng `rowVirtualizer.measure()` để bù các lần đo lại (`:364`, `:377`).
+Hai chỗ cố ý vẫn kéo: đổi chat ghim tức thì (`:337`) và người dùng vừa gửi thì luôn về
+đáy (`:345`). Yêu cầu còn thiếu: **nhảy bố cục khi một dòng gọn mở ra** — hiện chưa
+đo, và đây là chỗ dễ nhảy nhất vì danh sách có ảo hoá.
+
+**17. Diff và approval phải giúp ra quyết định nhanh.** Thay đổi đáng chú ý phải
+đứng **trước** phần context dài; phải nói rõ file bị ảnh hưởng, tác động và khả năng
+hoàn tác. `Allow once` và `Allow for project` phải khác nhau về **nghĩa**, không chỉ
+khác nhãn — quyền rộng không được dễ bấm nhầm.
+Đang có: hai bề mặt phê duyệt (`components/diff-confirm.tsx` với "Duyệt & Ghi Đĩa" /
+"Từ chối", và `components/shell-confirm.tsx`), có phím tắt và có chốt `Esc` để từ
+chối. Chưa có hai mức quyền, và nhãn còn trộn tiếng Anh trong khối phím tắt của
+`diff-confirm.tsx` (`reject`, `then ↵ on the chosen button`) — trộn ngôn ngữ ở đúng
+chỗ người dùng đang phải quyết định là lỗi, không phải chi tiết.
+
+**18. Bản sắc đến từ một trải nghiệm đặc trưng.** Vyen phải được nhận ra qua **cách
+gom một lượt công việc, cách tool thành tiến trình dễ hiểu, và cách kết quả được
+chứng minh** — không phải qua nền trắng + Inter + icon Lucide + xanh trầm, vì bốn thứ
+đó ai cũng có. Đây là sự khác biệt bền hơn mọi hiệu ứng trang trí.
+Đang có: §14.6 đã nêu đúng hướng, nhưng chưa điểm nào ở §15.1–§15.4 hoàn thành, nên
+hiện chưa có gì để nhận ra.
+
+### 15.5 Chốt: thế nào là đủ tốt
+
+Yêu cầu để chấm cả 18 điểm: UI đẹp theo kiểu **ít nhiễu nhưng nhiều thông tin hữu
+ích**. Nhìn nhanh phải trả lời được bốn câu: **agent đang làm gì · thay đổi ở đâu ·
+kết quả có được kiểm chứng không · có cần mình quyết định không.**
+
+"Bắt mắt hơn Codex" không phải mục tiêu, và cũng không phải thứ đánh giá được bằng
+phép tính trên mã: khi chưa có UI render thật để nhìn thì **không được khẳng định đã
+vượt đối thủ**. Điều kiện để câu đó trở thành sự thật vẫn là bộ ảnh ở §12 và §14.9.
