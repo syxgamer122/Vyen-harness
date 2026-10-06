@@ -64,6 +64,7 @@ Ba cái bẫy ngôn ngữ, đều đã gặp và đã sửa — đừng "sửa n
 | [10](#10-hợp-đồng-được-kiểm-chứng-bằng-gì) | Test kiểm chứng cái gì, và cái nó **không** kiểm |
 | [11](#11-nhật-ký-rà-soát-giao-diện-checklist-ui-ux-pro-max) | **Nhật ký rà soát** `ui-ux-pro-max` — lịch sử, không phải spec |
 | [12](#12-nghiệm-thu-giao-diện) | Nghiệm thu giao diện — phần không test tự động |
+| [13](#13-thiết-kế-đích-và-kế-hoạch-chuyển-tới) | **Thiết kế đích + migration** — không phải spec, chưa triển khai |
 
 ---
 
@@ -139,12 +140,25 @@ không mang thông tin chữ.
  nó không xuống `#d4d4d4` cho "nhẹ hơn": viền input nhạt hơn 3:1 là **không nhìn
 thấy**, mà ô nhập không nhìn thấy thì không phải ô nhập.
 
-**Nhưng 3:1 chỉ đúng trên nền trắng.** `default` trên `#f5f5f5` là 2.78:1, trên
-`#f7f7f7` là 2.83:1 — tức dưới ngưỡng. Nên luật thực dụng của hệ là: control trên
-nền `surface` / `overlay` (trắng) dùng `default`; control trên nền `raised` /
-`sunken` dùng `subtle` và **phải** có khác biệt nền đi kèm — đó là thứ phân
-ranh giới thật, vì WCAG 1.4.11 đòi tín hiệu nhận diện, không đòi riêng viền đạt 3:1
-khi control đã có nền khác. Đo lại khi thêm control mới, đừng copy 3.03:1 từ đây.
+**3:1 chỉ đúng trên nền trắng, và khác biệt nền KHÔNG thay thế được viền.**
+`default` trên `#f5f5f5` là 2.78:1, trên `#f7f7f7` là 2.83:1 — dưới ngưỡng. Mà
+nền trên nền thì gần như bằng nhau: `#f5f5f5` so với trắng là **1.09:1**, so với
+`#f7f7f7` là **1.02:1**. Nên câu "control trên nền xám dùng `subtle` và khác biệt
+nền bù cho viền" là **sai** — nó vi phạm chính WCAG 1.4.11 mà luật đó sinh ra.
+
+Luật đúng, theo đúng câu chữ của 1.4.11 (tín hiệu **cần thiết** để nhận diện
+control hoặc trạng thái phải đạt 3:1):
+
+- **Control mà ranh giới là tín hiệu nhận diện duy nhất** — input, select, checkbox,
+  radio, switch — phải nằm trên nền trắng (`surface` / `overlay`) với `default`,
+  hoặc dùng `strong`. Recipe `.field` / `.field-sm` đã đúng cả hai vế.
+- **Control được nhận diện bằng nhãn** — nút, chip, phân đoạn, trigger có chữ — được
+  dùng `subtle` trên nền xám, vì ở đó tín hiệu nhận diện là chữ chứ không phải viền.
+- `subtle` không bao giờ được dùng làm ranh giới của một input. Nó là đường phân
+  cách **trong** một khối.
+
+Đo lại khi thêm control mới, đừng copy 3.03:1 từ đây mà quên kiểm nó nằm trên nền
+nào.
 
 Viền luôn **1px**. Viền 2px là dấu hiệu của hệ cũ (nét mực) và đã bị gỡ khỏi toàn
 bộ recipe trong `globals.css` cùng 7 call site trong component.
@@ -733,3 +747,72 @@ Việc phải làm bằng mắt, mỗi lần đổi layout:
 - Tab qua một dialog rồi đóng bằng Esc: focus phải quay về đúng chỗ.
 - `freebuff-preview start` rồi nhìn app thật. Mọi tỉ lệ trong §2 là phép tính trên
   mã, không phải ảnh chụp — không kết luận được "đẹp" bằng phép tính.
+
+## 13. Thiết kế đích và kế hoạch chuyển tới
+
+> **Mục này KHÔNG phải spec.** §1–§12 mô tả cái đang chạy; mục này mô tả cái
+> **chưa** có trong code. Không dùng mục này để biện minh cho một sự thật đang
+> chạy, và khi một mục được triển khai thì nó phải được ghi ngược lại §2/§3 rồi
+> xoá khỏi đây — nếu không, tài liệu lại bắt đầu nói dối như §9.3 đã cảnh báo.
+
+### 13.1 Hướng: "Quiet precision"
+
+Không gian làm việc kỹ thuật, nhưng bình tĩnh và tinh tế. Cụ thể:
+
+| Vùng | Hướng |
+|---|---|
+| App shell | Trung tính, ít đường bao; không biến mọi vùng thành card |
+| Hội thoại | Nội dung là trọng tâm; assistant ít khung, người dùng có nền nhấn nhẹ |
+| Composer | Điểm tương tác chính; model và context phụ không được cạnh tranh với ô nhập |
+| Tool execution | Hàng trạng thái ngắn; log chi tiết mở khi cần |
+| Reasoning | Thu gọn mặc định khi không cần đọc; không để thành mảng tím lớn |
+| Diff / phê duyệt | Đường dẫn → thay đổi → rủi ro → hành động; nút phê duyệt không bị giấu |
+| Chiều sâu | Mặc định phẳng; bóng dành cho menu, popover, dialog |
+| Bản sắc | Giữ xanh trầm của Vyen, dùng có chủ đích, không tô nhấn khắp màn hình |
+
+Ba câu hỏi mọi màn hình phải trả lời được: **agent đang làm gì · có gì cần mình
+quyết · kết quả thay đổi ở đâu.**
+
+### 13.2 Ba việc đang treo, theo thứ tự nên làm
+
+**1. Sửa hai lỗi tương phản đã đo (§9.5).** Không có phong cách nào cứu được 2.26:1.
+
+- `accent-dim` `#7fb8a6` → `#519a85`: 3.05:1 trên `#f5f5f5`, 3.33:1 trên trắng.
+- Chấm trí đầu vỏ Settings: `bg-accent-dim` + `text-accent` (2.50:1) → nền
+  `bg-accent-soft` (5.09:1).
+- Đụng 4 file: `tailwind.config.ts`, `app/globals.css`, `tests/design-system.test.ts`,
+  `components/settings-dialog.tsx`. Sửa một bên là test đỏ — đó là ý muốn.
+
+**2. Quyết định typography.** Đây là câu hỏi mở, chưa có đáp án, và nó **đảo ngược**
+thứ §3 đang mô tả: trong 67 file `.tsx` ở `components/` + `app/`, có 48 file gọi
+`font-mono` và chỉ 10 file gọi `font-sans`; `.menu-item` / `.field-label` /
+`.btn-*` đều mono. Có hai hướng:
+
+- **Giữ nguyên.** Mono phủ nhãn tạo bản sắc kỹ thuật, chiều ngang chật, phù hợp
+  công cụ dày thông tin. Không tốn công.
+- **Đảo về sans cho control.** Inter cho nhãn, nút, menu; mono chỉ cho code, lệnh,
+  đường dẫn, ID, số liệu. Trông "cao cấp" hơn nhưng phải trả giá: chạm gần như mọi
+  control trong repo.
+
+Nếu chọn hướng 2, kèm bảng cỡ chữ đề xuất: nhãn/control 14px, hội thoại 16px,
+metadata 12px, và phải đo lại vì `tertiary` mới chỉ còn 4.69:1 trên `#f7f7f7` —
+nâng cỡ chữ làm dày thêm chữ, càng sát ngưỡng AA. Cần cả hai: phép đo **và** nhìn
+thật ở §12.
+
+**3. Chiều sâu.** Đang là "mặc định phẳng" rồi, chỉ là chưa chủ đích: `lift-md` ở độ
+mờ 6% trên nền gần trắng gần như vô hình, nên bóng không phải thứ tạo chiều sâu.
+Nếu muốn bóng làm việc thật thì phải nâng độ mờ và giới hạn nó cho overlay — đó là
+thay đổi diện mạo, đo bằng mắt, không sửa bằng số.
+
+### 13.3 Thứ tự triển khai và bằng chứng từng bước
+
+| Bước | Việc | Bằng chứng kết thúc |
+|---|---|---|
+| 1 | Sửa `accent-dim` + chấm trí Settings | `vitest tests/design-system.test.ts` xanh; đo lại tỉ lệ bằng công thức WCAG ghi vào §2.4 |
+| 2 | Chốt hướng typography, rồi mới sửa | Trước khi sửa: ảnh 375/768/1024/1440px của chat, composer, menu. Sau khi sửa: chụp lại cùng bộ, đối chiếu |
+| 3 | Nếu chọn sửa, migrate từng khối theo thứ tự đọc: composer → sidebar → menu/dialog → phần còn lại | Không lướt 48 file một lượt; mỗi khối một lượt, `npm run lint` sạch, không lỗi typecheck |
+| 4 | Chiều sâu | Cùng bộ ảnh, đánh giá có đọc ra lớp không bằng mắt hay không |
+
+Điều kiện để bước 2 được coi là xong: có **ảnh**, không chỉ có con số. Không có ảnh
+thì mọi kết luận "đẹp hơn" chỉ là phỏng đoán — và tài liệu này không ghi phỏng đoán
+thành luật.
