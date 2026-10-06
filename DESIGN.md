@@ -65,6 +65,7 @@ Ba cái bẫy ngôn ngữ, đều đã gặp và đã sửa — đừng "sửa n
 | [11](#11-nhật-ký-rà-soát-giao-diện-checklist-ui-ux-pro-max) | **Nhật ký rà soát** `ui-ux-pro-max` — lịch sử, không phải spec |
 | [12](#12-nghiệm-thu-giao-diện) | Nghiệm thu giao diện — phần không test tự động |
 | [13](#13-thiết-kế-đích-và-kế-hoạch-chuyển-tới) | **Thiết kế đích + migration** — không phải spec, chưa triển khai |
+| [14](#14-trải-nghiệm-sản-phẩm--cái-phải-xây) | Trải nghiệm sản phẩm: bố cục, hội thoại, tool, composer, ưu tiên P0–P3 |
 
 ---
 
@@ -548,6 +549,29 @@ Cùng đợt đó, comment trong `tests/design-system.test.ts` cũng còn ghi `#
 cho cả `primary` lẫn `strong` — `hex.strong` thật là `#525252`. §9.2 đã sửa; test thì
 để nguyên.
 
+### 9.6 Tham chiếu tới tài liệu này trong code — và vì sao đừng tách file vội
+
+Có **21** chỗ trong `.ts` / `.tsx` / `.cjs` (9 file: `lib/ui-z.ts`,
+`scripts/codemod-tokens.cjs`, `tailwind.config.ts`, `components/composer.tsx`,
+`components/chat/tool-trace.tsx`, `tests/composer-affordances.test.ts`,
+`tests/composer-contrast.test.ts`, `tests/design-system.test.ts`), cộng 1 chỗ trong
+`PLAN.md` — trỏ tới số mục của tài liệu này
+(`grep -rn "DESIGN\.md §" --include=*.ts --include=*.tsx --include=*.cjs`). Ba trong
+số đó đã lệch sẵn:
+
+| Chỗ ghi | Thực tế |
+|---|---|
+| `lib/ui-z.ts:2` — "DESIGN.md mục 4" | Thang z-index là §8 |
+| `scripts/codemod-tokens.cjs:3` — "mục 6.3" | §6 không có mục con nào |
+| `components/chat/tool-trace.tsx:797` — "§5.3" | §5 chỉ có 5.1 |
+
+Đây là lý do cụ thể để **không** tách tài liệu thành nhiều file ngay: mỗi lần đổi số
+mục là 22 tham chiếu có nguy cơ lệch, và ba chỗ trên cho thấy chúng lệch trong im
+lặng. Tách file không làm việc đó dễ hơn — chỉ đổi tham chiếu từ "sai số mục" thành
+"sai tên file". Nếu muốn tách, làm theo hai bước: (1) sửa ba tham chiếu lệch ở
+trên, (2) thay số mục bằng tên file ở cả 22 chỗ trong cùng một commit. Trước đó,
+dùng §11 làm "nhật ký" đã đủ để spec không lẫn với lịch sử.
+
 ---
 
 ## 10. Hợp đồng được kiểm chứng bằng gì
@@ -757,6 +781,14 @@ Việc phải làm bằng mắt, mỗi lần đổi layout:
 
 ### 13.1 Hướng: "Quiet precision"
 
+> **Vyen là trung tâm điều khiển bình tĩnh cho công việc phần mềm: mỗi tin nhắn phải
+> giải thích, mỗi tool phải đưa ra bằng chứng, và mỗi lần phê duyệt phải làm rõ
+> rủi ro trước khi hành động.**
+
+Ba câu hỏi này là tiêu chí, không phải mô tả: một màn hình trả lời được cả ba thì
+được coi là đạt, dù bố cục nó đẹp hay không. Cơ chế "thông minh" của Vyen phải nằm
+ở **cách thông tin được tổ chức**, không ở màu hay hiệu ứng.
+
 Không gian làm việc kỹ thuật, nhưng bình tĩnh và tinh tế. Cụ thể:
 
 | Vùng | Hướng |
@@ -810,12 +842,17 @@ chứ không hạ theo cảm nhận. Nên câu "nâng cỡ chữ thì tỉ lệ 
 nền sáng, không đặt lên nền xám. Chữ 14–16px vẫn kiểm theo ngưỡng 4.5:1 như mọi
 chữ thường.
 
-**3. Chiều sâu.** Đang là "mặc định phẳng" rồi, chỉ là chưa chủ đích: `lift-md` ở độ
-mờ 6% trên nền gần trắng gần như vô hình, nên bóng không phải thứ tạo chiều sâu.
-Nếu muốn bóng làm việc thật thì phải nâng độ mờ và giới hạn nó cho overlay — đó là
-thay đổi diện mạo, đo bằng mắt, không sửa bằng số.
+**3. Chiều sâu.** Đang là "mặc định phẳng" rồi, chỉ là chưa chủ đích. **Đánh giá, chưa
+đo:** `lift-md` là `0 1px 3px rgb(0 0 0 / 0.06)` + `0 6px 16px -4px rgb(0 0 0 / 0.08)`
+trên nền gần trắng — theo cảm nhận thì bóng không làm việc tạo chiều sâu, nhưng tôi
+chưa đo và chưa nhìn, nên đây **không** phải số liệu (khác với mọi tỉ lệ tương phản
+ở §2). Muốn biết thật thì chụp một card nội dung ở 100% và nhìn xem có đọc ra lớp
+hay không. Nếu kết luận là không, nâng độ mờ và giới hạn bóng cho overlay — đo bằng
+mắt, không sửa bằng số.
 
 ### 13.3 Thứ tự triển khai và bằng chứng từng bước
+
+> Trước khi tách tài liệu này thành nhiều file — xem §9.6.
 
 | Bước | Việc | Bằng chứng kết thúc |
 |---|---|---|
@@ -827,3 +864,118 @@ thay đổi diện mạo, đo bằng mắt, không sửa bằng số.
 Điều kiện để bước 2 được coi là xong: có **ảnh**, không chỉ có con số. Không có ảnh
 thì mọi kết luận "đẹp hơn" chỉ là phỏng đoán — và tài liệu này không ghi phỏng đoán
 thành luật.
+
+## 14. Trải nghiệm sản phẩm — cái phải xây
+
+> Cùng điều kiện với §13: mục này **không** mô tả code đang chạy. Mỗi mục ghi rõ
+> **đang có** hay **đích**, để không ai đọc nhầm thành hợp đồng.
+
+### 14.1 Bố cục
+
+Ba cột, và cả ba đã tồn tại — vấn đề là vai trò, không phải số cột:
+
+| Cột | Đang có | Đích |
+|---|---|---|
+| Trái | Danh sách phiên, tìm kiếm, thu gọn được | Thêm switcher workspace/project, **New task** nổi bật, trạng thái workspace |
+| Giữa | Cột hội thoại `maxWidth.thread = 48rem` (768px), composer cùng token | Giữ 768px — đã nằm trong dải 760–820px. Đổi thứ khác, không đổi số này |
+| Phải | `SessionRail` 20rem từ `screens.rail` 1432px, chứa Plan + undo checkpoint; dưới ngưỡng thì Plan rơi vào giữa | **Task control rail**: thêm files touched, tests, phê duyệt đang chờ, hành động gợi ý |
+
+Dưới ngưỡng rail, hành vi thật đã kiểm trong `chat-interface.tsx`: `MessageList`
+(150) → `<aside>` (183, chứa checkpoint bar + PlanPanel) → `Composer` (292), tức Plan
+nằm **dưới** danh sách tin nhắn và **trên** composer. Nó không đẩy tin nhắn xuống,
+nhưng **chiếm chiều cao của cột giữa** — mỗi lượt đang mở Plan thì vùng chat bị co
+lại. Đây là câu hỏi mở, không phải đã chốt: phương án "cột phải thành drawer ở màn
+hẹp" giải quyết được việc đó nhưng cần một ngưỡng mới và một nút mở, tức thêm một
+breakpoint nữa phải khai cùng lúc ở Tailwind và ở JS. Mobile vẫn là một cột với
+sidebar dạng drawer — chưa có drawer cho cột phải.
+
+### 14.2 Hội thoại
+
+**Đang có:** `.bubble` bo `2xl` 16px; người dùng `bg-accent-soft`, trợ lý `bg-surface`;
+hướng đọc bằng nền + căn lề, không có đuôi (§5.1).
+
+**Đích** — chuyển từ "chat bubble" sang "khối trả lời biên tập":
+
+- Trợ lý **không** bọc toàn bộ trong card. Nội dung trả lời là nội dung trực tiếp;
+  chỉ hàng bằng chứng (đã đổi N file, test N/N) nằm trong khối có nền.
+- Người dùng: compact hơn, bo 12px (`xl`) thay vì 16px, bề rộng tối đa ~72%.
+- Các tin liên tiếp của cùng một lượt gom thành một khối; avatar không lặp ở mọi
+  dòng.
+- Mỗi lượt có **turn header** ngắn: số thứ tự, tên việc, giờ bắt đầu, số hành động,
+  số file đổi — để đọc lại không phải quét toàn bộ lịch sử.
+
+Lưu ý bo góc: `xl` 12px cho bubble người dùng là **đổi vai trò** của `2xl` đang
+được §4.1 gán cho "bubble, khung modal, vỏ composer". Sửa thì sửa §4.1 cùng lượt.
+
+### 14.3 Tool execution — chỗ đáng đầu tư nhất
+
+Dữ liệu đã có phase (`tool-trace.tsx:123` đọc `phase: 'start' | 'done'`), hiển thị thì
+chưa thành năm lớp. Đích là thẻ tool năm lớp:
+
+1. **Đầu thẻ**: icon, tên hành động bằng ngôn ngữ người dùng hiểu, trạng thái
+   (`Queued` · `Running` · `Waiting` · `Completed` · `Failed`), thời gian chạy,
+   phạm vi (project / file / workspace).
+2. **Thân mặc định**: làm gì, đầu vào chính, kết quả ngắn, file bị đụng.
+3. **Thân mở rộng** (mới hiện raw command, stdout/stderr, payload, trace).
+4. **Đường trạng thái bên trái** — tín hiệu thứ hai ngoài màu, theo §6.
+5. **Nhóm theo phase**: PLAN → IMPLEMENT → REVIEW. Đây là thứ tạo cảm giác agent
+   có phương pháp thay vì spam tool.
+
+Trạng thái phải có cả icon **và** chữ: màu đơn độc là vi phạm §6.
+
+### 14.4 Composer
+
+Đang có: model selector, nút Send đổi thành Stop khi stream, phạm vi ngữ cảnh.
+Đích: hàng phụ ở chân (model · scope · gửi) với chữ nhỏ hơn chữ trong ô nhập, để
+không cạnh tranh với nội dung người dùng đang gõ; vùng focus mở rộng nhẹ theo chiều
+dọc; **context pill** dạng `@đường/dẫn`, `@diff-hiện-tại`, `@lỗi-gần-nhất` — giới hạn
+số pill hiển thị, quá 3 thì gom lại.
+
+### 14.5 Bốn cơ chế tạo cảm giác "thông minh"
+
+Không cần màu mới hay gradient. Bốn thứ này đủ:
+
+1. **Trạng thái agent rõ nghĩa.** Danh sách đích: `Planning` · `Inspecting` ·
+   `Editing` · `Running` · `Waiting for approval` · `Verifying` · `Completed` ·
+   `Blocked`. Hiện `status-line.tsx` chỉ có một lớp trạng thái mảnh.
+2. **Bằng chứng trước lời nói.** Mỗi kết quả quan trọng kèm: số file đổi, test
+   chạy, mức rủi ro, và mở được ra diff / log test / danh sách file. Nền tảng đã có
+   (`evidence-badge.tsx` dùng ở `plan-panel.tsx` và `hud/agent-hud.tsx`).
+3. **Phê duyệt có ngữ cảnh.** Đúng thứ tự: muốn làm gì → vì sao cần quyền → file
+   nào bị đụng → rủi ro → `Allow once` / `Allow for project` / `Deny`.
+4. **Hành động kế tiếp.** Xong việc không chỉ hiện "Done": gợi ý
+   `[Chạy preview] [Xem diff] [Tạo commit]`.
+
+### 14.6 Signature — bản sắc không bằng trang trí
+
+Nhận diện của Vyen nằm ở: cách gom hội thoại, cách tool thành timeline, cách
+approval trình bày rủi ro, cách composer phản hồi ngữ cảnh, và **một màu "signal"
+xuất hiện đúng lúc**. Không cạnh tranh bằng việc thêm màu.
+
+### 14.7 Cái không nên làm
+
+- Không thêm glassmorphism, gradient, hiệu ứng nặng để gây ấn tượng.
+- Không tăng shadow toàn app để tạo chiều sâu — chỉ tăng khả năng phân biệt ở
+  đúng vùng quan trọng.
+- Không đổi `maxWidth.thread` chỉ vì một con số tròn hơn.
+- Không đổi bo góc bubble mà không sửa §4.1 cùng lượt.
+
+### 14.8 Thứ tự ưu tiên
+
+| Mức | Việc |
+|---|---|
+| P0 | Sửa `accent-dim` và chấm trí Settings (§13.2) · triển khai typography Inter · visual QA ở 375 / 768 / 1024 / 1440px |
+| P1 | Khối trả lời biên tập (trợ lý không bọc card) · gom lượt + turn header · thẻ tool năm lớp · nhóm tool theo phase · composer mới |
+| P2 | Task control rail · bằng chứng mở được · approval theo rủi ro · hành động kế tiếp · context pill |
+| P3 | Chuyển động 150–200ms · chỉ báo streaming · hover/focus · drawer ở mobile · bàn phím · nhánh reduced-motion |
+
+P0 phải xong trước P1: sửa chữ và tương phản trước khi đổi bố cục, vì bố cục mới
+làm số chỗ hiển thị chữ tăng lên.
+
+### 14.9 Điều kiện nghiệm thu
+
+Cùng bộ ảnh như §12 — 375 / 768 / 1024 / 1440px, cộng mobile — cho **bốn** vùng:
+composer, một lượt hội thoại có tool chạy, một diff/approval, và Settings. Ảnh phải
+chụp cả trạng thái đang chạy và trạng thái lỗi. Không có ảnh thì không đánh giá được
+bố cục, khoảng trắng và mật độ — và đây là mục cuối cùng của tài liệu vì mọi thứ
+trước đó chỉ là điều kiện cần.
