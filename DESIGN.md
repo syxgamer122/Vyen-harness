@@ -1010,15 +1010,30 @@ vế còn thiếu của §14.1 (cột phải là tóm tắt trạng thái, khôn
 **Chốt trước — "một lượt" là gì.** Lượt là đơn vị công việc người dùng giao và agent
 theo đuổi tới lúc dừng, không phải "một khoảng thời gian" hay "một tin nhắn". Ranh
 giới lượt phải là **dữ liệu gắn theo sự kiện**, không suy đoán lúc vẽ: nếu mỗi chỗ
-render tự gom lại thì hai màn hình sẽ gom khác nhau. Bốn tình huống dễ mơ hồ, chốt
-như sau:
+render tự gom lại thì hai màn hình sẽ gom khác nhau. Và ranh giới do **điều khiển người
+dùng quyết định**, không do máy phân loại nội dung tin nhắn:
+
+- Gửi từ composer khi có lượt đang chạy = **điều chỉnh việc hiện tại** (bổ sung, sửa
+  yêu cầu) → thuộc lượt cũ, hiện thành đoạn điều chỉnh.
+- Giao một **việc khác** phải đi qua **New task** (§14.1) → lượt mới ở trạng thái
+  `chờ bắt đầu`, không được gộp âm thầm vào lượt cũ.
+- Khi lượt cũ **đang chờ quyền**: tin nhắn **trả lời đúng câu đang chờ** (cho phép /
+  từ chối / thông tin bị hỏi) thuộc lượt cũ; mọi tin khác là lượt mới `chờ bắt đầu`.
 
 | Tình huống | Thuộc lượt nào | Vì sao |
 |---|---|---|
-| Người dùng gửi tin mới khi agent **đang chạy** | Lượt đang mở, như một đoạn điều chỉnh | Chưa có điểm dừng nào, nên đây là ngữ cảnh bổ sung cho cùng một việc |
-| Người dùng **Stop** rồi gửi tiếp | Lượt mới; lượt cũ đóng ngay tại chỗ bấm Stop với trạng thái **đã hủy** | Stop là điểm kết thúc do người dùng đặt, không phải tạm dừng |
+| Gửi bổ sung / sửa yêu cầu khi agent đang chạy | Lượt đang mở, thành đoạn điều chỉnh | Cùng mục tiêu, chưa có điểm dừng nào |
+| Giao việc khác khi agent đang chạy | Lượt mới, `chờ bắt đầu`, xếp hàng sau lượt cũ | Việc khác không phải là phần của việc đang làm |
+| Người dùng **Stop** rồi gửi tiếp | Lượt mới; lượt cũ chỉ đóng khi các tool đã thực sự dừng (xem điều kiện dừng ở dưới) | Stop là điểm kết thúc do người dùng đặt, không phải tạm dừng |
 | Bấm **Retry** sau lỗi | **Không** tạo lượt mới — thêm một lần thử trong cùng lượt | Lỗi cũ phải còn nhìn thấy được; lượt mang trạng thái của lần thử cuối |
-| Tin nhắn đến khi lượt **đang chờ quyền** | Lượt đang mở | Lượt chưa kết thúc, chỉ đang chờ người dùng quyết định |
+| Tin nhắn trả lời câu đang chờ quyền | Lượt đang mở | Đó chính là câu hỏi của lượt |
+| Tin khác khi lượt đang chờ quyền | Lượt mới, `chờ bắt đầu` | Chưa tới lượt nó |
+
+**Stop không kết thúc lượt ngay.** Bấm Stop đưa lượt sang **`đang dừng`**; lượt chỉ
+trở thành **`đã hủy`** khi mọi tool đã thực sự ngừng chạy — tool nào còn dang dở thì
+được đánh dấu `bị bỏ dở` (§15.5). Lý do: nếu UI báo "đã hủy" mà tiến trình vẫn đang
+ghi file thì người dùng sẽ tin một trạng thái không có thật. `đang dừng` là trạng
+thái có thật trong bảng §15.5, không phải nhãn loading tạm.
 
 Lượt **kết thúc** khi agent đã dừng và không còn tool nào đang chạy hay chờ quyền —
 tức ở một trong các trạng thái cuối của bảng §15.5. Lượt chỉ có trả lời mà không có
@@ -1139,10 +1154,12 @@ overlay. Xanh trầm là **tín hiệu đúng lúc**, không phải màu phủ m
 **1.018:1** (§2.3). Đọc đúng con số này: đây là **nguy cơ phân lớp quá nhẹ, cần nhìn
 UI thật để xác nhận**, không phải một kết luận thị giác đã đo. Tỉ lệ tương phản WCAG
 không chứng minh hai nền không phân biệt được bằng mắt — diện tích, khoảng cách và
-các yếu tố quanh nó đều ảnh hưởng. Điều chắc chắn là: các tầng nền gần trắng **không
-đủ để một mình tạo lớp**, nên cách duy nhất hiện nay là viền; muốn bỏ viền thì phải
-đổi **cách** phân cấp, chứ không phải tăng bóng. Việc xác nhận bằng mắt thuộc
-§12/§14.9 (cần ảnh), không thuộc phép tính trên mã.
+các yếu tố quanh nó đều ảnh hưởng. Vì vậy phần "nền không đủ để một mình tạo lớp"
+vẫn chỉ là **giả thuyết cần kiểm bằng mắt**, không phải điều đã chứng minh: chưa ai
+đo được bằng mắt trong môi trường này. Yêu cầu của điểm 13 thì vẫn giữ nguyên —
+phân cấp bằng vị trí, khoảng trắng, độ đậm chữ và nền nhẹ, chứ không phải bằng cách
+thêm viền và shadow khắp nơi. Việc xác nhận bằng mắt thuộc §12/§14.9 (cần ảnh), không
+thuộc phép tính trên mã.
 
 **14. Tách nhu cầu đọc prose khỏi nhu cầu xem code/diff.** Cột hội thoại giữ ổn định
 (`maxWidth.thread`), nhưng nội dung kỹ thuật dài cần **vùng xem mở rộng**. Cột phải
@@ -1157,7 +1174,9 @@ có cuộn lồng, và người dùng có mất vị trí đọc hay không.
 
 **Chốt A — vùng xem mở rộng.** Một vùng duy nhất, nhiều ngăn (Plan · File · Test log ·
 Diff), mỗi lần mở một ngăn. Nó **phủ lên** chứ không đẩy: cột hội thoại giữ nguyên
-768px nên danh sách tin nhắn không bị đo lại và không co. Khi mở, trang nền khoá cuộn
+`maxWidth.thread` — tức giữ `max-width: 768px` **và** chiều rộng responsive hiện tại,
+không ép cột luôn rộng đúng 768px (trên mobile nó vẫn co về 100%) — nên danh sách tin
+nhắn không bị đo lại và không co. Khi mở, trang nền khoá cuộn
 và **chỉ vùng xem cuộn** — một ngữ cảnh cuộn duy nhất, không cuộn lồng. Đóng bằng
 `Esc` hoặc nút đóng, và khi đóng thì **trả nguyên vị trí đọc** của hội thoại (nối tiếp
 điểm 16). Vùng xem thuộc tầng dialog của §8.1 — không thêm tầng z mới, không thêm
@@ -1233,13 +1252,17 @@ dưới là bản chốt.
 
 | Khoá | Hiển thị | Nghĩa chính xác | Không dùng khi |
 |---|---|---|---|
-| `queued` | đang chờ | đã nhận yêu cầu, chưa bắt đầu | — |
+| `queued` | chờ bắt đầu | đã nhận yêu cầu, chưa bắt đầu xử lý | — |
 | `running` | đang làm | còn tiến triển | đang chờ người dùng |
 | `waiting_approval` | chờ bạn quyết định | agent đã dừng, không có tiến triển cho tới khi người dùng trả lời: cấp quyền, chọn phương án, hoặc bổ sung thông tin | còn tool đang chạy |
 | `completed` | xong | agent đã dừng và báo hoàn tất | muốn nói kết quả đã được kiểm chứng |
 | `blocked` | bị chặn | không tiếp tục được và agent nói được **thiếu gì**; người dùng phải đổi điều kiện rồi chạy lại | lỗi đã xảy ra mà không cần ai làm gì |
 | `failed` | lỗi | đã thử và hỏng | chỉ thiếu quyền hoặc thiếu thông tin |
-| `cancelled` | đã hủy | người dùng bấm Stop | agent tự dừng vì lỗi |
+| `stopping` | đang dừng | người dùng đã bấm Stop, vài tool còn đang thực thi | đã chắc chắn mọi tool đã ngừng |
+| `cancelled` | đã hủy | mọi tool đã ngừng chạy; lượt đóng ở đây | còn tool đang thực thi — khi đó phải hiện `đang dừng` |
+
+`stopping` chỉ có ở lượt; tool trong lúc đó giữ `đang chạy` cho tới khi thoát, rồi
+chuyển `bị bỏ dở` (hoặc `lỗi` nếu chính nó hỏng).
 
 **Bằng chứng** — sáu bậc đã có ở `lib/evidence.ts`, nhãn badge là copy của
 `describeEvidence`; chốt dùng đúng nhãn đó, không tự đặt tên khác: `Kế hoạch · chưa
@@ -1248,9 +1271,10 @@ chặn` · `Thất bại`.
 
 **Ba cặp dễ lẫn — quy tắc phân biệt:**
 
-- **Đang chạy vs Chờ bạn quyết định.** Chờ hệ thống (mạng, tiến trình con, model) là
-  *đang chạy*; chờ **người dùng** mới là *chờ bạn quyết định*. Không có nhãn "đang
-  chờ" trơ một mình — luôn phải nói chờ ai, chờ gì.
+- **Chờ cái gì.** Mọi nhãn bắt đầu bằng "chờ" phải nói rõ chờ ai: **chờ bắt đầu**
+  (chưa tới lượt xử lý), **chờ bạn quyết định** (đang chờ người dùng trả lời). Chờ
+  hệ thống — mạng, tiến trình con, model — hiển thị là *đang chạy*. Không có nhãn
+  "chờ" trơ một mình.
 - **Bị chặn vs Lỗi.** *Bị chặn* là biết vì sao và còn lối ra: câu hỏi kèm theo là
   "cần gì để mở". *Lỗi* là đã thử và hỏng: câu hỏi kèm theo là "hỏng ở đâu". Chặn
   không tự biến thành lỗi sau vài lần thử, và lỗi không được hiển thị như chặn.
@@ -1258,10 +1282,14 @@ chặn` · `Thất bại`.
   `reported_done`). *Đã xác minh* đòi biên nhận kiểm thử thật (`verified`). Vì vậy
   nhãn "xong" **không bao giờ** đi kèm dấu tick xanh.
 
-**Tên việc vs trạng thái.** Danh sách ở §14.5 (`Planning`, `Inspecting`, `Editing`,
-`Running`, `Verifying`…) là **việc đang làm** — một cụm động từ, không phải trạng
-thái. Hai thứ là hai trường riêng: việc đang làm không chứa từ trạng thái, và trạng
-thái không chứa động từ.
+**Hoạt động vs trạng thái vòng đời.** Danh sách ở §14.5 (`Planning`, `Inspecting`,
+`Editing`, `Running`, `Verifying`…) là **hoạt động đang diễn ra**; bảng ở trên là
+**trạng thái vòng đời**. Hai thứ phân biệt bằng **loại trường**, không bằng loại
+từ — riêng tiếng Việt cả hai đều ở dạng "đang …", nên phân biệt bằng cách nói sẽ
+sai. Hai trường độc lập và hiện cùng lúc được (`đang làm · đang sửa file`,
+`chờ bạn quyết định · 2 file chưa đọc`); hoạt động không được thay cho trạng thái —
+không hiện "đang sửa file" khi lượt thật sự đang `chờ bạn quyết định` — và trạng thái
+không được giấu sau một cụm hoạt động.
 
 ### 15.6 Chốt: thế nào là đủ tốt
 
