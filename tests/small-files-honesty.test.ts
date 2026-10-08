@@ -8,8 +8,9 @@
  *    nội dung. Số không có nguồn thì phải bỏ, không được giữ làm trang trí.
  * 3. `components/backup-reminder.tsx` — "Để sau" nhìn như tắt hẳn nhưng thật
  *    ra chỉ giấu 1 ngày, và con số đó không hiện ở đâu cả.
- * 4. `lib/provider-url.ts` — hai hàm luôn `return false`, không phải probe,
- *    không được để UI nào bật/tắt nút theo chúng.
+ * 4. `lib/provider-url.ts` — hàm `supportsThinkingLevel` luôn `return false`,
+ *    không phải probe, không được để UI nào bật/tắt nút theo nó
+ *    (`supportsMediaGeneration` đã xoá trong đợt dọn tàn dư media gen).
  *
  * vitest ở đây chạy `environment: 'node'` (vitest.config.mts) nên không render
  * được component: phần UI đọc SOURCE, phần logic gọi hàm thuần. Mọi source
@@ -24,7 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_TITLE, deriveTitle } from '@/lib/use-title-generator';
 import { groupChatsByDate } from '@/lib/date-groups';
 import { setLastBackupAt, shouldShowReminder, snoozeBackupReminder } from '@/lib/auto-backup';
-import { supportsMediaGeneration, supportsThinkingLevel } from '@/lib/provider-url';
+import { supportsThinkingLevel } from '@/lib/provider-url';
 import type { ChatSession } from '@/lib/db';
 
 const ROOT = path.resolve(__dirname, '..');
@@ -305,7 +306,7 @@ function callSites(name: string): string[] {
     .sort();
 }
 
-describe('lib/provider-url.ts — hai hằng false không giả làm capability probe', () => {
+describe('lib/provider-url.ts — hằng false không giả làm capability probe', () => {
   const BAD_INPUTS = [
     'https://api.openai.com/v1',
     'https://openrouter.ai/api/v1',
@@ -320,25 +321,14 @@ describe('lib/provider-url.ts — hai hằng false không giả làm capability 
     for (const base of BAD_INPUTS) expect(supportsThinkingLevel(base)).toBe(false);
   });
 
-  it('không baseUrl nào làm supportsMediaGeneration đổi giá trị', () => {
-    for (const base of BAD_INPUTS) expect(supportsMediaGeneration(base)).toBe(false);
-  });
-
-  it('supportsMediaGeneration không có caller nào, kể cả trong app/', () => {
-    // Thêm bất kỳ lời gọi nào (UI hay route) -> ĐỎ. Hàm này chưa có nguồn dữ
-    // liệu nào để tra nên chỉ có thể là hằng.
-    expect(callSites('supportsMediaGeneration')).toEqual([]);
-  });
-
   it('supportsThinkingLevel chỉ còn đúng một caller, và nó không phải UI', () => {
     // app/api/chat/route.ts dùng nó làm fast-path nên nhánh if không bao giờ
     // chạy. Thêm caller thứ hai -> ĐỎ.
     expect(callSites('supportsThinkingLevel')).toEqual(['app/api/chat/route.ts']);
   });
 
-  it('không nút nào trong components/ được bật/tắt bằng hai hàm này', () => {
-    const ui = [...callSites('supportsThinkingLevel'), ...callSites('supportsMediaGeneration')]
-      .filter((f) => f.startsWith('components/'));
+  it('không nút nào trong components/ được bật/tắt bằng hàm này', () => {
+    const ui = callSites('supportsThinkingLevel').filter((f) => f.startsWith('components/'));
     expect(ui).toEqual([]);
   });
 

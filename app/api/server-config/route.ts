@@ -5,7 +5,8 @@ export const runtime = 'nodejs';
 /**
  * Cho client biết capability mặc định của server-side model (metadata tĩnh).
  * Tầng gateway env (OPENAI_BASE_URL) đã gỡ — client dựa vào provider active
- * của mình (supportsThinkingLevel/supportsMediaGeneration trên baseUrl BYOK).
+ * của mình (metadata reasoning đọc từ `GET /v1/models` — xem
+ * `lib/reasoning-capability.ts`).
  */
 export async function GET(req: Request) {
   if (!checkSameOrigin(req)) {

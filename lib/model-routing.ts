@@ -8,7 +8,7 @@
  * - Trạng thái KHÔNG được lưu riêng — fold lại toàn bộ message history mỗi
  *   lượt (≤100 tin, deterministic, sống sót qua reload/F5 và không cần bảng
  *   Dexie mới). Server không biết gì về routing: client chỉ override field
- *   `model` trong body như đường media/recipe vẫn làm.
+ *   `model` trong body như đường recipe vẫn làm.
  * - "Thất bại thật" = tool trả lỗi (kể cả lệnh build/test exit ≠ 0) hoặc user
  *   phàn nàn ("sai rồi", "làm lại", "wrong"...). Timeout/429/5xx của LLM nằm
  *   ở annotation error chứ không nằm trong toolInvocations nên tự nhiên

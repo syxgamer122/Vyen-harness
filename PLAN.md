@@ -653,3 +653,52 @@ Phạm vi chốt với người dùng: Mục 1+2 chuyển hẳn worker_threads; 
 - [x] `npm run docs:check` → 0 lệch.
 - [x] `git status` sạch ngoài các file của đợt này: đã hoàn `package-lock.json`
       (npm tự bỏ optional dep Windows khi cài trên Linux) và anchor log sinh bởi test.
+
+---
+
+## ĐỢT DỌN TÀN DƯ MEDIA GEN (2026-10-08)
+
+Cơ chế ngừng sinh ảnh/video đã xong từ trước (`app/api/chat/route.ts` trả 410
+`MEDIA_GENERATION_RETIRED`; `components/model-selector.tsx` lọc model media;
+`lib/media-models.ts` + `tests/{chat-media-retirement,model-picker-retirement,media-models}.test.ts`).
+Đợt này dọn phần còn lại: code chết, comment và tài liệu vẫn mô tả tính năng
+như đang sống.
+
+### Việc đã làm
+
+- [x] `lib/provider-url.ts`: xoá `supportsMediaGeneration` — 0 caller (test
+      `tests/small-files-honesty.test.ts` từng khoá đúng điều đó); sửa test
+      theo: bỏ import + 2 case, giữ phần `supportsThinkingLevel` (hàm này còn
+      caller thật ở route chat nên không xoá).
+- [x] `app/api/providers/models/route.ts`: xoá nhánh tiêm `qwen-video` cho host
+      `gateway.lol` — model media bị picker lọc nên không có đường nào tới
+      người dùng; xoá luôn biến `host` chỉ phục vụ nhánh đó.
+- [x] `README.md`: bỏ bullet "Sinh ảnh/video" và câu "đang dùng cho tạo ảnh";
+      sửa "như đường media/recipe" → "recipe"; dòng giới thiệu model ghi đúng
+      catalog thật (6 model OpenAI + provider BYOK) thay cho "32 model chat kèm
+      5 model sinh ảnh/video".
+- [x] Comment mô tả tính năng đã ngừng: `lib/json-repair.ts`,
+      `lib/models.ts`, `lib/vision-bridge.ts`, `lib/model-routing.ts`,
+      `lib/markdown-preprocess.ts`, `app/api/server-config/route.ts`,
+      `react/use-chat-orchestration.ts`.
+- [x] `lib/models.ts`: bỏ literal `'media'` khỏi `ModelCategory` (không còn ai
+      dùng); giữ `MediaKind`/`ModelConfig.media`/`mediaKindOf` vì route chat
+      dùng để nhận diện id cũ và `tests/chat-media-retirement.test.ts` mock.
+- [x] Giữ có lý do (không phải tàn dư): `lib/media-models.ts` +
+      `lib/model-meta.ts` (bộ lọc/picker dùng thật), field `media` của
+      `app/api/server-config` (launcher probe đọc làm dấu nhận diện server —
+      `scripts/launch-desktop.cjs:545`), `lib/markdown-preprocess.ts` (vẫn
+      render URL ảnh/video trần nói chung).
+
+### Kết quả chạy
+
+- [x] `npm run typecheck` → 0 lỗi. (Lần đầu TS1005 vì comment `ModelConfig.media`
+      bị cụt `*/` do sửa vụng — sửa lại rồi chạy lại, 0 lỗi.)
+- [x] `npm run lint` → 0 error, 10 warning có sẵn từ trước (không warning nào ở
+      file của đợt này).
+- [x] `npx vitest related <10 file đã sửa> --run` → 73 file / 1763 test PASS,
+      nhưng exit 1 vì 1 `EnvironmentTeardownError` (dexie nạp sau khi teardown)
+      ở `tests/web-bridge.test.ts` — chạy thẳng file đó cùng 8 file liên quan →
+      9 file / 209 passed + 2 skipped, exit 0.
+- [x] `npx vitest run tests/markdown-preprocess.test.ts` → 12 passed.
+- [x] `npm run docs:check` → 0 lệch (10 tài liệu, 666 file theo dõi).

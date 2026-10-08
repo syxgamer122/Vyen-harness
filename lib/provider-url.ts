@@ -102,23 +102,6 @@ export function supportsThinkingLevel(baseUrl: string | null | undefined): boole
 }
 
 /**
- * KHÔNG phải capability probe — đây là hằng số trả về `false`, và hiện KHÔNG
- * có caller nào trong repo (đã grep toàn bộ `.ts`/`.tsx`, kể cả test).
- *
- * Lý do không thể trở thành probe: khả năng sinh media không nằm trên
- * baseUrl mà nằm trên TÊN MODEL, và cơ chế tra tên đó đã tồn tại và đã dùng:
- * `lib/media-models.ts` (`detectMediaKind` / `isRetiredMediaOption`), dùng ở
- * `components/model-selector.tsx` để loại các model media đã ngừng hoạt
- * động. Model media built-in đã gỡ khỏi catalog từ lâu.
- *
- * Đừng thêm UI nào gọi hàm này để bật/tắt nút: nó không đọc gì cả.
- */
-export function supportsMediaGeneration(baseUrl: string | null | undefined): boolean {
-  void baseUrl;
-  return false;
-}
-
-/**
  * Mọi provider đều cần key BYOK (ô nhập key luôn hiện). Hàm giữ lại vì
  * nhiều nơi gọi; NO_AUTH_HOSTS rỗng là mặc định an toàn.
  */

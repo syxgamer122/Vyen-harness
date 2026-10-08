@@ -59,7 +59,7 @@ export function extractImageDataUrl(url: string): ImagePayload | null {
   return { mimeType: m[1].toLowerCase(), base64: m[2].replace(/\s+/g, '') };
 }
 
-/** Bridge chỉ chạy cho model chữ thuần; model media (tạo ảnh/video) bỏ qua. */
+/** Bridge chỉ chạy cho model chữ thuần; model khai báo không xem được ảnh (kể cả model media cũ) bỏ qua. */
 export function shouldBridgeImages(model: {
   supportsImages: boolean;
   media?: unknown;

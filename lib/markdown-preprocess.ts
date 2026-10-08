@@ -3,9 +3,8 @@ const TAIL_WINDOW = 400;
 const HEAVY_PASS_LIMIT = 120_000;
 
 /**
- * Gateway sinh ảnh (qwen-image, flux...) trả link ảnh trơn trong text —
- * nâng thành markdown image để hiển thị trực tiếp. Bỏ qua URL đã nằm trong
- * cú pháp markdown (bắt đầu bằng "(" hoặc "]").
+ * Nâng URL ảnh trần trong text thành markdown image để hiển thị trực tiếp.
+ * Bỏ qua URL đã nằm trong cú pháp markdown (bắt đầu bằng "(" hoặc "]").
  */
 const BARE_IMAGE_URL =
   /(^|[\s>])(https?:\/\/[^\s<>()]+\.(?:png|jpe?g|webp|gif|avif)(?:\?[^\s<>()]*)?)(?=[)\s.,!?]|$)/gi;
@@ -321,14 +320,14 @@ function stripControlChars(s: string): string {
 }
 
 const IMAGE_EXT_RE = /\.(?:png|jpe?g|webp|gif|svg)(?:[?#][^\s<>)]*)?$/i;
+/** CDN của các model sinh ảnh cũ — giữ để hiển thị đúng dữ liệu/lịch sử cũ. */
 const IMAGE_HOST_RE =
   /^https?:\/\/(?:cdn\.qwenlm\.ai|media\.pollinations\.ai|image\.pollinations\.ai)\//i;
 
 /**
- * Model sinh ảnh (qwen-image, flux...) thường trả về URL ảnh trần trong text.
- * Biến thành cú pháp markdown ảnh để render trực tiếp trong bubble.
- * Bỏ qua URL đã nằm trong cú pháp link/image sẵn — không đụng code fence
- * vì hàm này chỉ chạy trên segment text.
+ * Biến URL ảnh/video trần trong text thành cú pháp markdown để render trực
+ * tiếp trong bubble. Bỏ qua URL đã nằm trong cú pháp link/image sẵn — không
+ * đụng code fence vì hàm này chỉ chạy trên segment text.
  */
 function embedBareImageUrls(s: string): string {
   if (!s.includes('http')) return s;
@@ -337,8 +336,8 @@ function embedBareImageUrls(s: string): string {
     (match, lead: string, url: string) => {
       const clean = url.replace(/[.,!?;]+$/, '');
       const punct = url.slice(clean.length);
-      // Video (qwen-video trả mp4 từ chính các host ảnh) — để nguyên URL trần,
-      // GFM autolink + component `a` sẽ render <video> thay vì <img>.
+      // Video (mp4/webm) — để nguyên URL trần, GFM autolink + component `a`
+      // sẽ render <video> thay vì <img>.
       const isVideo = /\.(?:mp4|webm)(?:[?#][^\s<>)]*)?$/i.test(clean);
       const isImage =
         !isVideo && (IMAGE_EXT_RE.test(clean) || IMAGE_HOST_RE.test(clean));

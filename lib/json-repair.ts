@@ -1,11 +1,12 @@
 /**
- * Sửa JSON hỏng trong đường SSE tạo ảnh/video (port từ prime-agent
- * `packages/ai/src/utils/json-parse.ts`, MIT — Prime Intellect / Mario Zechner,
- * lược bỏ phần partial-parse vì mỗi dòng `data:` của SSE là JSON hoàn chỉnh).
+ * Sửa JSON hỏng trên đường stream (MCP tool-mapper + parser tool-call của
+ * emulated agent; port từ prime-agent `packages/ai/src/utils/json-parse.ts`,
+ * MIT — Prime Intellect / Mario Zechner, lược bỏ phần partial-parse vì mỗi
+ * dòng `data:` của SSE là JSON hoàn chỉnh).
  *
- * Vấn đề: gateway free thỉnh thoảng nhả JSON có control character chưa escape
+ * Vấn đề: gateway thỉnh thoảng nhả JSON có control character chưa escape
  * hoặc backslash sai (thường do status text chứa ký tự lạ) — `JSON.parse`
- * ném lỗi và cả dòng event bị DROP IM LẶNG, mất luôn event image/video/url.
+ * ném lỗi và cả dòng event bị DROP IM LẶNG, mất luôn payload hợp lệ.
  * `repairJson` xử lý đúng 2 dạng hỏng đó mà không đụng nội dung hợp lệ.
  */
 

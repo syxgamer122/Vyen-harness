@@ -25,7 +25,7 @@
 - **Lead/Worker routing**: model mạnh chạy vài lượt đầu (lập kế hoạch) rồi model rẻ thực thi; tool lỗi liên tiếp / build-test fail / bạn phàn nàn ("sai rồi", "làm lại"…) thì tự quay lại model mạnh `fallbackTurns` lượt. Lỗi 429/5xx của gateway và việc bạn TỪ CHỐI phê duyệt không tính là thất bại. Vai trò từng lượt hiện badge `lead`/`worker` dưới câu trả lời; cấu hình trong Settings → Routing. Lệnh `/plan <mục tiêu>` lập kế hoạch bằng planner model ở chế độ chỉ-đọc, duyệt xong bấm "Duyệt & thực hiện" để chuyển sang Act.
 - **Auto-backup**: nhắc định kỳ theo chu kỳ tuỳ chọn; desktop Chrome/Edge chọn được thư mục để app **tự ghi file .json ngầm** khi đến kỳ (File System Access API).
 - **PWA cài lên thiết bị**: Android/Chrome bấm "Cài đặt ứng dụng" hoặc nút trong Settings; iOS Safari → Chia sẻ → Thêm vào Màn hình chính. Có trang offline khi mất mạng.
-- **32 model chat** (GPT/Claude/DeepSeek/Gemini/MiniMax/Grok/Qwen/Kimi) qua gateway tương thích OpenAI, kèm 5 model sinh ảnh/video riêng.
+- **Model qua provider BYOK**: catalog sẵn có 6 model OpenAI (ChatGPT-4o Latest, GPT-4o, GPT-4o Mini, o1, o1-mini, o3-mini); provider BYOK tự liệt kê model của nó. **Sinh ảnh/video đã ngừng** — model media bị lọc khỏi picker và route chat trả 410 `MEDIA_GENERATION_RETIRED`.
 
 ## Agent coding
 
@@ -52,7 +52,7 @@ Vyen đọc tự do nhưng ghi có kỷ luật: mọi thao tác ghi file / chạ
 ### Tự chủ & bảo mật key (bản desktop)
 
 - **Không cần key của server**: mọi route LLM (chat, tiêu đề, nén ngữ cảnh, orchestrator, vision) chạy hoàn toàn với Nhà cung cấp của bạn (BYOK) — sau khi cấu hình provider trong Cài đặt, bản desktop không phụ thuộc biến môi trường nào. Key pool/chain của server chỉ còn vai trò cho chế độ demo web.
-- **LLM fetch qua Web/bridge**: bản desktop (launcher Edge/Chrome `--app`) gọi gateway trực tiếp từ Web (không gắn header Origin lạ) nên các gateway chặn origin của trình duyệt thường không còn là rào cản (đang dùng cho tạo ảnh; response buffer, trần 10MB/300s, header qua allowlist).
+- **LLM fetch qua Web/bridge**: bản desktop (launcher Edge/Chrome `--app`) gọi gateway trực tiếp từ Web (không gắn header Origin lạ) nên các gateway chặn origin của trình duyệt thường không còn là rào cản (response buffer, trần 10MB/300s, header qua allowlist).
 - **Kho key mã hoá opt-in**: bật "Lưu API key mã hoá" trong Cài đặt → Nhà cung cấp để key nằm trong Credential Manager của hệ điều hành (safeStorage — DPAPI/Keychain/libsecret); IndexedDB chỉ giữ con trỏ `@secure:`, key thật không bao giờ ghi plaintext. Vault lỗi/thiếu → từ chối lưu mã hoá rõ ràng, không lặng lẽ hạ cấp.
 
 ### MCP & Tool Router
@@ -164,10 +164,9 @@ Hệ thống Cài đặt được tổ chức lại theo 6 nhóm chức năng tr
 ### Kiểm soát ngữ cảnh & model
 
 - **Compaction**: hội thoại dài tự nén qua `/api/compact` — phần cũ thay bằng summary, dữ kiện quan trọng (file đã chạm, yêu cầu đã nêu) sống sót qua nhiều lần nén.
-- **Lead/Worker routing**: state machine tính lại từ toàn bộ lịch sử mỗi lượt (không lưu state riêng — sống sót qua reload), client chỉ override field `model` của request như đường media/recipe; server không cần biết. `/plan` chạy planner model đúng một lượt rồi nhả về routing thường.
+- **Lead/Worker routing**: state machine tính lại từ toàn bộ lịch sử mỗi lượt (không lưu state riêng — sống sót qua reload), client chỉ override field `model` của request như đường recipe; server không cần biết. `/plan` chạy planner model đúng một lượt rồi nhả về routing thường.
 - **Thanh trượt suy luận**: 4 mức low/medium/high/max; mức nào khả dụng đọc từ metadata `/v1/models` (chuẩn OpenRouter) nên model không hỗ trợ không nhận tham số rác.
 - **Ngân sách tool**: tối đa 32 lần gọi tool mỗi lượt (đếm theo hội thoại, không reset khi client resubmit), tự chặn gọi trùng tham số và phát hiện doom-loop để bảo model đổi hướng; kết quả tool bị cắt ở 24.000 ký tự.
-- **Sinh ảnh/video**: nút trong ô nhập gọi thẳng nhà cung cấp để tạo ảnh hoặc video ngay trong khung chat, tự fallback qua server khi nhà cung cấp chặn CORS.
 - **Emulated tool-calling**: model không hỗ trợ function calling vẫn dùng được toàn bộ tool — schema render thành text trong system prompt, model trả khối `<tool_call>` JSON, server parse + thực thi + vòng lặp (trần 10 vòng, 5 call/vòng, chống model tự bịa kết quả tool).
 
 ## Tech stack

@@ -1,7 +1,7 @@
 export type ProviderId = 'openai';
-export type ModelCategory = 'general' | 'coding' | 'reasoning' | 'fast' | 'media';
+export type ModelCategory = 'general' | 'coding' | 'reasoning' | 'fast';
 
-/** Model sinh media: route /api/chat đi đường riêng (images API / SSE type:video). */
+/** Loại media của model cũ (ảnh/video) — tính năng đã ngừng, chỉ còn để nhận diện id cũ. */
 export type MediaKind = 'image' | 'video';
 
 export interface ModelConfig {
@@ -20,7 +20,7 @@ export interface ModelConfig {
   readonly supportsTemperature: boolean;
   readonly supportsImages: boolean;
   readonly supportsPdf: boolean;
-  /** Có mặt = model sinh ảnh/video, không phải model chat. */
+  /** Có mặt = model media cũ; route chat dùng để nhận diện id cũ và chặn. */
   readonly media?: MediaKind;
 }
 
@@ -215,8 +215,8 @@ export function resolveProviderModelChain(model: ModelConfig): readonly string[]
   push(model.providerModel);
   for (const f of model.providerModelFallbacks) push(f);
 
-  // Model media: KHÔNG chèn model chat mặc định vào chuỗi — nếu provider không
-  // có model ảnh/video thì phải báo lỗi, chứ không âm thầm trả về text.
+  // Model media cũ: KHÔNG chèn model chat mặc định vào chuỗi — nếu provider
+  // không có model đó thì phải báo lỗi, chứ không âm thầm trả về text.
   if (model.media === undefined && model.id !== DEFAULT_MODEL_ID) {
     const d = MODEL_BY_ID.get(DEFAULT_MODEL_ID);
     if (d) {

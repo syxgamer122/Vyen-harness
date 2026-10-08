@@ -5433,7 +5433,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       /* Tìm kiếm web (toggle Globe): tra cứu TRƯỚC khi submit rồi gửi kèm qua
          per-call body — useChat gộp options.body lên config body mỗi lần gọi,
          nên không đụng stale closure như đường state→ref của compaction.
-         Media không cần web; lỗi tra cứu chỉ cảnh báo, KHÔNG chặn gửi. */
+         Lỗi tra cứu chỉ cảnh báo, KHÔNG chặn gửi. */
       if (!modelOverride && webSearchEnabled && userText) {
         setWebBusy(true);
         webBusyRef.current = true;
@@ -5634,7 +5634,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   const recipeSnapshotRef = useRef<readonly Message[] | null>(null);
 
   /* Run mới xuất hiện trong store → chụp snapshot + gửi lượt mở đầu qua
-     submitTurn (hưởng đủ gate busy/web/media + body.recipe). */
+     submitTurn (hưởng đủ gate busy/web + body.recipe). */
   useEffect(() => {
     const run = recipeActiveRun;
     if (!run || run.runId === lastRecipeRunIdRef.current) return;
