@@ -426,9 +426,9 @@ RootLayout (app/layout.tsx)
 > **Đồng bộ 2026-10-04**: mốc kiểm chứng trước đây đạt **222** suite trong `tests/` (nay là **223**, xem ghi chú bên dưới) và **2,629 tests PASS**.
 >
 > **Đồng bộ 2026-10-07 (đợt LƯỢT)**: thêm `tests/turns.test.ts` (mô hình lượt: ranh giới theo sự kiện + bảng trạng thái §15.5).
-> **Đồng bộ 2026-10-07 (đợt P1-D)**: **224 file `tests/*.test.ts`** — thêm `tests/tool-phases.test.ts` (nhóm phase + phạm vi tool). Số file TSX: **68**, tổng dòng **17,805 / 17,873** như dòng đầu tài liệu ghi.
+> **Đồng bộ 2026-10-07 (đợt P1-D)**: **225 file `tests/*.test.ts`** — thêm `tests/tool-phases.test.ts` (nhóm phase + phạm vi tool). Số file TSX: **68**, tổng dòng **17,805 / 17,873** như dòng đầu tài liệu ghi.
 >
-> **Đồng bộ 2026-10-08 (đợt P1-E)**: số file `tests/*.test.ts` **không đổi** (224) —
+> **Đồng bộ 2026-10-08 (đợt P1-E)**: số file `tests/*.test.ts` **không đổi** (225) —
 > hợp đồng mới của composer nằm trong `tests/composer-affordances.test.ts` (49 → 68
 > test). Số file TSX: **68**, tổng dòng **17,941 / 18,009** — toàn bộ phần tăng
 > (+136) nằm ở `components/composer.tsx` (1,435 → 1,571 dòng).
