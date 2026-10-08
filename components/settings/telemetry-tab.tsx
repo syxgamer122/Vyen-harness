@@ -107,7 +107,7 @@ export function TelemetryTab() {
   };
 
   return (
-    <div className="space-y-4 font-mono text-ui">
+    <div className="space-y-4 font-sans text-ui">
       {/* Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-subtle pb-3">
         <div className="flex items-center gap-2">
@@ -120,7 +120,7 @@ export function TelemetryTab() {
            * thật của ring buffer thay vì gõ `500` cứng.
            */}
           {bufferedSpans > 0 && (
-            <span className="rounded-full border border-subtle bg-raised px-2 py-0.5 font-mono text-micro tabular-nums text-tertiary">
+            <span className="rounded-full border border-subtle bg-raised px-2 py-0.5 font-sans text-micro tabular-nums text-tertiary">
               {bufferedSpans} / {MAX_TELEMETRY_SPANS} spans
             </span>
           )}

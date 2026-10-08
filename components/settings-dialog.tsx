@@ -188,12 +188,19 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-labelledby="settings-dialog-title"
         tabIndex={-1}
-        className="relative flex max-h-[min(70vh,calc(100dvh-3rem))] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg focus:outline-none"
+        className="relative flex max-h-[min(70vh,calc(100dvh-3rem))] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-sans shadow-lift-lg focus:outline-none"
       >
         {/* Header */}
         <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-subtle bg-raised px-4 py-2.5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-dim text-micro font-bold text-accent">
+            {/*
+              * Chấm trí đầu vỏ: nền `accent-soft` + chữ `accent` = 5.09:1.
+              * Trước đây là `bg-accent-dim` + `text-accent` — đo được 2.50:1,
+              * fail AA ở chữ cỡ `micro`. `accent-dim` là token cho VẬT THỂ ĐỒ
+              * HOẠ (cột biểu đồ, chấm trạng thái), không phải nền mang chữ.
+              * Xem DESIGN.md §2.4.
+              */}
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-soft text-micro font-bold text-accent">
               $
             </span>
             <div className="flex items-center gap-2">
@@ -326,7 +333,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                     tabIndex={isActive ? 0 : -1}
                     onClick={() => switchTab(t.id)}
                     onKeyDown={onTabKeyDown}
-                    className={`flex flex-shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left font-mono text-ui transition-colors duration-150 ${
+                    className={`flex flex-shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left font-sans text-ui transition-colors duration-150 ${
                       isActive
                         ? 'border-strong bg-raised font-medium text-accent'
                         : 'border-transparent text-secondary hover:border-subtle hover:bg-raised hover:text-primary'

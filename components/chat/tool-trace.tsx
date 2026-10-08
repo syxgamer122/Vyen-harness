@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useCallback } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -32,6 +32,12 @@ import { resolveToolEntry } from '@/lib/tool-catalog';
 import { stripEmulatedToolMarkup } from '@/lib/text-tool-guard';
 import { sanitizeContent } from '@/lib/chat-tree-persistence';
 import { toolResultBody } from '@/lib/agent-tools';
+import {
+  TOOL_SCOPE_LABEL,
+  groupByPhase,
+  toolScopeOf,
+  type ToolPhaseGroup,
+} from '@/lib/tool-phases';
 
 export interface ToolEvent {
   id: string;
@@ -657,6 +663,117 @@ export function sameToolEvent(a: ToolEvent, b: ToolEvent): boolean {
   );
 }
 
+/*
+ * LOẠI TOOL — quyết định CÁCH TRÌNH BÀY, không quyết định nội dung.
+ *
+ * §15.2 điểm 7: "không dùng một khuôn chung cho tất cả". Ba nhóm dưới đây là
+ * ba câu trả lời khác nhau cho câu hỏi "tool này vừa cho thấy gì": sửa tệp thì
+ * con số đáng đọc là số dòng thay đổi; chạy lệnh thì là lượng đầu ra; đọc/tìm
+ * thì là lượng thứ đã lấy về. Nhóm theo TIỀN TỐ TÊN TOOL (dữ liệu có thật),
+ * không đoán theo nội dung đầu ra.
+ */
+export function toolKindOf(name: string): 'edit' | 'run' | 'read' {
+  const n = (name || '').toLowerCase();
+  if (/fs_edit|fs_write|apply_patch|edit_file|write_file|code_patch|multiedit/.test(n)) return 'edit';
+  if (/shell|bash|exec|command|spawn|git_commit|npm|yarn|pnpm|test|build|lint/.test(n)) return 'run';
+  return 'read';
+}
+
+/**
+ * QUY MÔ của một lần gọi — vế "bao nhiêu" trong dòng gọn (§15.2 điểm 6+7).
+ *
+ * Đếm trên ĐẦU RA ĐANG HIỂN THỊ (`ev.body ?? ev.summary`), không parse nội
+ * dung để đoán "N file" / "N test pass": số dòng chia được là đúng số dòng
+ * người dùng mở ra sẽ thấy, nên nó không nói dối kể cả với tệp lạ, tool lạ hay
+ * đầu ra thù địch. Con số sai trong một dòng trông rất chắc chắn — đó là lý do
+ * duy nhất để chọn cách đếm được. Hàm thuần, export cho test.
+ */
+export function toolScaleOf(ev: ToolEvent): string | null {
+  const output = ev.body ?? ev.summary ?? '';
+  if (!output.trim()) return null;
+  const lines = output.split('\n');
+  const kind = toolKindOf(ev.name);
+  if (kind === 'edit') {
+    let added = 0;
+    let removed = 0;
+    for (const line of lines) {
+      /* Bỏ dòng tiêu đề của diff (`+++ b/tệp`, `--- a/tệp`) — đếm chúng thành
+         thay đổi thật là thổi số lên đúng 2 dòng mỗi tệp. */
+      if (line.startsWith('+++') || line.startsWith('---')) continue;
+      if (line.startsWith('+')) added += 1;
+      else if (line.startsWith('-')) removed += 1;
+    }
+    if (added || removed) return `+${added} −${removed}`;
+    return `±${lines.length} dòng`;
+  }
+  if (kind === 'run') return `${lines.length} dòng ra`;
+  return `${lines.length} dòng`;
+}
+
+/**
+ * THỜI GIAN CHẠY — chỉ khi chip TỰ THẤY tool chuyển từ đang chạy sang xong.
+ *
+ * Annotation không mang mốc thời gian (`collectToolEvents` chỉ đọc `phase`,
+ * `args`, `summary`, `at`), nên KHÔNG có cách nào biết một tool đã chạy bao lâu
+ * khi mở lại lịch sử. Đo bằng đồng hồ của chính chip thì đúng cho phần đang
+ * diễn ra trước mắt — và chỉ cho phần đó: chip mount ra ở trạng thái đã xong thì
+ * không có mốc bắt đầu, in `0,1s` là bịa. Vì vậy `armed` chỉ bật sau khi ta
+ * từng thấy nó đang chạy.
+ *
+ * Không có vòng tick mỗi giây: số chỉ được tính MỘT lần, lúc tool kết thúc —
+ * chip nào cũng vừa render lại lúc đó rồi.
+ */
+function useElapsed(running: boolean, done: boolean): string | null {
+  const startedRef = useRef<number | null>(null);
+  const armedRef = useRef(false);
+  const [elapsed, setElapsed] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (running) {
+      armedRef.current = true;
+      if (startedRef.current === null) startedRef.current = Date.now();
+      return;
+    }
+    if (armedRef.current && done && startedRef.current !== null) {
+      setElapsed(Date.now() - startedRef.current);
+      armedRef.current = false;
+    }
+  }, [running, done]);
+
+  if (elapsed === null) return null;
+  const seconds = elapsed / 1000;
+  return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
+}
+
+/**
+ * DÒNG TIÊU ĐỀ CỬA MỘT ĐOẠN PHASE (§14.3 lớp 5, §15.2 điểm 8).
+ *
+ * Vì sao là chữ trên nền chứ không phải một dải có nền riêng: §15.3 điểm 13
+ * cấm khắc phục phân cấp bằng cách thêm viền và nền khắp nơi; ở đây nhóm đã
+ * được phân biệt bằng VỊ TRÍ (đứng trước cả cụm) và thứ tự đọc. Con số đi kèm
+ * là số lần gọi trong đoạn — thông tin phụ, cỡ `meta`.
+ *
+ * "N lỗi" chỉ hiện khi đoạn THẬT SỰ có lần gọi lỗi: một dòng `0 lỗi` trên mọi
+ * đoạn là nhiễu, và dễ bị đọc thành lời trấn an.
+ */
+const ToolPhaseBand = memo(function ToolPhaseBand({
+  group,
+}: {
+  group: ToolPhaseGroup<ToolEvent>;
+}) {
+  return (
+    <div
+      className="flex items-center gap-2 pt-3 pb-1 font-sans text-meta text-tertiary"
+      data-testid="tool-phase"
+      data-tool-phase={group.phase}
+    >
+      <span className="text-secondary">{group.label}</span>
+      <span className="tabular-nums">{group.count} thao tác</span>
+      {group.errorCount > 0 && <span className="text-danger">{group.errorCount} lỗi</span>}
+    </div>
+  );
+});
+
 /** Chip là ĐƯỜNG MỘT, mọi thứ bên ngoài nó (khoảng cách, viền) do cha quyết. */
 const ToolChip = memo(function ToolChip({ ev }: { ev: ToolEvent }) {
   const [expanded, setExpanded] = useState(false);
@@ -713,14 +830,41 @@ const ToolChip = memo(function ToolChip({ ev }: { ev: ToolEvent }) {
   /* Sắc + bề mặt của trạng thái, kèm hover RIÊNG cho từng trạng thái. Không
      gộp một `hover:` chung: bấm rê lên chip lỗi mà nền đổi sang xám là mất
      luôn dấu hiệu lỗi đúng lúc người đọc đang nhìn. */
+  /*
+   * §14.3 lớp 4: ĐƯỜNG TRẠNG THÁI BÊN TRÁI — tín hiệu thứ hai ngoài màu, và
+   * nay có mặt ở CẢ BỐN trạng thái. Trước đây chỉ lỗi/bỏ dở mới có vạch, nên
+   * mắt phải đọc chữ ở cuối dòng mới biết một tool đang chạy hay đã xong —
+   * đúng lúc danh sách dài, đó là khác biệt duy nhất giữa hai thứ rất khác nhau.
+   * Mỗi trạng thái một màu vạch, và chữ trạng thái vẫn luôn đi kèm (§6).
+   */
   const tone = running
-    ? 'lift-sm rounded-lg bg-raised text-secondary'
+    ? 'lift-sm rounded-lg border-l-2 border-l-accent bg-raised pl-2 text-secondary'
     : failed
       ? 'rounded-lg border-l-2 border-l-danger bg-danger/5 pl-2 text-danger hover:bg-danger/10'
       : abandoned
         ? 'rounded-lg border-l-2 border-l-warning bg-warning/5 pl-2 text-warning hover:bg-warning/10'
-        : 'text-tertiary hover:bg-sunken hover:text-secondary';
+        : 'rounded-lg border-l-2 border-l-subtle pl-2 text-tertiary hover:bg-sunken hover:text-secondary';
   const layout = 'flex w-full items-center gap-2 px-2 py-1 text-left';
+
+  /*
+   * Màu của NHÃN TRẠNG THÁI (chữ, ở đuôi dòng). Chỉ là lớp thứ hai — nhãn đã
+   * là chữ nên màu không mang thông tin một mình (§6). Chọn theo đúng bảng
+   * §15.5: đang chạy → accent, lỗi → danger, bị bỏ dở → warning, xong →
+   * tertiary (xong KHÔNG được đội lốt thành công — "xong" chỉ nói lệnh đã kết
+   * thúc, không nói kết quả đúng).
+   */
+  const statusTone = failed
+    ? 'text-danger'
+    : abandoned
+      ? 'text-warning'
+      : running
+        ? 'text-accent'
+        : 'text-tertiary';
+  const scale = toolScaleOf(ev);
+  const elapsed = useElapsed(running, ev.done);
+  /* Phạm vi là thông tin của THẺ (lớp 1 §14.3), không phải của dòng gọn: dòng
+     gọn đã có tham số chỉ thẳng tệp/lệnh ngay cạnh nhãn (§15.2 điểm 6). */
+  const scope = toolScopeOf(ev.name, ev.args);
 
   /* Thân dùng chung cho cả hai nhánh bên dưới: cùng bố cục, chỉ khác cách
      tương tác — tách riêng thì hai nhánh sẽ trôi khỏi nhau sau vài lần sửa. */
@@ -743,19 +887,45 @@ const ToolChip = memo(function ToolChip({ ev }: { ev: ToolEvent }) {
 
       <span className="min-w-0 truncate">
         {label}
-        {displayParam ? <span className="text-tertiary"> · {displayParam}</span> : null}
+        {/*
+         * Tham số là CHỮ MÁY (đường dẫn, lệnh, pattern) nên giữ mono; nhãn
+         * hành động đứng trước nó thì không — xem DESIGN.md §13.2. Trước đây
+         * cả dòng chip là mono nên mọi loại tool đọc giống hệt nhau.
+         */}
+        {displayParam ? (
+          <span className="font-mono text-tertiary"> · {displayParam}</span>
+        ) : null}
       </span>
 
-      {hasBody && (
-        <span className="ml-auto shrink-0 pl-2 text-tertiary" aria-hidden>
-          {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-        </span>
-      )}
+      {/*
+       * BA THỨ Ở ĐUÔI DÒNG GỌN, đúng thứ tự đọc của §15.2 điểm 6
+       * (`Đọc cấu hình build · 8 file · đang chạy · 2,4s`):
+       *
+       *   quy mô   — "bao nhiêu", tính từ đầu ra THẬT SỰ đang hiển thị
+       *              (`toolScaleOf`), không phải con số đoán từ nội dung
+       *   thời gian — đo bằng đồng hồ của chính lần chạy này, chỉ khi chip tự
+       *              thấy tool chuyển từ đang chạy sang xong; mở lại lịch sử thì
+       *              không có số nào để bịa (xem `useElapsed`)
+       *   trạng thái — CHỮ, không chỉ icon hay màu (§6: ý nghĩa không được chỉ
+       *              dựa vào màu). Đây là nhãn DUY NHẤT trùng bảng §15.5.
+       */}
+      <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
+        {scale ? <span className="tabular-nums text-tertiary">{scale}</span> : null}
+        {elapsed ? <span className="tabular-nums text-tertiary">{elapsed}</span> : null}
+        <span className={statusTone}>{statusLabel}</span>
+        {hasBody && (
+          <span className="text-tertiary" aria-hidden>
+            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </span>
+        )}
+      </span>
     </>
   );
 
   return (
-    <div className="font-mono text-meta">
+    /* Dòng gọn của tool là CHROME (nhãn hành động + trạng thái) nên là Inter;
+       chữ máy — tham số, lệnh, log — tự khai mono tại chỗ. DESIGN.md §13.2. */
+    <div className="font-sans text-meta">
       {/*
        * KHÔNG có gì để mở thì KHÔNG vẽ nút.
        *
@@ -803,8 +973,11 @@ const ToolChip = memo(function ToolChip({ ev }: { ev: ToolEvent }) {
           {/* "Xem đủ" chỉ hiện khi thật sự bị cắt: nút mở thêm mà không còn
               gì để mở thì là nói dối người đọc. */}
           <div className="flex items-center justify-between gap-2 pb-1.5">
-            <span className="min-w-0 truncate text-meta text-tertiary">
-              {hidden > 0 ? `còn ${hidden} dòng nữa` : null}
+            {/* Phạm vi đứng cạnh lượng còn lại: hai thông tin phụ của cùng một
+                hàng, không tranh chỗ với nội dung đang đọc. */}
+            <span className="flex min-w-0 items-center gap-2 truncate text-meta text-tertiary">
+              <span data-testid="tool-scope">{TOOL_SCOPE_LABEL[scope]}</span>
+              <span>{hidden > 0 ? `còn ${hidden} dòng nữa` : null}</span>
             </span>
             <span className="flex shrink-0 items-center gap-2">
               {hidden > 0 && (
@@ -827,8 +1000,13 @@ const ToolChip = memo(function ToolChip({ ev }: { ev: ToolEvent }) {
             </span>
           </div>
           {/* Mở đủ vẫn phải có trần: khối cao hơn viewport làm trang nhảy. */}
+          {/*
+           * Đầu ra thô (stdout/stderr/payload) là chữ MÁY: giữ mono kể cả khi
+           * vỏ chip đã chuyển sang sans — đây là thứ người dùng soi từng ký tự,
+           * và cột ký tự thẳng hàng mới đọc được.
+           */}
           <pre
-            className={`overflow-y-auto whitespace-pre-wrap border border-subtle p-2 text-secondary ${
+            className={`overflow-y-auto whitespace-pre-wrap border border-subtle p-2 font-mono text-secondary ${
               showAll ? 'max-h-[70vh]' : 'max-h-60'
             }`}
           >
@@ -890,6 +1068,22 @@ export const ToolTrace = memo(function ToolTrace({
    */
   const events =
     prebuiltEvents ?? collectToolEvents(annotations, toolInvocations, isStreaming !== false);
+  /*
+   * ĐOẠN PHASE (§14.3 lớp 5, §15.2 điểm 8) — cắt từ CHÍNH mảng sự kiện đang vẽ,
+   * nên nhóm không thể lệch với chip: cả hai đọc chung một dữ liệu. Cắt trên cả
+   * mảng (không cắt theo từng đoạn lời) là cố ý: một đoạn `Thực hiện` vẫn là một
+   * đoạn kể cả khi model viết vài câu xen giữa hai lần gọi tool.
+   */
+  const phaseGroups = useMemo(() => groupByPhase(events), [events]);
+  const bandByEventId = useMemo(() => {
+    const map = new Map<string, ToolPhaseGroup<ToolEvent>>();
+    for (const group of phaseGroups) {
+      const first = group.events[0];
+      if (first) map.set(first.id, group);
+    }
+    return map;
+  }, [phaseGroups]);
+
   const subagentAnns = getSubagentAnnotations(annotations);
   if (events.length === 0 && subagentAnns.length === 0) return null;
 
@@ -904,16 +1098,28 @@ export const ToolTrace = memo(function ToolTrace({
       ))}
 
       {/*
-       * Cột THẲNG với chữ trong bubble. Bubble là `flex items-start gap-2`
-       * gồm avatar 26px + `gap-2` (8px) + `px-4` (16px) = 50px; trace trước đây
-       * là mảnh rời không vỏ nên mọi đoạn xen kẽ bắt đầu ở 0 và nhãn chip ở
-       * ~8px — một lượt có câu mở đầu lệch vài chữ, câu sau thẳng cột, đọc như
-       * lỗi căn chỉnh chứ không phải lựa chọn bố cục.
+       * Cột THẲNG với chữ trả lời. Từ đợt P1 (§15.1 điểm 2), trợ lý KHÔNG còn
+       * khung và avatar chỉ hiện ở tin mở khối, nên cột chữ bắt đầu ngay sau
+       * `avatar 26px + gap-2 (8px)` = **34px**; đệm 16px của hộp cũ đã bị gỡ cùng
+       * hộp. Trước đây trace là mảnh rời không vỏ nên mọi đoạn xen kẽ bắt đầu ở
+       * 0 và nhãn chip ở ~8px — một lượt có câu mở đầu lệch vài chữ, câu sau
+       * thẳng cột, đọc như lỗi căn chỉnh chứ không phải lựa chọn bố cục.
+       * Đổi bố cục câu trả lời thì phải đổi ĐÚNG con số này.
        */}
-      <div className="pl-[50px]">
+      <div className="pl-[34px]">
         {owned
           ? owned.map((seg, i) => {
-              if (seg.kind === 'tool') return <ToolChip key={seg.event.id} ev={seg.event} />;
+              if (seg.kind === 'tool') {
+                /* Tiêu đề đoạn mở ở chip ĐẦU TIÊN của đoạn đó — cùng một chip,
+                   hai lớp thông tin: đoạn đang làm gì, rồi việc cụ thể. */
+                const band = bandByEventId.get(seg.event.id);
+                return (
+                  <React.Fragment key={seg.event.id}>
+                    {band && <ToolPhaseBand group={band} />}
+                    <ToolChip ev={seg.event} />
+                  </React.Fragment>
+                );
+              }
               const shown = displayText(seg.text);
               /* Mảnh toàn markup rác dọn ra thành chuỗi rỗng — vẽ nó là một
                  khoảng trắng 8px giữa hai chip. */
@@ -947,7 +1153,15 @@ export const ToolTrace = memo(function ToolTrace({
                  Việt. */
               <div className="my-2 flex flex-col divide-y divide-subtle">
                 {events.map((ev) => (
-                  <ToolChip key={ev.id} ev={ev} />
+                  /* Mỗi mục là MỘT đoạn-chip: khoá nằm ở vỏ để vạch ngăn cắt
+                     giữa hai lần gọi, không cắt giữa tiêu đề đoạn và chip đầu
+                     của chính nó. */
+                  <div key={ev.id}>
+                    {bandByEventId.get(ev.id) && (
+                      <ToolPhaseBand group={bandByEventId.get(ev.id)!} />
+                    )}
+                    <ToolChip ev={ev} />
+                  </div>
                 ))}
               </div>
             )}

@@ -6,6 +6,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import { DEFAULT_THINKING_LEVEL, THINKING_LEVELS, type ThinkingLevel } from '@/lib/provider-url';
 import { resolveNearestEffort } from '@/lib/reasoning-capability';
 import { useAnchoredPanel } from '@/lib/hooks/use-anchored-panel';
+import { Z_CLASS } from '@/lib/ui-z';
 
 const LEVELS: {
   key: ThinkingLevel;
@@ -300,10 +301,13 @@ export function ThinkingMenu({ value, onChange, disabled, supportedLevels, manda
             tabIndex={-1}
             onKeyDown={onMenuKeyDown}
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width }}
-            className="surface-panel z-40 animate-pop-in overflow-hidden p-1.5"
+            /* Số z lấy từ `lib/ui-z.ts`, không viết tay `z-40` — DESIGN.md §8.
+               Giá trị thì đúng (40 = `dropdown`), nhưng viết thẳng số là mở đường
+               cho lần sau lệch thang mà không ai thấy. */
+            className={`surface-panel ${Z_CLASS.dropdown} animate-pop-in overflow-hidden p-1.5`}
           >
             <div className="border-b border-subtle px-2.5 pb-1.5 pt-1">
-              <p className="font-mono text-meta font-semibold uppercase tracking-[0.08em] text-accent-steel">
+              <p className="font-sans text-meta font-semibold uppercase tracking-[0.08em] text-accent-steel">
                 Mức suy luận
               </p>
               <p className="mt-0.5 text-meta leading-relaxed text-tertiary">

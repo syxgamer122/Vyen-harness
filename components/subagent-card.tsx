@@ -53,7 +53,7 @@ export function SubagentCard({ annotation }: SubagentCardProps) {
   const StatusIcon = isRunning ? Loader2 : isDone ? CheckCircle2 : XCircle;
 
   return (
-    <div className="my-2 rounded-xl border border-subtle bg-panel-bg font-mono text-xs overflow-hidden transition-all duration-200">
+    <div className="my-2 rounded-xl border border-subtle bg-panel-bg font-sans text-xs overflow-hidden transition-all duration-200">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}

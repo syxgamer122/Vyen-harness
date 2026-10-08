@@ -80,7 +80,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
 
   return (
     <div
-      className="mx-auto w-full max-w-thread px-4 pb-2 font-mono"
+      className="mx-auto w-full max-w-thread px-4 pb-2 font-sans"
       role="region"
       aria-label={`Kế hoạch: ${plan.title}`}
     >
@@ -183,7 +183,7 @@ export function PlanPanel({ plan, onHide, canApprove = false, onApprove }: PlanP
                         <p className="text-meta text-text-muted">{st.description}</p>
                       )}
                       {st.files && st.files.length > 0 && (
-                        <p className="mt-0.5 truncate font-mono text-micro text-accent-steel">
+                        <p className="mt-0.5 truncate font-sans text-micro text-accent-steel">
                           {st.files.join(" · ")}
                         </p>
                       )}

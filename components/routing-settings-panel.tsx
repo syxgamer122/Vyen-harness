@@ -184,7 +184,7 @@ export function RoutingSettingsPanel() {
   };
 
   return (
-    <div className="space-y-4 text-ui font-mono">
+    <div className="space-y-4 text-ui font-sans">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-subtle pb-2.5">
         <div>
           <h3 className="text-read font-semibold text-primary">Mixture-of-Models Routing</h3>

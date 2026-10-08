@@ -210,7 +210,7 @@ export function AuditViewerDialog({ isOpen, onClose, chatIdFilter }: AuditViewer
         role="dialog"
         aria-modal="true"
         aria-labelledby="audit-viewer-title"
-        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg animate-pop-in"
+        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-sans shadow-lift-lg animate-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

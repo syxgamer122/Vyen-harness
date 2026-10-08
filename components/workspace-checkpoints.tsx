@@ -177,7 +177,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
           type="button"
           disabled={busy || running}
           onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 rounded-full border border-subtle bg-raised px-3 py-1 font-mono text-meta text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-bg hover:text-text-primary disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-full border border-subtle bg-raised px-3 py-1 font-sans text-meta text-accent-steel transition-colors hover:border-border-hover hover:bg-panel-bg hover:text-text-primary disabled:opacity-40"
           title="Khôi phục các file agent vừa sửa về trạng thái trước đó"
         >
           <History size={12} className="text-accent-steel" aria-hidden />
@@ -196,7 +196,7 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
           }}
         >
           <div
-            className="lift-lg relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-subtle bg-panel-bg font-mono"
+            className="lift-lg relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-subtle bg-panel-bg font-sans"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="border-b border-subtle bg-raised px-4 py-3">
@@ -225,9 +225,9 @@ export function WorkspaceCheckpointBar({ chatId, busy = false, onNotice }: Props
                           if (el.open && pv.status === 'idle') void loadPreview(f);
                         }}
                       >
-                        <summary className="cursor-pointer select-none font-mono text-ui text-text-primary">
+                        <summary className="cursor-pointer select-none font-sans text-ui text-text-primary">
                           <span
-                            className={`mr-2 rounded-full px-2 py-0.5 font-mono text-micro ${
+                            className={`mr-2 rounded-full px-2 py-0.5 font-sans text-micro ${
                               f.existedBefore
                                 ? 'border border-accent/40 bg-accent/10 text-accent-steel'
                                 : 'border border-danger/40 bg-danger/10 text-status-error'

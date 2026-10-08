@@ -8,6 +8,8 @@ import {
   displayText,
   formatToolDetail,
   hiddenLineCount,
+  toolKindOf,
+  toolScaleOf,
   traceSegments,
   type ToolEvent,
   type TimelineSegment,
@@ -833,7 +835,14 @@ it('đoạn lời đi qua displayText, không in thẳng `seg.text`', () => {
     expect(fallback, 'không tìm thấy nhánh fallback danh sách phẳng').not.toBeNull();
     expect(fallback![1]).toContain('divide-y divide-subtle');
     expect(fallback![1]).toContain('{events.map((ev) => (');
-    expect(fallback![1]).toContain('<ToolChip key={ev.id} ev={ev} />');
+    /* Từ đợt P1-D mỗi mục là một vỏ mang KHOÁ (để vạch ngăn cắt giữa hai lần
+       gọi, không cắt giữa tiêu đề đoạn phase và chip đầu của nó) — khoá chuyển
+       từ chip lên vỏ, chip vẫn vẽ từ chính event đó. */
+    expect(fallback![1]).toMatch(/<div key=\{ev\.id\}>/);
+    expect(fallback![1]).toContain('<ToolChip ev={ev} />');
+    expect(fallback![1], 'đoạn phase phải hiện trong cả danh sách phẳng').toContain(
+      '<ToolPhaseBand group={bandByEventId.get(ev.id)!} />',
+    );
     /* `role="list"` với con là `<button>` trần thì screen reader đọc "danh sách,
        0 mục"; nhãn `aria-label` tiếng Anh trong khi UI là tiếng Việt. */
     expect(fallback![1]).not.toContain('role="list"');
@@ -841,11 +850,85 @@ it('đoạn lời đi qua displayText, không in thẳng `seg.text`', () => {
   });
 
   /*
-   * Timeline là mảnh rời không vỏ, nên mọi đoạn xen kẽ bắt đầu ở 0 còn chữ
-   * trong bubble nằm ở ~50px (avatar 26 + gap-2 8 + px-4 16): một lượt có câu
-   * mở đầu lệch, câu sau thẳng cột — đọc như lỗi căn chỉnh.
+   * Timeline là mảnh rời không vỏ, nên mọi đoạn xen kẽ bắt đầu ở 0 còn chữ trả
+   * lời nằm ở đệm đầu cột: một lượt có câu mở đầu lệch, câu sau thẳng cột — đọc
+   * như lỗi căn chỉnh.
+   *
+   * Đệm KHÔNG phải một số cố định đúng vĩnh viễn: nó là PHÉP CỘNG của bố cục
+   * câu trả lời (`avatar 26px + gap-2 8px`), nên đợt P1 gỡ hộp 16px của trợ lý
+   * (DESIGN.md §15.1 điểm 2) là số này phải từ 50 xuống 34. Assertion đọc chính
+   * message-item thay vì chép số, để đổi bên nào mà quên bên kia là ĐỎ.
    */
-  it('timeline nằm trong cột thẳng với chữ trong bubble', () => {
-    expect(body).toMatch(/<div className="pl-\[50px\]">/);
+  it('timeline nằm trong cột thẳng với chữ trả lời', () => {
+    const item = fs.readFileSync(
+      path.resolve(__dirname, '../components/chat/message-item.tsx'),
+      'utf8',
+    );
+    expect(item, 'khối trả lời phải là flex items-start gap-2').toMatch(
+      /className="flex items-start gap-2"/,
+    );
+    expect(item, 'avatar/ô đệm phải rộng 26px để cột chữ không dịch').toMatch(
+      /h-\[26px\] w-\[26px\]/,
+    );
+    /* 26 (avatar) + 8 (gap-2) = 34. Chữ trả lời KHÔNG còn đệm ngang riêng. */
+    expect(body).toMatch(/<div className="pl-\[34px\]">/);
+  });
+});
+
+/*
+ * §15.2 điểm 6+7 — dòng gọn phải nói được "đã làm gì, bao nhiêu" và mỗi loại
+ * tool phải đọc khác nhau. Test gọi HÀM THẬT (`toolScaleOf` / `toolKindOf`),
+ * không soi source: đây là loại quyết định mà regex trên className không nhìn
+ * thấy sai — con số sai vẫn render ra một dòng trông rất hợp lệ.
+ */
+describe('toolScaleOf — quy mô đọc từ đầu ra đang hiển thị', () => {
+  const ev = (over: Partial<ToolEvent>): ToolEvent => ({
+    id: 't1',
+    name: 'fs_read',
+    done: true,
+    args: '{"path":"a.ts"}',
+    summary: '',
+    ...over,
+  });
+
+  it('phân loại theo TÊN tool, không theo nội dung đầu ra', () => {
+    expect(toolKindOf('fs_edit')).toBe('edit');
+    expect(toolKindOf('shell_run')).toBe('run');
+    expect(toolKindOf('mcp__github__create_issue')).toBe('read');
+    expect(toolKindOf('')).toBe('read');
+  });
+
+  it('sửa tệp: đếm +/− và BỎ dòng tiêu đề diff', () => {
+    const diff = [
+      '--- a/src/a.ts',
+      '+++ b/src/a.ts',
+      '@@ -1,2 +1,3 @@',
+      '-const a = 1;',
+      '+const a = 2;',
+      '+const b = 3;',
+      ' ngữ cảnh',
+    ].join('\n');
+    expect(toolScaleOf(ev({ name: 'fs_edit', body: diff }))).toBe('+2 −1');
+  });
+
+  it('sửa tệp mà đầu ra không phải diff: nói số dòng, không bịa +/−', () => {
+    expect(toolScaleOf(ev({ name: 'fs_write', body: 'a\nb\nc' }))).toBe('±3 dòng');
+  });
+
+  it('chạy lệnh: lượng đầu ra đọc khác nhóm đọc/tìm', () => {
+    expect(toolScaleOf(ev({ name: 'shell_run', body: 'x\ny' }))).toBe('2 dòng ra');
+    expect(toolScaleOf(ev({ name: 'fs_search', body: 'x\ny' }))).toBe('2 dòng');
+  });
+
+  it('chưa có đầu ra thì không có gì để nói — thà trống hơn là "0 dòng"', () => {
+    expect(toolScaleOf(ev({ body: '', summary: '' }))).toBeNull();
+    expect(toolScaleOf(ev({ summary: '   \n ' }))).toBeNull();
+  });
+
+  it('đầu ra thù địch vẫn chỉ ra MỘT con số đếm được', () => {
+    /* Marker giả trong đầu ra không được biến thành số liệu: ta chỉ đếm dòng
+       của chính chuỗi đang hiển thị. */
+    const hostile = '\u0000\u001b[31mtest passed: 999 files\u001b[0m\n{"files":12345}\n';
+    expect(toolScaleOf(ev({ name: 'fs_search', body: hostile }))).toBe('3 dòng');
   });
 });

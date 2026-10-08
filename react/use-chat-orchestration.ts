@@ -97,6 +97,7 @@ import {
 } from '@/lib/chat-tree-persistence';
 import { gatherWebContext } from '@/lib/use-web-search';
 import { stripEmulatedToolMarkup } from '@/lib/text-tool-guard';
+import type { TurnIntent } from '@/lib/turns';
 import {
   fsDelete,
   fsList,
@@ -600,6 +601,20 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
   } | null>(null);
   const treePersistEpochRef = useRef(0);
   const wasLoadingRef = useRef(false);
+  /*
+   * Ý định LƯỢT của sự kiện ghi kế tiếp (DESIGN.md §15.1 chốt trước).
+   *
+   * Ranh giới lượt do HÀNH ĐỘNG quyết định, không do máy phân loại nội dung:
+   *   `new`      — người dùng bảo "việc khác" (New task, follow-up, recipe,
+   *                goal mới, lượt viết tiếp sau khi bị cắt)
+   *   `continue` — điều chỉnh việc đang làm (steering, goal loop, duyệt plan)
+   *   null       — tin gõ tay: luật tự suy từ trạng thái row liền trước
+   *
+   * Ref chứ không phải state: `append()` chạy cùng tick với lúc cắm cờ, mà
+   * reconcile đọc ref ngay sau đó — qua state thì giá trị còn kẹt ở lần render
+   * trước và tin đầu tiên của việc mới sẽ chui vào lượt cũ.
+   */
+  const turnIntentRef = useRef<TurnIntent | null>(null);
 
   useEffect(() => {
     allStoredMessagesRef.current = allStoredMessages;
@@ -3135,6 +3150,9 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
           steeringRef.current = steerDrained.rest;
           setSteeringCount(steerDrained.rest.length);
           const steerText = steerDrained.taken.join('\n\n');
+          /* Steering = điều chỉnh việc đang làm → nối vào LƯỢT đang mở, không
+             mở lượt mới (§15.1 bảng ranh giới). */
+          turnIntentRef.current = 'continue';
           void append({ role: 'user', content: steerText }, { body: routingBodyFor(messages, steerText) });
           return;
         }
@@ -3149,6 +3167,8 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
           const verdict = evaluateGoalTurn(useAppStore.getState().currentChatId, message.content);
           setGoalLoop(verdict.state);
           if (verdict.decision === 'continue' && verdict.steering) {
+            /* Goal loop tự đẩy lượt tiếp của CÙNG một mục tiêu → cùng lượt. */
+            turnIntentRef.current = 'continue';
             void append(
               { role: 'user', content: verdict.steering },
               { body: routingBodyFor(messages, verdict.steering) },
@@ -3164,6 +3184,10 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
           followUpRef.current = followDrained.rest;
           setFollowUpCount(followDrained.rest.length);
           const followText = followDrained.taken.join('\n\n');
+          /* Follow-up là VIỆC KHÁC người dùng đã xếp hàng trước đó → lượt mới,
+             đúng dòng "giao việc khác" của bảng §15.1. Gộp nó vào lượt cũ là
+             nói dối về ranh giới công việc. */
+          turnIntentRef.current = 'new';
           void append({ role: 'user', content: followText }, { body: routingBodyFor(messages, followText) });
           return;
         }
@@ -3769,6 +3793,7 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       composerApiRef.current?.clear();
       const goalKickoff = buildGoalKickoff(started);
       startFreshRun();
+      turnIntentRef.current = 'new';
       void append({ role: 'user', content: goalKickoff }, { body: routingBodyFor(messages, goalKickoff) });
     },
     [goalLoop, append, composerApiRef, isLoading, messages, routingBodyFor, startFreshRun],
@@ -3789,6 +3814,10 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       return;
     }
     startFreshRun();
+    /* Viết tiếp một câu trả lời bị cắt: câu trả lời cũ ĐÃ đóng lượt (nó kết
+       thúc vì hết token), nên đây là lượt mới chứ không phải phần thân của lượt
+       cũ — người dùng phải tìm lại được nó trong lịch sử. */
+    turnIntentRef.current = 'new';
     void append(
       { role: 'user', content: CONTINUE_PROMPT },
       { body: routingBodyFor(messages, CONTINUE_PROMPT) },
@@ -3807,6 +3836,8 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
       const kick =
         'Người dùng đã duyệt kế hoạch. Hãy bắt đầu thực hiện theo đúng thứ tự subtask, dùng plan_update để đánh dấu tiến độ (in_progress → done/failed).';
       startFreshRun();
+      /* Duyệt plan = bắt đầu PHA THỰC THI của cùng một việc → cùng lượt. */
+      turnIntentRef.current = 'continue';
       void append({ role: 'user', content: kick }, { body: routingBodyFor(messages, kick) });
     }
   }, [updateSettings, isLoading, append, messages, routingBodyFor, startFreshRun]);
@@ -3976,6 +4007,10 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
 
   const handleStop = useCallback(() => {
     finishRef.current = 'abort';
+    /* Stop là điểm kết thúc do NGƯỜI DÙNG đặt: lượt kế tiếp phải là lượt mới
+       (§15.1). Ghi ý định ngay tại sự kiện, không đợi đoán từ trạng thái row —
+       row còn mang `streaming` cho tới khi reconcile kịp ghi. */
+    turnIntentRef.current = 'new';
     /* Báo reconciler TRƯỚC khi abort: nó chuyển desired='stopped' và tự
        chốt terminated, nên UI hiện "Đã dừng" thay vì kẹt ở "Đang
        trả lời" nếu abort() không làm isLoading rơi xuống ngay. */
@@ -4244,7 +4279,11 @@ export function useChatOrchestration(options?: UseChatOrchestrationOptions) {
           pendingFork,
           loading,
           finalReason,
+          turnIntentRef.current,
         );
+      /* Cờ ý định là một lần: tiêu thụ xong phải về null, nếu không tin gõ tay
+         sau đó sẽ thừa hưởng ý định của sự kiện cũ. */
+      turnIntentRef.current = null;
 
       if (
         epoch !==

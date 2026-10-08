@@ -84,7 +84,7 @@ export function StorageQuotaMeter() {
           <span className="text-text-muted flex items-center gap-1.5">
             <Database size={12} /> Đã dùng: {formatBytes(usage)} / {formatBytes(quota)}
           </span>
-          <span className="font-mono text-text-primary">{percentage}%</span>
+          <span className="font-sans text-text-primary">{percentage}%</span>
         </div>
 
         {/* Progress Bar */}

@@ -27,7 +27,7 @@ export function Toast({ message, onClose }: ToastProps) {
       aria-live="polite"
       className={`pointer-events-none fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] ${Z_CLASS.toast} flex justify-center px-4`}
     >
-      <div className="pointer-events-auto flex max-w-md items-start gap-2.5 lift-lg rounded-xl border border-warning/40 bg-panel-bg p-3.5 text-xs font-mono text-text-primary animate-slide-up">
+      <div className="pointer-events-auto flex max-w-md items-start gap-2.5 lift-lg rounded-xl border border-warning/40 bg-panel-bg p-3.5 text-xs font-sans text-text-primary animate-slide-up">
         <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-status-warning" />
         <p className="min-w-0 flex-1">{message}</p>
         <button

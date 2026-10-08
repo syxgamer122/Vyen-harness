@@ -66,7 +66,7 @@ export function StagingPanel({
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden lift-md rounded-xl border border-subtle bg-panel-bg font-mono"
+        className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden lift-md rounded-xl border border-subtle bg-panel-bg font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -104,7 +104,7 @@ export function StagingPanel({
                     <FileText size={12} className="flex-shrink-0 text-accent" />
                     <span className="truncate font-mono text-meta text-text-primary">{file.path}</span>
                     {file.original === null && (
-                      <span className="flex-shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-micro font-mono text-accent">
+                      <span className="flex-shrink-0 rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-micro font-sans text-accent">
                         NEW
                       </span>
                     )}

@@ -80,7 +80,7 @@ export function DiskSkillsSection() {
   }, [newName, newDesc, rescan]);
 
   return (
-    <div className="space-y-3 font-mono">
+    <div className="space-y-3 font-sans">
       <div className="flex items-center justify-between gap-2">
         <h3 className="field-label text-read">Kỹ năng (SKILL.md)</h3>
         <button
@@ -115,7 +115,7 @@ export function DiskSkillsSection() {
                 <span className="block text-ui font-medium text-primary">
                   {e.name}
                   <span className="ml-1.5 font-normal text-tertiary">{e.source === 'workspace' ? 'workspace' : 'toàn cục'}</span>
-                  {e.version && <span className="ml-1.5 font-mono text-micro text-tertiary">v{e.version}</span>}
+                  {e.version && <span className="ml-1.5 font-sans text-micro text-tertiary">v{e.version}</span>}
                 </span>
                 <span className="field-hint block truncate">{e.description}</span>
               </label>

@@ -1,0 +1,334 @@
+{
+  "out": [
+    {
+      "viewport": "375",
+      "rest": {
+        "state": "rest",
+        "shellH": 170,
+        "inputH": 64,
+        "footH": 52,
+        "inputPad": {
+          "top": "12px",
+          "bottom": "0px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "14px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 130,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 375,
+        "docClientW": 375,
+        "footTop": 759
+      },
+      "focused": {
+        "state": "focused",
+        "shellH": 170,
+        "inputH": 72,
+        "footH": 44,
+        "inputPad": {
+          "top": "14px",
+          "bottom": "6px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "6px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 130,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 375,
+        "docClientW": 375,
+        "footTop": 767
+      },
+      "panel": {
+        "top": 190,
+        "bottom": 765,
+        "left": 33,
+        "right": 367,
+        "insideViewport": true
+      },
+      "errors": [],
+      "shots": {
+        "rest": "375-composer-rest.png",
+        "focus": "375-composer-focus.png"
+      }
+    },
+    {
+      "viewport": "768",
+      "rest": {
+        "state": "rest",
+        "shellH": 170,
+        "inputH": 64,
+        "footH": 52,
+        "inputPad": {
+          "top": "12px",
+          "bottom": "0px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "14px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 146,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 768,
+        "docClientW": 768,
+        "footTop": 800.22
+      },
+      "focused": {
+        "state": "focused",
+        "shellH": 170,
+        "inputH": 72,
+        "footH": 44,
+        "inputPad": {
+          "top": "14px",
+          "bottom": "6px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "6px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 146,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 768,
+        "docClientW": 768,
+        "footTop": 808.22
+      },
+      "panel": {
+        "top": 217,
+        "bottom": 806,
+        "left": 333,
+        "right": 760,
+        "insideViewport": true
+      },
+      "errors": [],
+      "shots": {
+        "rest": "768-composer-rest.png",
+        "focus": "768-composer-focus.png"
+      }
+    },
+    {
+      "viewport": "1024",
+      "rest": {
+        "state": "rest",
+        "shellH": 144,
+        "inputH": 38,
+        "footH": 52,
+        "inputPad": {
+          "top": "12px",
+          "bottom": "0px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "14px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 146,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 1024,
+        "docClientW": 1024,
+        "footTop": 800.22
+      },
+      "focused": {
+        "state": "focused",
+        "shellH": 144,
+        "inputH": 46,
+        "footH": 44,
+        "inputPad": {
+          "top": "14px",
+          "bottom": "6px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "6px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 146,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 1024,
+        "docClientW": 1024,
+        "footTop": 808.22
+      },
+      "panel": {
+        "top": 217,
+        "bottom": 806,
+        "left": 333,
+        "right": 953,
+        "insideViewport": true
+      },
+      "errors": [],
+      "shots": {
+        "rest": "1024-composer-rest.png",
+        "focus": "1024-composer-focus.png"
+      }
+    },
+    {
+      "viewport": "1440",
+      "rest": {
+        "state": "rest",
+        "shellH": 144,
+        "inputH": 38,
+        "footH": 52,
+        "inputPad": {
+          "top": "12px",
+          "bottom": "0px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "14px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 146,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 1440,
+        "docClientW": 1440,
+        "footTop": 817.61
+      },
+      "focused": {
+        "state": "focused",
+        "shellH": 144,
+        "inputH": 46,
+        "footH": 44,
+        "inputPad": {
+          "top": "14px",
+          "bottom": "6px"
+        },
+        "footPad": {
+          "top": "6px",
+          "bottom": "6px"
+        },
+        "modelInFoot": true,
+        "modelText": "GPT-4o",
+        "modelFont": "14px",
+        "chipLabel": "chưa có thư mục",
+        "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+        "chipFont": "14px",
+        "chipBox": {
+          "w": 146,
+          "h": 32
+        },
+        "sendInFoot": true,
+        "textareaFont": "16px",
+        "overflowX": 0,
+        "docScrollW": 1440,
+        "docClientW": 1440,
+        "footTop": 825.61
+      },
+      "panel": {
+        "top": 235,
+        "bottom": 824,
+        "left": 493,
+        "right": 1113,
+        "insideViewport": true
+      },
+      "errors": [],
+      "shots": {
+        "rest": "1440-composer-rest.png",
+        "focus": "1440-composer-focus.png"
+      }
+    }
+  ],
+  "zoom": {
+    "state": "rest",
+    "shellH": 340,
+    "inputH": 128,
+    "footH": 104,
+    "inputPad": {
+      "top": "12px",
+      "bottom": "0px"
+    },
+    "footPad": {
+      "top": "6px",
+      "bottom": "14px"
+    },
+    "modelInFoot": true,
+    "modelText": "GPT-4o",
+    "modelFont": "14px",
+    "chipLabel": "chưa có thư mục",
+    "chipTitle": "Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc",
+    "chipFont": "14px",
+    "chipBox": {
+      "w": 36,
+      "h": 64
+    },
+    "sendInFoot": true,
+    "textareaFont": "16px",
+    "overflowX": 0,
+    "docScrollW": 1440,
+    "docClientW": 1440,
+    "footTop": 1565.61
+  }
+}

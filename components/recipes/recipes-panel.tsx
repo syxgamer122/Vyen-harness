@@ -370,7 +370,7 @@ export function RecipesPanel({
       onClick={onClose}
     >
       <aside
-        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden lift-md rounded-xl border border-subtle bg-overlay font-mono"
+        className="flex h-full w-[min(30rem,100vw)] flex-col overflow-hidden lift-md rounded-xl border border-subtle bg-overlay font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2 border-b border-subtle bg-raised px-4 py-3">

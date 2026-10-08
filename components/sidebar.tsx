@@ -111,7 +111,7 @@ const ChatItem = memo(function ChatItem({
           role="menu"
           aria-label="Tuỳ chọn cuộc trò chuyện"
           style={{ position: 'fixed', top: menuRect.top, right: menuRect.right }}
-          className={`surface-panel ${Z_CLASS.dropdown} w-52 animate-pop-in rounded-xl border border-default bg-overlay p-1.5 font-mono`}
+          className={`surface-panel ${Z_CLASS.dropdown} w-52 animate-pop-in rounded-xl border border-default bg-overlay p-1.5 font-sans`}
         >
           <button
             type="button" role="menuitem"
@@ -496,7 +496,7 @@ export function Sidebar() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="$ /search..."
-                className="well w-full rounded-lg border border-default bg-surface py-2.5 pl-9 pr-8 font-mono text-ui text-primary transition-colors duration-150 placeholder:text-tertiary focus:border-accent"
+                className="well w-full rounded-lg border border-default bg-surface py-2.5 pl-9 pr-8 font-sans text-ui text-primary transition-colors duration-150 placeholder:text-tertiary focus:border-accent"
               />
               {isSearching ? (
                 <Loader2 size={12} aria-hidden="true" className="absolute right-2 animate-spin text-accent" />
@@ -569,7 +569,7 @@ export function Sidebar() {
             )}
           </div>
 
-          <div className="border-t border-subtle px-3 pb-[env(safe-area-inset-bottom)] pt-2 font-mono">
+          <div className="border-t border-subtle px-3 pb-[env(safe-area-inset-bottom)] pt-2 font-sans">
             <button
               type="button"
               onClick={() => {

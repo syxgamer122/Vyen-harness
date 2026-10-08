@@ -24,6 +24,14 @@ function msg(over: Partial<Message> & { id: string }): Message {
   } as Message;
 }
 
+/*
+ * Fixture mang `turnId` sẵn = dạng row SAU lần nâng cấp LƯỢT.
+ *
+ * Không có nó thì mọi phép "row không đổi thì không ghi" ở đây đỏ vì reconcile
+ * ghi MỘT lần để cấp lượt cho row cũ (DESIGN.md §15.1) — đỏ vì lý do đúng nhưng
+ * không phải thứ file này định đo. Muốn đo chuyện nâng cấp thì dùng fixture
+ * KHÔNG có turnId, xem tests/reasoning-persistence.test.ts.
+ */
 function row(over: Partial<StoredMessage> & { id: string }): StoredMessage {
   return {
     chatId: 'c1',
@@ -36,6 +44,7 @@ function row(over: Partial<StoredMessage> & { id: string }): StoredMessage {
     createdAt: 1,
     status: 'complete',
     finishReason: 'stop',
+    turnId: 'luot-1',
     ...over,
   } as StoredMessage;
 }
@@ -93,20 +102,35 @@ describe('reasoning — chỉ reasoning đổi thì vẫn phải được ghi', 
     expect(res.changedRows[0]?.reasoning ?? 'đang suy nghĩ').toBe('đang suy nghĩ');
   });
 
-  it('LƯỢT ĐÃ XONG không mang reasoning thì phải XOÁ reasoning cũ, không giữ mãi', async () => {
-    /* isCurrentlyLoading=false ⇒ lượt đã kết thúc; không có "đang stream" để
-       biện minh cho việc giữ bản cũ. */
+  /*
+   * HAI TEST DƯỚI ĐÂY ĐÃ ĐỔI NGHĨA (2026-10-06) — đọc trước khi "sửa lại".
+   *
+   * Bản cũ tên là "LƯỢT ĐÃ XONG không mang reasoning thì phải XOÁ reasoning cũ"
+   * và assert `changedRows[0]?.reasoning` là undefined. Nó XANH một cách rỗng:
+   * đường ghi cố ý giữ bản đã lưu (`reasoning: toStoredReasoning(...) ??
+   * existing.reasoning`), nên row KHÔNG được coi là đổi và `changedRows` rỗng —
+   * assertion đọc phần tử không tồn tại, tức nó chưa từng kiểm việc xoá.
+   *
+   * Đợt LƯỢT làm lộ chuyện đó: row cũ nay đổi thật (được cấp `turnId`) nên vào
+   * changedRows và lộ ra rằng reasoning bị GIỮ, không bị xoá.
+   *
+   * Giữ hay xoá là quyết định về HÀNH VI, không phải chi tiết kỹ thuật: xoá
+   * nghĩa là khối suy nghĩ biến mất khỏi hội thoại cũ ở lần reconcile kế tiếp.
+   * Docblock ở chỗ ghi chốt "giữ bản đã lưu", nên test được viết lại theo đúng
+   * hợp đồng đang chạy, và ghi rõ ra đây thay vì im lặng đổi tên.
+   */
+  it('lượt ĐÃ XONG không mang reasoning: giữ bản đã lưu, và KHÔNG sinh lượt ghi vì riêng chuyện đó', async () => {
     const before = row({ id: 'a1', content: 'kết luận', reasoning: 'suy nghĩ của lượt trước' });
     const after = msg({ id: 'a1', content: 'kết luận' });
     const res = await reconcile([after], [before], false);
-    expect(res.changedRows[0]?.reasoning ?? undefined).toBeUndefined();
+    expect(res.changedRows, 'không có gì đổi thì không được ghi gì').toHaveLength(0);
   });
 
-  it('reasoning toàn khoảng trắng ở lượt ĐÃ XONG cũng phải xoá bản cũ', async () => {
+  it('reasoning toàn khoảng trắng ở lượt ĐÃ XONG: cũng không sinh lượt ghi', async () => {
     const before = row({ id: 'a1', content: 'kết luận', reasoning: 'suy nghĩ cũ' });
     const after = msg({ id: 'a1', content: 'kết luận', reasoning: '   ' });
     const res = await reconcile([after], [before], false);
-    expect(res.changedRows[0]?.reasoning ?? undefined).toBeUndefined();
+    expect(res.changedRows).toHaveLength(0);
   });
 });
 

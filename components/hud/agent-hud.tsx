@@ -74,7 +74,7 @@ export function AgentHud({ className = '' }: AgentHudProps) {
     <div
       role="status"
       aria-label="Phiếu lượt chạy gần nhất"
-      className={`border-b border-subtle bg-surface px-3 py-1.5 text-meta font-mono text-tertiary ${className}`}
+      className={`border-b border-subtle bg-surface px-3 py-1.5 text-meta font-sans text-tertiary ${className}`}
     >
       {laneList.map((lane) => (
         <HudRow key={lane.laneId} lane={lane} />

@@ -77,7 +77,7 @@ export default function ChatInterface() {
       {!isLeader && (
         <div
           data-testid="observer-banner"
-          className="flex items-center justify-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-1.5 text-center font-mono text-xs text-primary"
+          className="flex items-center justify-center gap-2 border-b border-warning/40 bg-warning/10 px-3 py-1.5 text-center font-sans text-xs text-primary"
         >
           <span>
             {isAcquiring
@@ -131,7 +131,7 @@ export default function ChatInterface() {
       {orch.swipeDirection && (
         <div
           className={[
-            'pointer-events-none fixed top-1/2 z-50 -translate-y-1/2 rounded-full border border-subtle bg-panel-bg px-3.5 py-1.5 font-mono text-xs text-primary animate-pop-in',
+            'pointer-events-none fixed top-1/2 z-50 -translate-y-1/2 rounded-full border border-subtle bg-panel-bg px-3.5 py-1.5 font-sans text-xs text-primary animate-pop-in',
             orch.swipeDirection === 'left' ? 'right-4' : 'left-4',
           ].join(' ')}
           aria-live="polite"
@@ -223,7 +223,7 @@ export default function ChatInterface() {
 
         {orch.hintsChip && (
           <div className="mx-auto mb-2 w-full max-w-thread px-4">
-            <div className="lift-sm rounded-lg border border-subtle bg-raised font-mono text-meta text-tertiary">
+            <div className="lift-sm rounded-lg border border-subtle bg-raised font-sans text-meta text-tertiary">
               <button
                 type="button"
                 onClick={() => orch.setShowHints((v) => !v)}

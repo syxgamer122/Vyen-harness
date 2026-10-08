@@ -256,7 +256,7 @@ export function ProviderManager() {
     });
 
   return (
-    <div className="space-y-3 font-mono">
+    <div className="space-y-3 font-sans">
       {/* Máy chủ mặc định */}
       <label
         className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-3.5 py-3 transition-colors ${
@@ -397,7 +397,7 @@ export function ProviderManager() {
                     id={`pv-key-${p.id}`}
                     type="password"
                     autoComplete="off"
-                    className="field-sm flex-1 font-mono"
+                    className="field-sm flex-1 font-sans"
                     placeholder={p.apiKey ? '••••••••  (nhập key mới)' : 'sk-... / dán key tại đây'}
                     value={draft ?? ''}
                     onChange={(e) => setKeyDraft((d) => ({ ...d, [p.id]: e.target.value }))}
@@ -463,14 +463,14 @@ export function ProviderManager() {
             onChange={(e) => setEditing({ ...editing, name: e.target.value })}
           />
           <input
-            className="field-sm font-mono"
+            className="field-sm font-sans"
             aria-label="Base URL"
             placeholder="Base URL (vd: https://api.openai.com/v1)"
             value={editing.baseUrl}
             onChange={(e) => setEditing({ ...editing, baseUrl: e.target.value })}
           />
           <input
-            className="field-sm font-mono"
+            className="field-sm font-sans"
             type="password"
             aria-label="API key"
             placeholder={

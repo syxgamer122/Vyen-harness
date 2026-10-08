@@ -143,7 +143,7 @@ export const StatusLine = memo(function StatusLine({
      * `·` chen giữa các mảnh không còn chỗ nào để thở. Hàng này là thanh
      * trạng thái duy nhất của app nên nó phải đọc được ở khoảng cách tay.
      */
-    <header className="sticky top-0 z-20 flex h-10 min-w-0 flex-shrink-0 items-center gap-2 overflow-x-auto no-scrollbar border-b border-subtle bg-surface/90 px-4 font-mono text-ui text-secondary">
+    <header className="sticky top-0 z-20 flex h-10 min-w-0 flex-shrink-0 items-center gap-2 overflow-x-auto no-scrollbar border-b border-subtle bg-surface/90 px-4 font-sans text-ui text-secondary">
       <button
         type="button"
         onClick={onOpenSidebar}

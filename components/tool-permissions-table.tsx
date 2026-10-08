@@ -158,7 +158,7 @@ export function ToolPermissionsTable() {
   };
 
   return (
-    <div className="lift-sm space-y-3 rounded-xl border border-subtle bg-raised p-4 font-mono">
+    <div className="lift-sm space-y-3 rounded-xl border border-subtle bg-raised p-4 font-sans">
       {/* Header controls: Search, Group Filter, Reset */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-1 flex-wrap items-center gap-2">

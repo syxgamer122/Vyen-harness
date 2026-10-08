@@ -49,7 +49,7 @@ function StreamThinkingBlock({
         </span>
       </button>
       {open && (
-        <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-ui leading-relaxed text-secondary pt-2 border-t border-reasoning/40">
+        <div className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap font-sans text-ui leading-relaxed text-secondary pt-2 border-t border-reasoning/40">
           {reasoning}
         </div>
       )}
@@ -95,7 +95,7 @@ export const StreamBubble = memo(function StreamBubble({
     >
       <div className="mx-auto max-w-4xl space-y-2">
         <div className="flex items-center justify-between text-xs text-text-muted">
-          <div className="flex items-center gap-1.5 font-mono text-meta text-cyan-glow">
+          <div className="flex items-center gap-1.5 font-sans text-meta text-cyan-glow">
             <Sparkles size={12} className={isStreaming ? 'animate-pulse text-cyan-glow' : ''} />
             <span className="uppercase tracking-wider font-semibold">{role}</span>
             {isStreaming && <span className="text-micro text-text-muted font-normal">(streaming...)</span>}
@@ -105,7 +105,7 @@ export const StreamBubble = memo(function StreamBubble({
             <button
               type="button"
               onClick={onStop}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-meta font-mono rounded-lg border border-danger/40 bg-danger/10 hover:bg-rose-danger/20 text-rose-danger transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-meta font-sans rounded-lg border border-danger/40 bg-danger/10 hover:bg-rose-danger/20 text-rose-danger transition-colors"
               title="Dừng sinh phản hồi"
             >
               <Square size={10} className="fill-current" />
@@ -123,7 +123,7 @@ export const StreamBubble = memo(function StreamBubble({
             <MarkdownRenderer content={content} />
           ) : (
             isStreaming && (
-              <div className="flex items-center gap-2 text-xs font-mono text-text-muted py-1 italic">
+              <div className="flex items-center gap-2 text-xs font-sans text-text-muted py-1 italic">
                 <TextShimmer text="Đang chờ phản hồi từ model..." />
                 <span className="w-2 h-4 bg-cyan-glow inline-block align-middle ml-1 animate-pulse" aria-hidden="true" />
               </div>

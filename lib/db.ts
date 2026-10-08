@@ -97,6 +97,20 @@ export interface StoredMessage {
    */
   annotations?: Array<Record<string, unknown>>;
   /**
+   * Lượt (turn) mà row này thuộc về — xem `lib/turns.ts` và DESIGN.md §15.1.
+   *
+   * Vì sao phải LƯU chứ không suy lúc vẽ: lượt là đơn vị công việc người dùng
+   * giao, và ranh giới của nó do HÀNH ĐỘNG người dùng quyết định (gửi khi agent
+   * đang chạy = điều chỉnh việc hiện tại; Stop rồi gửi = lượt mới; New task =
+   * lượt mới), không do máy phân loại nội dung tin nhắn. Nếu mỗi chỗ render tự
+   * gom thì cùng một lịch sử sẽ ra hai cách gom khác nhau.
+   *
+   * Row cũ đọc ra là undefined: phía đọc dùng chung `groupTurns()` để gom theo
+   * ĐÚNG một luật (`assignTurnIds`), không màn hình nào tự đoán riêng.
+   * Trường không index → không cần bump version Dexie.
+   */
+  turnId?: string;
+  /**
    * Kết quả tool client-executed (fs_*) do useChat gắn vào assistant message.
    * PHẢI persist: route.attachToolResultParts() dựng lại tool-call parts từ
    * đây, thiếu nó thì sau khi tải lại trang model mất sạch kết quả đã đọc và

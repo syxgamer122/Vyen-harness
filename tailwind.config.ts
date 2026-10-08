@@ -37,7 +37,16 @@ const hex = {
   strong: '#525252',
 
   accent: '#2a7360',
-  'accent-dim': '#7fb8a6',
+  /*
+   * `accent-dim` là vật thể ĐỒ HOẠ (cột biểu đồ, chấm trạng thái), không phải
+   * nền chữ — nên nó chịu ngưỡng 3:1 của WCAG 1.4.11 chứ không phải 4.5:1.
+   * Giá trị cũ `#7fb8a6` chỉ đạt 2.26:1 trên trắng và 2.07:1 trên `#f5f5f5`:
+   * dưới ngưỡng, tức đúng loại tín hiệu mà luật đó sinh ra để bảo vệ.
+   * `#519a85` giữ nguyên tông xanh trầm, đo được 3.33:1 trên trắng và 3.05:1
+   * trên `#f5f5f5`. Sửa ở đây thì phải sửa cả `:root` trong globals.css và
+   * bảng màu trong tests/design-system.test.ts — test kiểm cả hai chiều.
+   */
+  'accent-dim': '#519a85',
   'accent-soft': '#f0f4f3',
   'on-fill': '#ffffff',
   success: '#167a4a',
@@ -253,16 +262,21 @@ const config: Config = {
          * VAI TRÒ, dùng lại được ở mọi nơi:
          *   micro   — siêu nhỏ, dấu phân biệt, số đếm
          *   meta    — timestamp, metadata, chú thích nhỏ
-         *   ui      — nhãn, nút, chữ trong khối giao diện (mặc định)
          *   body    — nội dung trong ô nhập, dòng bảng
+         *   ui      — nhãn, nút, chữ trong khối giao diện (mặc định)
          *   read    — văn bản đọc dài (markdown, đoạn văn)
          *   head    — tiêu đề khối lớn
+         *
+         * Cỡ px theo bảng vai trò ở DESIGN.md §13.2 (đợt 2026-10-06): nhãn/nút/
+         * menu 14, hội thoại dài 16, metadata 12. `body` giữ 13 — tài liệu không
+         * gán cỡ nào cho vai trò này, và thang vẫn tăng dần theo thứ tự
+         * micro → meta → body → ui → read → head.
          */
         micro: ['10px', { lineHeight: '1.4' }],
-        meta: ['11px', { lineHeight: '1.45' }],
-        ui: ['12px', { lineHeight: '1.5' }],
+        meta: ['12px', { lineHeight: '1.45' }],
         body: ['13px', { lineHeight: '1.6' }],
-        read: ['15px', { lineHeight: '1.7' }],
+        ui: ['14px', { lineHeight: '1.5' }],
+        read: ['16px', { lineHeight: '1.7' }],
         head: ['20px', { lineHeight: '1.3' }],
 
         /*

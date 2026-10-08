@@ -101,7 +101,7 @@ Bốn hệ quả cụ thể, mỗi cái đều kiểm được:
 |---|---|---|
 | `bg-sunken` | `#f7f7f7` | ngoài cùng — nền app, sidebar |
 | `bg-base` | `#fcfcfc` | vùng làm việc chính — chat stream, composer |
-| `bg-surface` | `#ffffff` | khối nội dung — thẻ, bubble, dải tiêu đề |
+| `bg-surface` | `#ffffff` | khối nội dung — thẻ, dải tiêu đề (lời trợ lý KHÔNG còn nền riêng, xem §15.1 điểm 2) |
 | `bg-raised` | `#f5f5f5` | control — ô nhập, nút, khối hover, code |
 | `bg-overlay` | `#ffffff` | nổi trên cùng — popover, dropdown, menu |
 
@@ -170,7 +170,7 @@ bộ recipe trong `globals.css` cùng 7 call site trong component.
 | Token | HEX | Dùng cho |
 |---|---|---|
 | `accent` | `#2a7360` | nhấn chủ đạo: link, con trỏ, viền focus — 5.6:1 |
-| `accent-dim` | `#7fb8a6` | nhấn bị tắt, cột biểu đồ, chấm trạng thái — **2.26:1** trên trắng, 2.07:1 trên `#f5f5f5`: **dưới** ngưỡng 3:1 cho vật thể đồ hoạ. Xem §9.5 |
+| `accent-dim` | `#519a85` | nhấn bị tắt, cột biểu đồ, chấm trạng thái — **3.33:1** trên trắng, **3.05:1** trên `#f5f5f5`: đạt ngưỡng 3:1 của WCAG 1.4.11 cho vật thể đồ hoạ. Giá trị cũ `#7fb8a6` (2.26:1 / 2.07:1) đã bị thay |
 | `accent-soft` | `#f0f4f3` | **nền** nhấn nhạt — tag active, bubble người dùng |
 | `on-fill` | `#ffffff` | chữ trên nền tô đậm |
 | `success` / `warning` / `danger` / `info` | `#167a4a` / `#9a6206` / `#b3261e` / `#0369a1` | trạng thái |
@@ -178,6 +178,11 @@ bộ recipe trong `globals.css` cùng 7 call site trong component.
 
 `accent-soft` là token **nền**, không phải token chữ — nó tách riêng khỏi `accent`
 vì nền nhạt trên giấy trắng chỉ đạt ~1.1:1, không đọc được.
+
+`accent-dim` là token **vật thể đồ hoạ**, không phải token nền mang chữ: nó vừa
+đủ 3:1 để mắt nhận ra một cột biểu đồ hay một chấm trạng thái, nhưng `text-accent`
+trên nó chỉ được 2.50:1 — fail AA. Chỗ nào cần nền cho chữ nhấn thì dùng
+`accent-soft` (`accent` trên đó là **5.09:1**).
 
 `reasoning` là token **chữ**, không phải token nền. Dùng nó làm nền đặc sẽ hạ
 `text-primary` trên nền đó xuống ~2.4:1 (fail AA). Nền suy luận phải là
@@ -201,19 +206,40 @@ và đó chính là thứ làm bảng màu loãng.
 
 ## 3. Typography
 
-**Hai họ chữ, hai việc.**
+**Hai họ chữ, hai việc — và mặc định là Inter.**
 
 | Họ | Font | Dùng cho |
 |---|---|---|
-| `mono` | JetBrains Mono | **mặc định cho control và nhãn** trong khối công cụ, và mọi thứ do máy sinh ra: code, token, id, đường dẫn, hash, timestamp |
-| `sans` | Inter | prose đọc dài (`.claude-prose` kế thừa từ preflight) và chữ trang trí — wordmark, avatar |
+| `sans` | Inter | **mặc định cho giao diện**: nhãn, nút, hàng menu, điều hướng, nhãn trường, mô tả, metadata, thông báo — và prose đọc dài (`.claude-prose`, `.uic`) |
+| `mono` | JetBrains Mono | **chữ MÁY**: code, lệnh, đường dẫn, tên tệp, tên tool, ID, hash, payload JSON, dòng diff, đầu ra stdout/stderr, và số liệu trong bảng |
 
-Sai lệch này từng được ghi ngược trong tài liệu: bảng cũ nói sans cho "toàn bộ
-nhãn, nút", nhưng code thì ngược lại — `font-mono` có mặt ở 48 file
-`components/` + `app/`, `font-sans` chỉ 10 file, và các recipe `.menu-item`,
-`.field-label`, `.btn-primary` đều khai `font-mono`. Sửa bảng cho đúng code, không
-đổi code: mono là lựa chọn có chủ đích cho giao diện công cụ, sans dành cho chữ
-đọc. Nếu đổi chiều này thì đổi cả hai bên cùng lúc, không sửa riêng bảng.
+Đợt typography (2026-10-06) đã **đảo chiều mặc định** so với bảng cũ. Trước đây
+mono là mặc định cho control và nhãn: `font-mono` có mặt ở 48 file
+`components/` + `app/`, và các recipe `.menu-item` / `.field-label` / `.field`
+đều khai mono — nên toàn giao diện đọc như một cửa sổ terminal. Bảng trên là
+chiều **đang chạy**, không phải chiều mong muốn: `.field-label` / `.field-hint` /
+`.field` / `.field-sm` / `.menu-item` / `.notice` trong `globals.css` đã chuyển
+sang `var(--font-sans)`, và 55 chỗ `font-mono` trong component đã đổi sang
+`font-sans` ở đúng những khối là chrome (vỏ dialog/panel, nhãn, chip, nút, hàng
+trạng thái, metadata).
+
+Còn lại **37 chỗ `font-mono`**, và mỗi chỗ đều là chữ máy theo đúng vai ở bảng
+trên: code block (`.claude-code-block`, `markdown-renderer.tsx`), tham số tool +
+đầu ra thô (`tool-trace.tsx`), khối lệnh (`shell-confirm.tsx`), dòng diff
+(`diff-confirm.tsx`, `staging-panel.tsx`), đường dẫn/tên tệp (`staging-panel.tsx`,
+`diff-confirm.tsx`, chip đính kèm trong `composer.tsx`/`message-item.tsx`), ID và
+payload (`telemetry-tab.tsx`, `workspace-checkpoints.tsx`), tên tool
+(`tool-grants-panel.tsx`, `tool-permissions-table.tsx`), lệnh slash
+(`/‹tên›`), khoá recipe, biểu thức cron, model id (`usage-stats.tsx`), số đếm
+(`branch-switcher.tsx`, `appearance-tab.tsx`, badge số trong `composer.tsx`), và
+chi tiết lỗi `break-all` ở `app/error.tsx` + `app/global-error.tsx`.
+
+**Cỡ px của thang 6 bậc — ĐÃ ĐỔI (2026-10-06, đợt riêng có ảnh đối chiếu).**
+Đợt họ chữ trước đó chỉ đổi HỌ chữ (Inter ↔ mono) và để nguyên 12/13/15px cho
+`ui`/`body`/`read`. Đợt cỡ chữ lấy con số đúng theo bảng vai trò §13.2: nhãn/nút/
+menu 14px, hội thoại dài 16px, metadata 12px; `body` giữ 13px vì §13.2 không gán
+cỡ nào cho vai trò này. Bằng chứng: ảnh trước/sau ở 375/768/1024/1440px (chat rỗng
++ Settings, xem §13.3 bước 2) và CSS sinh ra thật đọc từ trình duyệt — xem §13.2.
 
 Chữ vẽ tay (Patrick Hand) **đã bị gỡ khỏi hệ**. Lý do đo được, không phải thẩm
 mỹ: Patrick Hand chỉ có **một nét** (weight 400), nên phân cấp đậm/nhạt buộc
@@ -229,11 +255,16 @@ không phải làm nhạt đi.
 | Bậc | px | Dùng cho |
 |---|---|---|
 | `micro` | 10 | siêu nhỏ, dấu phân biệt, số đếm |
-| `meta` | 11 | timestamp, metadata, chú thích nhỏ |
-| `ui` | 12 | nhãn, nút, chữ trong khối giao diện (mặc định) |
+| `meta` | 12 | timestamp, metadata, chú thích nhỏ |
 | `body` | 13 | nội dung trong ô nhập, dòng bảng |
-| `read` | 15 | văn bản đọc dài (markdown, đoạn văn) |
+| `ui` | 14 | nhãn, nút, chữ trong khối giao diện (mặc định) |
+| `read` | 16 | văn bản đọc dài (markdown, đoạn văn) |
 | `head` | 20 | tiêu đề khối lớn |
+
+> Hàng xếp theo bậc px tăng dần, nên thứ tự vai trò trong bảng đổi chỗ so với bản
+> trước (`ui` vượt `body`): nhãn/nút là chữ để ĐỌC để quyết định nên lấy 14px theo
+> §13.2, còn `body` là chữ dày trong ô nhập và dòng bảng, không có cỡ trong bảng
+> §13.2 nên giữ 13px. Sáu bậc vẫn cách nhau đều — không bậc nào trùng bậc nào.
 
 `fontSize` giữ nguyên `xs`/`sm`/`base` của Tailwind cho tới khi từng component
 chuyển sang tên bậc mới — đổi số ở đó là đổi diện mạo toàn ứng dụng trong một lần,
@@ -252,8 +283,8 @@ còn mỗi lần đổi tên class thì an toàn.
 | `DEFAULT` | 6 | control nhỏ, chip |
 | `md` | 8 | nút icon (`.icon-btn`) |
 | `lg` | 10 | **control chính**: nút (`.btn-*`), ô nhập (`.field`), hàng menu (`.menu-item`) |
-| `xl` | 12 | khối nội dung: thẻ settings, panel, vỏ overlay (`.surface-panel`) |
-| `2xl` | 16 | khối lớn: bubble, khung modal, vỏ composer |
+| `xl` | 12 | khối nội dung: thẻ settings, panel, vỏ overlay (`.surface-panel`), ghi chú người dùng (`.user-note`) |
+| `2xl` | 16 | khối lớn: khung modal, vỏ composer |
 | `3xl` | 20 | dự phòng, lớn hơn mọi khối đang dùng |
 | `full` | 9999 | hình tròn |
 
@@ -265,8 +296,13 @@ cho câu hỏi "control này bo bao nhiêu":
 | Chip, badge, ô inline | 4px (`sm`) | — |
 | Nút icon | 8px (`md`) | `.icon-btn` |
 | Nút, ô nhập, hàng menu, trigger | 10px (`lg`) | `.btn-primary`, `.field`, `.menu-item` |
-| Khối nội dung, vỏ overlay | 12px (`xl`) | `.surface-panel` |
+| Khối nội dung, vỏ overlay, ghi chú người dùng | 12px (`xl`) | `.surface-panel`, `.user-note` |
 | Khung modal, vỏ composer | 16px (`2xl`) | `settings-dialog.tsx` |
+
+> **Đổi vai trò 2026-10-06 (P1).** Bong bóng người dùng từ `2xl` 16px xuống `xl`
+> 12px và bong bóng trợ lý **biến mất** cùng lượt: §15.1 điểm 2 đổi khối nào
+> *được* có khung — lời nói không còn khung nào, chỉ code/diff/bằng chứng/yêu cầu
+> quyết định mới có. `16px` vì vậy chỉ còn thuộc khung modal và vỏ composer.
 
 Ba bậc `DEFAULT` / `md` / `lg` trước đây đều được ghi là "control", nên không ai
 biết chọn bậc nào. Bảng trên chốt lại: **control chính là `lg` 10px**, và đó là
@@ -502,8 +538,9 @@ xem §3.
 > **Đợt rà `ui-ux-pro-max` (10/2025) đã dọn phần còn lại.** Toàn bộ cỡ px tự chế
 > trong bề mặt hợp đồng nay đã về tên bậc: `text-[11px]` → `text-meta`,
 > `text-[10px]` → `text-micro`, `text-[12px]` → `text-ui`, `text-[13px]` →
-> `text-body`, `text-[15px]` → `text-read` (cùng số px, nên **không đổi một pixel
-> diện mạo nào** — chỉ đổi tên để đổi cỡ ở đây cũng kéo được cả app). Các cỡ
+> `text-body`, `text-[15px]` → `text-read` (lúc đó cùng số px nên **không đổi một
+> pixel diện mạo nào** — chỉ đổi tên; từ 2026-10-06 các bậc là 12/13/14/16px theo
+> §13.2, nên tên bậc nay kéo cỡ theo thang). Các cỡ
 > lệch nửa px (`10.5` / `11.5` / `12.5` / `9.5`) — vốn **không thuộc bậc nào** —
 > đã bấm về bậc gần nhất, nên lệch tối đa 0.5px và một chiều.
 >
@@ -528,21 +565,20 @@ xem §3.
   **đặc** làm nền, khiến `text-primary` trên đó chỉ còn 2.39:1 (fail AA) và icon
   `text-reasoning` là 1.00:1 — vô hình. Nay dùng `bg-reasoning/10` + chữ
   `text-primary`/`text-secondary`. Xem §2.4.
-- **`thinking-menu.tsx:303` tự ghi `z-40` thay vì `Z_CLASS.dropdown`.** Giá trị thì
-  đúng (40 = `dropdown`), nên màn hình không sai — nhưng nó vi phạm §8 và là hàng
-  thứ 12 trong số overlay nên lấy số từ `lib/ui-z.ts` (11 component còn lại đều gọi
-  `Z_CLASS`). Sửa là đổi một chữ, không đổi diện mạo.
+- **`thinking-menu.tsx` tự ghi `z-40` — ĐÃ SỬA (2026-10-06).** Chỗ đó nay dùng
+  `${Z_CLASS.dropdown}`; cả 12 overlay đều lấy số từ `lib/ui-z.ts`. Giá trị không
+  đổi (40 = `dropdown`) nên diện mạo không đổi.
 
-### 9.5 Vòng đo lại tương phản — phát hiện được, đợt này KHÔNG sửa code
+### 9.5 Vòng đo lại tương phản — hai lỗi đã sửa ở đợt P0
 
 Các tỉ lệ trong §2 được đo tay và **không test canh** (§10.2). Một vòng đo lại bằng
-công thức WCAG trên bảng màu thật bắt được bốn điều. Đợt này chỉ sửa **tài liệu**,
-nên ba điều đầu vẫn nằm nguyên trong code và được ghi lại ở đây làm việc còn treo:
+công thức WCAG trên bảng màu thật bắt được bốn điều; đợt typography + tương phản
+(2026-10-06) đã sửa hai điều đầu, hai điều còn lại vẫn là việc đang treo:
 
 | Phát hiện | Trạng thái |
 |---|---|
-| `accent-dim` `#7fb8a6` chỉ **2.26:1** trên trắng, 2.07:1 trên `#f5f5f5`. Comment trong `globals.css:59` vẫn ghi "4.0:1, đạt 3:1 cho vật thể đồ hoạ" — sai. Token đang tô cột biểu đồ (`usage-stats.tsx:109`, `telemetry-tab.tsx:209`) và chấm trạng thái (`status-line.tsx:80`), tức đúng loại vật thể mà 1.4.11 đòi 3:1 | **Chưa sửa.** Hướng đã đo thử: hạ xuống `#519a85` → 3.05:1 trên `#f5f5f5`, 3.33:1 trên trắng, giữ nguyên tông. Khi nào sửa thì phải sửa đồng bộ `tailwind.config.ts`, `:root`, bảng màu của test và §2.4 |
-| Chấm trí đầu vỏ Settings vẽ `bg-accent-dim` với `text-accent` → **2.50:1**, fail AA ở chữ cỡ `micro` (`settings-dialog.tsx:196`) | **Chưa sửa.** Hướng đã đo thử: nền `bg-accent-soft` → `accent` trên đó là 5.09:1 |
+| `accent-dim` `#7fb8a6` chỉ **2.26:1** trên trắng, 2.07:1 trên `#f5f5f5`. Comment trong `globals.css:59` vẫn ghi "4.0:1, đạt 3:1 cho vật thể đồ hoạ" — sai. Token đang tô cột biểu đồ (`usage-stats.tsx:109`, `telemetry-tab.tsx:209`) và chấm trạng thái (`status-line.tsx:80`), tức đúng loại vật thể mà 1.4.11 đòi 3:1 | **ĐÃ SỬA.** Hạ xuống `#519a85` → 3.05:1 trên `#f5f5f5`, 3.33:1 trên trắng, giữ nguyên tông. Sửa đồng bộ `tailwind.config.ts`, `:root` trong `globals.css`, bảng màu của `tests/design-system.test.ts` và §2.4 — test canh cả hai chiều nên lệch một bên là đỏ |
+| Chấm trí đầu vỏ Settings vẽ `bg-accent-dim` với `text-accent` → **2.50:1**, fail AA ở chữ cỡ `micro` (`settings-dialog.tsx:196`) | **ĐÃ SỬA.** Nền chuyển sang `bg-accent-soft` → `accent` trên đó là 5.09:1 |
 | Số trong bảng §2 đo trên nền khác với nhãn cột: `primary` ghi 16.4:1 "trên `#fff`" nhưng trên `#fff` thật là 17.72:1 (con số 16.4 khớp `#f7f7f7`); `strong` ghi 6.4:1, thật là 7.81:1 | **Đã sửa trong §2** — nhưng comment cũ ở `globals.css:44,55` vẫn ghi số cũ, vì đợt này không đụng code |
 | `border-default` trên nền `bg-raised` là 2.78:1 (`shell-confirm.tsx:159`, `branch-switcher.tsx:39`) | **Cố ý để nguyên.** Ở đó viền không phải tín hiệu nhận diện duy nhất — control có nền `raised` khác nền trang và có chữ bên trong — nên vẫn thoát 1.4.11 theo nghĩa "có tín hiệu nhận diện". Đổi sang `strong` sẽ thắt chặt hơn thiết kế hiện tại |
 
@@ -719,9 +755,10 @@ chắc chúng đỏ **đúng lý do**:
 
 ### 11.2 Cố ý giữ
 
-- **`micro` 10px / `meta` 11px** (§3, hạng 6). Hai bậc nhỏ nhất chỉ dùng cho số
-  đếm, nhãn trạng thái và metadata trong khối — không dùng cho câu đọc. Nâng
-  chúng lên 12px sẽ xoá mất phân cấp 6 bậc mà §3 đã chốt, và không sửa được vấn
+- **`micro` 10px / `meta` 12px** (§3, hạng 6; `meta` 11 → 12 theo cột px §13.2,
+  `micro` vẫn giữ 10 nên hai bậc vẫn cách nhau). Hai bậc nhỏ nhất chỉ dùng cho số
+  đếm, nhãn trạng thái và metadata trong khối — không dùng cho câu đọc. Đưa cả hai
+  cùng một cỡ mới xoá mất phân cấp 6 bậc mà §3 đã chốt, và không sửa được vấn
   đề nào của người đọc.
 - **Timing 100ms cho micro-interaction** (mũi tên xoay trong `thinking-menu`,
   fade của thanh dưới bubble khi cuộn — hạng 7). Đây là "timing theo ngữ cảnh"
@@ -729,19 +766,28 @@ chắc chúng đỏ **đúng lý do**:
   dùng 150ms, panel 200ms, chuyển động cơ học 100ms. Test chỉ bắt
   `transition-colors` dưới 150ms và CỐ Ý bỏ qua `transform`/`opacity` ở 100ms.
 - **`outline-none` ở `textarea` của composer** (hạng 1). Ô này CỐ Ý không dùng
-  vòng focus: focus của nó hiện ở VỎ form — `isFocused` dựng viền accent +
-  `PulseGlow` (`composer.tsx:1081`). Vòng quanh `textarea` sẽ là dư. Test khoá
-  danh sách ô nhập buộc phải có ring, và composer là ngoại lệ được ghi rõ.
+  vòng focus: focus của nó hiện ở VỎ form — `isFocused` dựng viền accent và vùng
+  nhập lớn lên nhẹ theo chiều dọc (§14.4, đợt P1-E 2026-10-08). Vòng quanh
+  `textarea` sẽ là dư. Test khoá danh sách ô nhập buộc phải có ring, và composer
+  là ngoại lệ được ghi rõ.
+- ~~**Hiệu ứng `PulseGlow` khi focus composer**~~ — **đã gỡ ở đợt P1-E
+  (2026-10-08).** Vòng `animate-pulse ring-accent/30` bao quanh vỏ vừa phát sáng
+  vừa làm mất một chuyển động, mà §15.4 điểm 15 cấm "phát sáng gây phân tâm";
+  dấu hiệu focus nay là viền accent + vùng nhập lớn lên. `PulseGlow` vẫn nằm
+  trong `components/effects/index.tsx` nhưng không còn nơi gọi — gỡ hẳn hay dùng
+  lại ở chỗ khác là việc riêng, không thuộc đợt này.
 - **`border-default` cho viền control** (§2.3): 3.03:1 — đạt WCAG 1.4.11 cho ranh
   giới control, dù dưới 4.5:1 của chữ.
 
 ### 11.3 Chưa kiểm được ở đây
 
-- **Chưa nhìn bằng mắt trên trình duyệt.** Mọi kết luận ở mục này là đọc mã +
-  phép tính khoảng cách/tương phản, không phải ảnh chụp.
-- **Chưa đo ở 375 / 768 / 1024 / 1440px thật.** Các lớp chống vỡ (`min-w-0`,
-  `truncate`, `max-w-[85vw]`, `flex-wrap`) đã có mặt trong mã, nhưng chưa có
-  phép đo layout thực tế.
+- **Chưa có người xem ảnh bằng mắt.** Ảnh chụp thật ở 4 bề rộng đã có
+  (`docs/design-qa/2026-10-06-type-scale/`), nhưng các kết luận dưới đây vẫn là
+  đọc mã + phép tính khoảng cách/tương phản — chưa ai ngồi soi ảnh để chốt.
+- **Đã đo bề rộng ở 4 khổ, CHƯA đo từng trạng thái (2026-10-06).** Ở 375 / 768 /
+  1024 / 1440px: `scrollWidth === clientWidth` — 0px tràn ngang — và có ảnh chụp
+  ở cả bốn bề rộng. Các lớp chống vỡ (`min-w-0`, `truncate`, `max-w-[85vw]`,
+  `flex-wrap`) vẫn chưa được soi tiếp ở chat dài, code dài, đang stream và lỗi.
 - **Hạng 3 (Performance) không đổi gì**: không có ảnh raster để lazy-load, logo
   và avatar đều là SVG inline.
 - **Chưa chạy `freebuff-preview` để nhìn app thật.** Riêng đợt 4 (theme tô màu
@@ -770,6 +816,10 @@ Việc phải làm bằng mắt, mỗi lần đổi layout:
 - Xem hết các trạng thái: chat dài, code dài (ngang phải cuộn được), đang stream,
   empty state, lỗi, modal phê duyệt, Settings.
 - Tab qua một dialog rồi đóng bằng Esc: focus phải quay về đúng chỗ.
+
+> **Đã làm bớt phần máy được (2026-10-06):** chụp 4 bề rộng trước/sau đợt cỡ chữ
+> và đo `scrollWidth === clientWidth` (0px tràn ngang) — còn lại (zoom 200%, chat
+> dài, stream, lỗi, vòng focus) vẫn phải làm bằng mắt.
 - `freebuff-preview start` rồi nhìn app thật. Mọi tỉ lệ trong §2 là phép tính trên
   mã, không phải ảnh chụp — không kết luận được "đẹp" bằng phép tính.
 
@@ -808,7 +858,7 @@ quyết · kết quả thay đổi ở đâu.**
 
 ### 13.2 Ba việc đang treo, theo thứ tự nên làm
 
-**1. Sửa hai lỗi tương phản đã đo (§9.5).** Không có phong cách nào cứu được 2.26:1.
+**1. Sửa hai lỗi tương phản đã đo (§9.5). — ĐÃ XONG (2026-10-06).**
 
 - `accent-dim` `#7fb8a6` → `#519a85`: 3.05:1 trên `#f5f5f5`, 3.33:1 trên trắng.
 - Chấm trí đầu vỏ Settings: `bg-accent-dim` + `text-accent` (2.50:1) → nền
@@ -816,8 +866,8 @@ quyết · kết quả thay đổi ở đâu.**
 - Đụng 4 file: `tailwind.config.ts`, `app/globals.css`, `tests/design-system.test.ts`,
   `components/settings-dialog.tsx`. Sửa một bên là test đỏ — đó là ý muốn.
 
-**2. Typography — ĐÃ CHỐT, chưa triển khai.** Hướng: **Inter cho lớp điều hướng,
-`JetBrains Mono` chỉ cho nội dung kỹ thuật.** Cụ thể:
+**2. Typography — ĐÃ TRIỂN KHAI phần HỌ CHỮ, còn phần CỠ chữ.** Hướng: **Inter cho
+lớp điều hướng, `JetBrains Mono` chỉ cho nội dung kỹ thuật.** Cụ thể:
 
 | Vai trò | Font | px |
 |---|---|---|
@@ -829,11 +879,23 @@ quyết · kết quả thay đổi ở đâu.**
 Mono **vẫn giữ vai trò**, nhưng chỉ ở đúng chỗ — không phải mọi nút đều trông như
 terminal.
 
-Việc này **đảo ngược** thứ §3 đang mô tả: trong 67 file `.tsx` ở `components/` +
-`app/`, có 48 file gọi `font-mono` và chỉ 10 file gọi `font-sans`; `.menu-item` /
-`.field-label` / `.btn-*` đều mono. Khi triển khai, phải đi theo thứ tự đọc —
-composer → sidebar → menu/dialog → phần còn lại — chứ không lướt 48 file một lượt.
-Xem bảng kế hoạch ở §13.3.
+Việc này **đảo ngược** chiều cũ: trong 67 file `.tsx` ở `components/` + `app/`, có
+48 file gọi `font-mono` và chỉ 10 file gọi `font-sans`; `.menu-item` /
+`.field-label` / `.field-*` đều mono. Đợt này đi theo thứ tự đọc — composer →
+sidebar → menu/dialog → phần còn lại — và kết quả là 55 chỗ đổi sang Inter, còn
+37 chỗ mono đúng vai chữ máy (§3 ghi danh sách).
+
+**Cột px trong bảng trên (14 / 16 / 12) — ĐÃ LÀM (2026-10-06).** `ui` 12 → 14,
+`read` 15 → 16, `meta` 11 → 12 trong `tailwind.config.ts`; hai recipe tự khai cỡ
+riêng cũng theo cùng con số: `.field-label` 13 → 14px, `.claude-prose` 15 → 16px
+(`.field-hint` vốn đã 12px). `body` giữ 13px — bảng trên không gán cỡ cho vai trò
+này, và thang vẫn tăng dần 10/12/13/14/16/20. Bằng chứng: cặp ảnh trước/sau ở
+375/768/1024/1440px (`docs/design-qa/2026-10-06-type-scale/`), CSS đọc trực tiếp
+từ trình duyệt (`text-ui` 14px, `text-read` 16px, `text-meta` 12px,
+`.field-label` 0.875rem, `.claude-prose` 16px), 0px tràn ngang ở cả bốn bề rộng,
+`tests/design-system.test.ts` khóa sẵn 6 bậc + 3 recipe, toàn bộ suite xanh.
+**Còn thiếu điều kiện §14.9**: ảnh lượt có tool chạy / diff / lỗi, zoom 200%,
+ảnh 375px-Settings (nút *Cài đặt* không trong DOM khi sidebar đóng ở mobile).
 
 **Về tương phản thì cỡ chữ không vào cuộc.** Tỉ lệ tương phản phụ thuộc màu, không
 phụ thuộc cỡ chữ; WCAG chỉ *hạ* ngưỡng cho "large text" (≥24px, hoặc ≥18.66px đậm)
@@ -856,7 +918,35 @@ mắt, không sửa bằng số.
 > Trước khi tách tài liệu này thành nhiều file — xem §9.6.
 
 | Bước | Việc | Bằng chứng kết thúc |
-|---|---|---|
+
+> **Trạng thái 2026-10-06 (cập nhật cuối ngày):** bước 1 xong (`accent-dim` +
+> chấm trí Settings); bước 3 xong phần HỌ CHỮ; **bước 2 xong vế cỡ chữ** — đã có
+> ảnh trước/sau ở 4 bề rộng tại `docs/design-qa/2026-10-06-type-scale/`,
+> `tsc --noEmit` 0 lỗi, toàn bộ suite xanh với test hợp đồng khóa 6 bậc.
+> **Bước 4 (chiều sâu) chưa làm** — nó đòi nhìn bằng mắt. Ảnh đã chụp nhưng
+> chưa ai soi; đừng đọc bảng dưới thành "đã nghiệm thu".
+>
+> **Trạng thái 2026-10-07 (đợt LƯỢT):** bốn bước trên không đổi. Thêm: dữ liệu
+> LƯỢT theo sự kiện + turn header (§15.1 điểm 1/3/4) — bằng chứng là
+> `tests/turns.test.ts` (30 test gọi hàm thật), hợp đồng trong
+> `tests/design-system.test.ts`, và `tests/reasoning-persistence.test.ts` khóa
+> đường ghi/nâng cấp. Đợt P1-D thêm nhóm phase + vạch trạng thái cho thẻ tool
+> (`tests/tool-phases.test.ts`, hợp đồng trong `tests/design-system.test.ts`) và hai
+> ảnh `1440-chat-tools-phases.png` / `1440-chat-tools-card-open.png`. Ảnh: `docs/design-qa/2026-10-07-turns/` — 4 bề rộng
+> (375/1024/1440/1440-zoom200%) cho lượt có tool chạy và lượt lỗi, đo 0px tràn
+> ngang, 0 lỗi console; thêm ảnh lượt đã GẬP (`1440-chat-turns-folded.png`, đợt
+> P1-C) cùng số đo hai chiều gập/mở. **Vẫn chưa có ảnh diff/approval thật**, nên
+> điều kiện §14.9 vẫn **chưa đạt** và "đẹp hơn" vẫn chưa được chứng minh bằng mắt.
+>
+> **Trạng thái 2026-10-08 (đợt P1-E):** bước 1–3 không đổi. Thêm: composer mới
+> (§14.4) — hàng chân `model · phạm vi · gửi`, chip phạm vi hai trạng thái, focus
+> mở rộng dọc mà chiều cao vỏ không đổi; bằng chứng là 19 test mới trong
+> `tests/composer-affordances.test.ts` (hàm thật + soi source, tổng 68 test),
+> hợp đồng số `COMPOSER_FOCUS_PAD`, và bộ ảnh/số đo ở
+> `docs/design-qa/2026-10-08-composer/` (0px tràn ngang ở 375/768/1024/1440 +
+> zoom 200%, 0 lỗi console, `elementFromPoint` xác nhận cả bốn control bấm được ở
+> 320/375/768/1024/1432/1440px). Lỗi thật tìm được khi đo và đã sửa trong đợt: ô
+> chọn model bị ép còn 26px và chồng lên chip phạm vi ở 768px.
 | 1 | Sửa `accent-dim` + chấm trí Settings | `vitest tests/design-system.test.ts` xanh; đo lại tỉ lệ bằng công thức WCAG ghi vào §2.4 |
 | 2 | Chốt hướng typography, rồi mới sửa | Trước khi sửa: ảnh 375/768/1024/1440px của chat, composer, menu. Sau khi sửa: chụp lại cùng bộ, đối chiếu |
 | 3 | Nếu chọn sửa, migrate từng khối theo thứ tự đọc: composer → sidebar → menu/dialog → phần còn lại | Không lướt 48 file một lượt; mỗi khối một lượt, `npm run lint` sạch, không lỗi typecheck |
@@ -880,7 +970,7 @@ Ba cột, và cả ba đã tồn tại — vấn đề là vai trò, không ph�
 
 | Cột | Đang có | Đích |
 |---|---|---|
-| Trái | Danh sách phiên, tìm kiếm, thu gọn được | Thêm switcher workspace/project, **New task** nổi bật, trạng thái workspace |
+| Trái | Danh sách phiên, tìm kiếm, thu gọn được | Thêm switcher workspace/project, **New task** nổi bật, trạng thái workspace — xem ghi chú dưới bảng |
 | Giữa | Cột hội thoại `maxWidth.thread = 48rem` (768px), composer cùng token | Giữ 768px — đã nằm trong dải 760–820px. Đổi thứ khác, không đổi số này |
 | Phải | `SessionRail` 20rem từ `screens.rail` 1432px, chứa Plan + undo checkpoint; dưới ngưỡng thì Plan rơi vào giữa | **Task control rail**: thêm files touched, tests, phê duyệt đang chờ, hành động gợi ý |
 
@@ -905,8 +995,11 @@ hướng đọc bằng nền + căn lề, không có đuôi (§5.1).
 - Người dùng: compact hơn, bo 12px (`xl`) thay vì 16px, bề rộng tối đa ~72%.
 - Các tin liên tiếp của cùng một lượt gom thành một khối; avatar không lặp ở mọi
   dòng.
-- Mỗi lượt có **turn header** ngắn: số thứ tự, tên việc, giờ bắt đầu, số hành động,
-  số file đổi — để đọc lại không phải quét toàn bộ lịch sử.
+- Mỗi lượt có **turn header** ngắn — để đọc lại không phải quét toàn bộ lịch sử.
+  **Đã làm (2026-10-07):** `components/chat/turn-header.tsx`, gắn vào tin ĐẦU của
+  lượt trong `components/chat/message-list.tsx`. Nội dung theo bản CHỐT ở §15.1
+  điểm 4 (tên việc + trạng thái nổi; giờ, số tool, số file là thông tin phụ), chứ
+  không theo năm thứ ngang nhau mà mục này liệt kê — §15 thắng khi cụ thể hơn.
 
 Lưu ý bo góc: `xl` 12px cho bubble người dùng là **đổi vai trò** của `2xl` đang
 được §4.1 gán cho "bubble, khung modal, vỏ composer". Sửa thì sửa §4.1 cùng lượt.
@@ -928,6 +1021,27 @@ chưa thành năm lớp. Đích là thẻ tool năm lớp:
 Trạng thái phải có cả icon **và** chữ: màu đơn độc là vi phạm §6. Năm tên liệt kê
 ở trên là bản cũ; tên hiển thị và nghĩa của mọi trạng thái chốt ở §15.5.
 
+**Đã làm một phần (2026-10-07, đợt P1-D).** Ba lớp đầu tiên có thêm thứ mà bản cũ
+thiếu, và cả ba đều đọc từ DỮ LIỆU (`lib/tool-phases.ts`), không đoán từ đầu ra:
+
+- **lớp 4 (đường trạng thái bên trái) — xong.** Trước đây chỉ `lỗi` và `bị bỏ dở` có
+  vạch; nay CẢ BỐN trạng thái đều có (`accent` đang chạy · `danger` lỗi · `warning`
+  bỏ dở · `subtle` xong), nên trong một danh sách dài mắt đọc được trạng thái mà
+  không phải dò chữ ở cuối dòng. Chữ trạng thái vẫn luôn đi kèm — vạch là lớp thứ hai.
+- **lớp 5 (nhóm theo phase) — xong.** `groupByPhase()` cắt mảng sự kiện thành các đoạn
+  `Khảo sát / Thực hiện / Kiểm chứng / Khác`: **đổi phase thì mở đoạn mới**, nên vòng
+  `sửa → test lỗi → sửa` hiện ra thành `Thực hiện` → `Kiểm chứng · 1 lỗi` → `Thực hiện`
+  chứ không bị gộp thành một rổ. Tool lạ (đặc biệt là `mcp__*`, tên chỉ nói nguồn chứ
+  không nói đọc hay ghi) rơi vào đoạn `Khác` — không gán bừa vào một phase trông rất
+  chắc chắn. Nhãn đoạn là chữ trên nền, không viền/nền (điểm 13).
+- **lớp 1 (đầu thẻ) — một phần.** Thêm PHẠM VI (`một tệp` / `dự án` / `phiên làm việc`)
+  trong **thẻ mở**, không chen vào dòng gọn: dòng gọn đã có tham số chỉ thẳng tệp/lệnh
+  ngay cạnh nhãn (§15.2 điểm 6).
+
+**Chưa làm ở §14.3:** nhãn `chờ bạn cho phép` ở cấp tool (chưa có dữ liệu trạng thái
+phê duyệt theo từng tool — §15.2 điểm 6 ghi rõ), lớp 3 chưa tách raw payload/trace khỏi
+stdout, và "8 file" kiểu đếm theo ĐỐI TƯỢNG vẫn ngoài tầm (cần biết kết quả tool).
+
 ### 14.4 Composer
 
 Đang có: model selector, nút Send đổi thành Stop khi stream, phạm vi ngữ cảnh.
@@ -935,6 +1049,21 @@ Trạng thái phải có cả icon **và** chữ: màu đơn độc là vi phạ
 không cạnh tranh với nội dung người dùng đang gõ; vùng focus mở rộng nhẹ theo chiều
 dọc; **context pill** dạng `@đường/dẫn`, `@diff-hiện-tại`, `@lỗi-gần-nhất` — giới hạn
 số pill hiển thị, quá 3 thì gom lại.
+
+> **ĐÃ LÀM 2026-10-08 (đợt P1-E)** — ba vế đầu:
+> · **Hàng chân** = `model · phạm vi · gửi` (ô chọn model rời dải công cụ, xuống
+> cùng hàng với nút gửi); mọi chữ ở hàng đó ≤ 14px, dưới `text-read` 16px của ô
+> nhập. Dải công cụ trên chỉ còn việc của tác vụ (menu Tác vụ, chế độ phê duyệt,
+> chip file chờ duyệt).
+> · **Phạm vi** là chip có CHỮ (`workspaceScopeChip`), phân biệt `chưa có thư mục`
+> với tên thư mục đang nối — trước đây là nút icon nên hai trạng thái trông giống
+> nhau.
+> · **Focus mở rộng nhẹ theo chiều dọc** đúng nghĩa đen: vùng nhập +8px (12/0 →
+> 14/6), hàng chân trả lại đúng 8px ở ĐÁY (6/14 → 6/6), nên vỏ composer và cột tin
+> nhắn KHÔNG dịch chuyển một pixel (§15.4 điểm 15). Hợp đồng số:
+> `COMPOSER_FOCUS_PAD`; đo trong trình duyệt: `docs/design-qa/2026-10-08-composer/`.
+> · **Còn lại của mục này: context pill** `@đường/dẫn` (nhóm P2) — chưa có cơ chế
+> gắn đường dẫn, nên chưa có gì để hiển thị hay giới hạn "quá 3 thì gom".
 
 ### 14.5 Bốn cơ chế tạo cảm giác "thông minh"
 
@@ -971,8 +1100,8 @@ xuất hiện đúng lúc**. Không cạnh tranh bằng việc thêm màu.
 
 | Mức | Việc |
 |---|---|
-| P0 | Sửa `accent-dim` và chấm trí Settings (§13.2) · triển khai typography Inter · visual QA ở 375 / 768 / 1024 / 1440px |
-| P1 | Khối trả lời biên tập (trợ lý không bọc card) · gom lượt + turn header · thẻ tool năm lớp · nhóm tool theo phase · composer mới |
+| P0 | Sửa `accent-dim` và chấm trí Settings (§13.2) — **xong** · typography Inter — **xong** · cột px 14/16/12 (§13.2) — **xong, có ảnh trước/sau** · visual QA ở 375 / 768 / 1024 / 1440px — **đã chụp chat rỗng + Settings và đo 0px tràn ngang; còn lượt tool chạy / diff / lỗi / zoom 200%** |
+| P1 | Khối trả lời biên tập (trợ lý không bọc card) — **xong** · **turn header + dữ liệu lượt — ĐÃ LÀM (2026-10-07)** · **gom lượt thành khối gập được — ĐÃ LÀM (2026-10-07)** · **nhóm tool theo phase — ĐÃ LÀM (2026-10-07)** · thẻ tool năm lớp — **một phần (lớp 1/4/5, đợt P1-D)** · **composer mới (hàng chân + focus) — ĐÃ LÀM (2026-10-08, đợt P1-E)** · context pill — **chưa (P2)** |
 | P2 | Task control rail · bằng chứng mở được · approval theo rủi ro · hành động kế tiếp · context pill |
 | P3 | Chuyển động 150–200ms · chỉ báo streaming · hover/focus · drawer ở mobile · bàn phím · nhánh reduced-motion |
 
@@ -986,6 +1115,29 @@ composer, một lượt hội thoại có tool chạy, một diff/approval, và 
 chụp cả trạng thái đang chạy và trạng thái lỗi. Không có ảnh thì không đánh giá được
 bố cục, khoảng trắng và mật độ. Đây vẫn là điều kiện cần cho mọi thứ khác trong tài
 liệu, kể cả §15: §15 là đặc tả chấm được, không phải bằng chứng giao diện đã tốt lên.
+
+> **Trạng thái 2026-10-06:** đã có ảnh cho **2/4 vùng** — composer/chat rỗng và
+> Settings, cả 4 bề rộng, trước và sau đợt đổi cỡ chữ, lưu ở
+> `docs/design-qa/2026-10-06-type-scale/`. **Còn 2 vùng chưa chụp** (lượt hội thoại
+> có tool chạy, diff/approval) vì cần dữ liệu thật, và chưa chụp trạng thái lỗi,
+> chưa đo zoom 200%. Điều kiện nghiệm thu này **chưa đạt**.
+>
+> **Trạng thái 2026-10-07 (đợt LƯỢT):** đã chụp thêm vùng **lượt hội thoại có tool
+> chạy** (ba lượt: xong có 3 thao tác · lỗi · chờ quyết định) ở 375/1024/1440 +
+> 1440 zoom 200%, đo `scrollWidth === clientWidth` (0px tràn ngang) và 0 lỗi
+> console — `docs/design-qa/2026-10-07-turns/` ghi cách seed và số đo.
+> **Còn 1/4 vùng chưa có ảnh: diff/approval** — trạng thái đó đến từ runtime, không
+> seed được từ IndexedDB, và không có khoá LLM thì không sinh được lượt thật.
+> Ảnh vẫn chưa ai soi bằng mắt, nên điều kiện này **vẫn chưa đạt**.
+>
+> **Trạng thái 2026-10-08 (đợt P1-E):** vùng **composer** đã chụp LẠI sau khi đổi
+> bố cục (hàng chân + focus) — 375/768/1024/1440 ở trạng thái nghỉ, thêm 1440
+> đang focus, 1440 đã nối thư mục (chip phạm vi đổi nhãn) và 1440 zoom 200%:
+> `docs/design-qa/2026-10-08-composer/`, 0px tràn ngang ở cả năm cấu hình, 0 lỗi
+> console, và chiều cao vỏ đo được không đổi khi focus (170/170 · 144/144).
+> **Vẫn còn 1/4 vùng chưa có ảnh (diff/approval)** và **vẫn chưa ai soi ảnh bằng
+> mắt**, nên điều kiện nghiệm thu này **vẫn chưa đạt** — phần đã làm chỉ thu hẹp
+> khoảng trống, không đóng được điều kiện.
 
 ## 15. Yêu cầu thiết kế — 18 điểm để chấm
 
@@ -1012,6 +1164,11 @@ theo đuổi tới lúc dừng, không phải "một khoảng thời gian" hay "
 giới lượt phải là **dữ liệu gắn theo sự kiện**, không suy đoán lúc vẽ: nếu mỗi chỗ
 render tự gom lại thì hai màn hình sẽ gom khác nhau. Và ranh giới do **điều khiển người
 dùng quyết định**, không do máy phân loại nội dung tin nhắn:
+
+**Đã triển khai (2026-10-07):** ranh giới lượt là dữ liệu lưu trữ — `lib/turns.ts`
+(`nextTurnId` / `assignTurnIds`) là LUẬT DUY NHẤT, `StoredMessage.turnId` giữ kết
+quả, `reconcileActiveMessages` cấp lúc GHI. Đường "việc khác khi đang chạy" chạy
+qua sự kiện **follow-up** (Alt+Enter) — xem §14.1.
 
 - Gửi từ composer khi có lượt đang chạy = **điều chỉnh việc hiện tại** (bổ sung, sửa
   yêu cầu) → thuộc lượt cũ, hiện thành đoạn điều chỉnh.
@@ -1047,35 +1204,67 @@ thứ tự **yêu cầu → cập nhật ngắn → nhóm thao tác → kết qu
 hay lượt bị hủy vẫn phải trình bày tự nhiên. Điều bắt buộc chỉ là: lời giải thích,
 tool và kết luận không được cùng một độ nổi, vì như thế người đọc phải tự đi tìm
 thông tin quan trọng.
-Đang có: chưa. `components/chat/message-item.tsx` render từng tin rời rạc; không có
-khái niệm "lượt" trong dữ liệu, nên thứ tự hiện tại là do model viết ra quyết định.
+**Đã làm phần DỮ LIỆU (2026-10-07).** Khái niệm lượt nay tồn tại trong dữ liệu:
+`lib/turns.ts` là nguồn duy nhất quyết định ranh giới, `StoredMessage.turnId` giữ
+kết quả (trường không index, không bump version Dexie), và việc gán xảy ra ở
+`reconcileActiveMessages` — tức lúc GHI, không phải lúc vẽ. Row cũ chưa có lượt
+được cấp đúng một lần rồi giữ nguyên; `hasStoredMessageChanged` so sánh `turnId`
+nên việc nâng cấp thật sự được ghi.
+Đang có: thứ tự **yêu cầu → nhóm thao tác → kết quả** vẫn do model viết ra quyết
+định; mới có mốc mở lượt (turn header) chứ chưa có bản tổng kết đọc theo thứ tự
+đó.
 
 **2. Trợ lý là nội dung biên tập, không phải bong bóng chat.** Văn bản trả lời đặt
 trực tiếp trên nền hội thoại; **chỉ** code, diff, bằng chứng và yêu cầu quyết định
 mới có khung riêng. Tin người dùng compact, nền nhấn nhẹ.
-Đang có: ngược lại. `.bubble` bo `2xl` (`app/globals.css:528`) và mỗi tin đều có
-avatar riêng, kể cả trợ lý (`components/chat/message-item.tsx:486`). Yêu cầu này
-không chỉ đổi bo góc — nó đổi việc khối nào **được** có khung.
+**Đã làm (P1, 2026-10-06).** `.bubble` / `.bubble-user` / `.bubble-bot` đã bị gỡ
+khỏi `app/globals.css`; trợ lý là `data-testid="reply-text"` nằm trực tiếp trên nền
+hội thoại, người dùng là `.user-note` (bo 12px). Không còn avatar lặp ở mọi dòng
+(§15.1 điểm 3), và cột chip tool đổi đệm từ 50px xuống 34px cho khớp cột chữ mới
+(`components/chat/tool-trace.tsx`). Yêu cầu này không chỉ đổi bo góc — nó đổi việc
+khối nào **được** có khung, nên khung của code/diff/bằng chứng vẫn nguyên.
 
 **3. Gom cập nhật liên tiếp.** Một agent đang làm một việc thì không tạo "tin nhắn
 mới" cho từng thao tác nhỏ. Các cập nhật thuộc cùng một khối tiến trình; chỉ kết quả
 cuối có điểm ngắt rõ. Avatar và tiêu đề không lặp ở mỗi dòng.
-Đang có: chưa — không có mã nhóm/lượt, avatar vẽ theo từng tin.
+**Đã làm một phần (P1, 2026-10-06):** avatar chỉ hiện ở tin MỞ khối
+(`runPosition === 'start'`), tin sau giữ cột bằng ô đệm 26px; vị trí trong khối do
+`runPositionById` trong `components/chat/message-list.tsx` tính MỘT chỗ.
+**Cập nhật 2026-10-07:** dữ liệu LƯỢT đã có (`turnId` trên row + `groupTurns()`
+trong `lib/turns.ts`), turn header đánh dấu chỗ MỞ lượt, và vế "gộp cập nhật thành
+một khối tiến trình" **đã xong**: mỗi lượt ĐÃ ĐÓNG gập được thân lại, chỉ còn lại
+`tên việc · trạng thái` — nút chevron trên header, `aria-expanded`, và dòng phụ nói
+thật là `đã gập`. Luật gập là dữ liệu (`isFoldableTurn` + `foldedRowIds`), nên lượt
+đang chạy hoặc đang chờ quyền **không** gập được: gập nó là giấu đúng thứ người
+dùng đang cần nhìn. Trạng thái gập là trợ giúp ĐỌC nên ở lại trong phiên, không ghi
+xuống DB — ghi vào thì một cú bấm hôm nay sẽ ẩn nội dung ở mọi phiên sau.
 
 **4. Turn header gọn, và giúp đọc lại lịch sử.** Nổi bật **tên việc + trạng thái**;
 thời gian, số tool, số file là **thông tin phụ**. Header không được biến thành một
 hàng đầy badge. Nhìn lướt lịch sử phải phân biệt được lượt nào sửa tính năng, lượt
 nào điều tra lỗi, lượt nào bị chặn.
-Đang có: chưa có turn header. §14.2 liệt kê năm thứ ngang nhau (số thứ tự, tên việc,
-giờ, số hành động, số file) — điểm này thu lại: nội dung header **chỉ** là tên việc +
-trạng thái; số thứ tự, giờ, số hành động, số file là thông tin phụ.
+**Đã làm (2026-10-07).** `components/chat/turn-header.tsx` render ở đầu mỗi lượt:
+tên việc (từ yêu cầu NGƯỜI DÙNG mở lượt, `turnTitleOf`) + nhãn trạng thái lấy
+nguyên văn bảng §15.5 kèm icon và `title` giải nghĩa; dòng phụ `text-meta` chỉ hiện
+khi có gì thật để nói (giờ, số tool, số file), và hai con số đó đếm trên DỮ LIỆU
+(số lần gọi tool, số đường dẫn khác nhau trong tham số tool) — không parse chuỗi
+hiển thị. Không badge, không viền, không bóng; trạng thái `xong` **không** kèm dấu
+tick (§15.5). Hợp đồng: `tests/design-system.test.ts` + `tests/turns.test.ts`.
+Đang có: header phủ đủ 8 trạng thái vòng đời của lượt; **chưa có** số thứ tự lượt —
+§14.2 xếp nó vào thông tin phụ, và khi chưa có nơi nào dùng thì thêm nó chỉ làm dày
+header, đúng thứ điểm này cấm.
 
 **5. Nhịp khoảng trắng phải biểu đạt quan hệ thông tin.** Khoảng cách **trong** một
 nhóm nhỏ hơn khoảng cách **giữa** các lượt; phần kết luận thở rộng hơn cập nhật tiến
 trình. Khoảng trắng không được chia đều cho "đẹp".
-Đang có: §4.2 chỉ ghim gutter ngang `px-5` và thang 4px của Tailwind; chưa có bậc
-khoảng cách nào mã hoá "trong nhóm" khác "giữa lượt". Đây là yêu cầu còn thiếu hẳn,
-không phải việc tinh chỉnh.
+**Đã làm (P1, 2026-10-06).** Nhịp nay là MỘT hàm — `rowSpacing(position)` trong
+`components/chat/message-item.tsx`: giữa khối `py-0.5`, mở khối `pt-1 pb-0.5`, đóng
+khối `pb-5 pt-1.5`; hàng người dùng `py-5` (nó MỞ một lượt, nên là mốc ngắt lớn
+nhất). Assertion trong `tests/design-system.test.ts` đọc chính hàm này và so các con
+số với nhau (trong khối < mốc ngắt), nên đổi một nhánh về "đều cho đẹp" là đỏ. Còn
+thiếu: "phần kết luận thở rộng hơn cập nhật tiến trình" — nó cần biết đâu là kết
+luận, tức cần thêm một trường trên dữ liệu LƯỢT (dữ liệu lượt nay đã có, nhưng
+chưa có chỗ nào đánh dấu "tin nào là kết luận").
 
 ### 15.2 Hiển thị tool — điểm 6–11
 
@@ -1083,11 +1272,28 @@ không phải việc tinh chỉnh.
 một mạch kiểu `Đọc cấu hình build · 8 file · Đang chạy · 2,4s`: tên hành động bằng
 ngôn ngữ người dùng hiểu đứng trước, raw command / payload / log nằm sau thao tác mở.
 Năm lớp của §14.3 là **năm tầng thông tin**, không phải năm vùng luôn chiếm màn hình.
-Đang có: đúng một nửa. `components/chat/tool-trace.tsx:662` mở ở trạng thái gấp
-(`expanded = false`), chân thẻ đã có chevron (`:751`), thân chi tiết chỉ vẽ khi mở
-(`:794`). Thiếu: dòng gọn hiện chỉ có `nhãn · tham số` cộng nhãn trạng thái — không
-có số file, không có thời gian chạy, tức chưa nói được "đã làm gì, bao nhiêu, mất
-bao lâu" trên một dòng.
+**Đã làm (P1, 2026-10-06).** Dòng gọn nay đọc một mạch
+`nhãn · tham số · quy mô · thời gian · trạng thái`:
+
+- **quy mô** — `toolScaleOf()` đếm trên ĐẦU RA ĐANG HIỂN THỊ (`+a −b` cho nhóm sửa
+tệp, `N dòng ra` cho nhóm chạy lệnh, `N dòng` cho nhóm đọc/tìm). Cố ý không parse
+"N file"/"N test pass" từ chuỗi: parse sai một lần là UI nói dối bằng một con số
+trông rất chắc chắn.
+- **thời gian** — đo bằng đồng hồ của chính chip, CHỈ khi nó tự thấy tool chuyển từ
+đang chạy sang xong (`useElapsed`). Annotation không mang mốc thời gian, nên mở lại
+lịch sử thì không có số nào để hiện — và không bịa.
+- **trạng thái** — nay là CHỮ ở đuôi dòng (`xong` / `đang chạy` / `lỗi` / `bị bỏ dở`),
+không còn chỉ nằm trong `aria-label` và màu icon (§6: ý nghĩa không được chỉ dựa
+vào màu).
+
+Còn thiếu so với §14.3: "8 file" kiểu đếm theo ĐỐI TƯỢNG (cần biết kết quả tool,
+không chỉ chuỗi hiển thị) và nhãn `chờ bạn cho phép` (chưa có dữ liệu trạng thái
+theo tool).
+**Bổ sung 2026-10-07 (đợt P1-D):** dòng tiêu đề ĐOẠN PHASE không chen vào dòng gọn —
+nó là một hàng riêng phía trên cụm chip, nên thứ tự đọc `nhãn · tham số · quy mô ·
+thời gian · trạng thái` của một lần gọi vẫn nguyên. Đoạn được cắt trên cả mảng sự
+kiện, không cắt theo từng đoạn lời, nên vài câu model viết xen giữa hai lần gọi tool
+không làm đứt một đoạn `Thực hiện`.
 
 **7. Mỗi loại tool một cách trình bày.** Không dùng một khuôn chung cho tất cả:
 
@@ -1109,6 +1315,12 @@ shell. Khung PLAN → IMPLEMENT → REVIEW là tốt, nhưng phải chứa đư�
 **kiểm tra → sửa → test lỗi → sửa tiếp**, và cả thao tác chạy song song.
 Đang có: `tool-trace.tsx:123` chỉ đọc `phase: 'start' | 'done'` — hai giá trị này
 không đủ để vẽ vòng lặp, càng không đủ để vẽ hai nhánh chạy song song.
+**Bổ sung 2026-10-07 (đợt P1-D):** nhóm nay cắt từ **danh tính của tool** (`tên` +
+`tham số`), không từ annotation `phase` — nên không cần thêm giá trị phase nào vào
+dữ liệu, và vòng lặp hiện ra vì **đổi phase thì mở đoạn mới** (`groupByPhase`).
+Thao tác chạy song song nằm chung một đoạn theo đúng thứ tự chúng xảy ra; gọi tên
+công việc ở mức người dùng ("Điều tra lỗi đăng nhập") **vẫn chưa làm** — tên đoạn
+hiện là tên phase, và muốn có tên việc thì phải có dữ liệu mục tiêu của lượt gắn xuống.
 
 **9. Trạng thái tool khác trạng thái nhiệm vụ.** Tool hoàn tất **không** có nghĩa
 việc thành công. Phải phân biệt đang chạy / chờ quyền / bị chặn / thất bại / bị hủy,
@@ -1141,10 +1353,12 @@ và bốn câu trên chưa được viết ở đâu cả.
 **12. Hoàn thiện phân vai typography.** Inter cho hội thoại, điều hướng, nút và nhãn;
 JetBrains Mono **chỉ** cho code, lệnh, đường dẫn và ID. Toàn UI không được trông như
 terminal. Và: metadata nhỏ không được chứa thông tin quyết định.
-Đang có: ngược — §3 ghi mono là mặc định cho control và nhãn, 48 trong 67 file
-`.tsx` gọi `font-mono`, bậc `ui` là 12px. §13.2 đã chốt hướng Inter 14px/16px nhưng
-chưa triển khai. Điểm này là **yêu cầu**, không phải gợi ý: thứ người dùng phải đọc
-để quyết định không được nằm ở `micro` (10px) hay `meta` (11px).
+Đang có: **đã đổi cả họ chữ lẫn cỡ (2026-10-06).** 48 trong 67 file `.tsx` từng gọi
+`font-mono`; nay chrome (nhãn, nút, menu, nhãn trường, chip, hàng trạng thái,
+metadata) là Inter và mono chỉ còn 37 chỗ đúng vai chữ máy — §3 ghi chiều đang chạy.
+Vế cỡ cũng đã xong theo §13.2: `ui` 14px, hội thoại dài 16px, `meta` 12px (trước là
+12/15/11), kèm ảnh trước/sau ở 4 bề rộng. Điểm này là **yêu cầu**, không phải gợi ý:
+thứ người dùng phải đọc để quyết định không được nằm ở `micro` (10px) hay `meta` (12px).
 
 **13. Giảm "hộp trong hộp", tăng phân cấp bằng bố cục.** Các tầng nền gần trắng
 không tự tạo ra chiều sâu, và **không được khắc phục bằng cách thêm viền và shadow
@@ -1198,9 +1412,28 @@ ngưỡng mới. Ngoại lệ duy nhất được phép chiếm chỗ: khi lư�
 **file đã gắn** / **đường dẫn không hợp lệ** / **phạm vi project đang chọn**. Model
 selector và tùy chọn phụ lùi sau nội dung nhập. Focus rõ, nhưng không làm cả hội
 thoại dịch chuyển hay phát sáng gây phân tâm.
-Đang có: `components/composer.tsx` đã có chỗ gắn ngữ cảnh (`Paperclip` ở `:1273`,
-`Globe` và `FolderOpen` ở `:1351`/`:1358`), nhưng chưa có pill nói đường dẫn vừa gắn
-có phân giải được hay không — nên "đã gắn" và "gắn sai" hiện trông giống nhau.
+> **New task — đã có SỰ KIỆN, chưa có NÚT (2026-10-07).** Bảng ranh giới lượt ở
+> §15.1 đòi một đường "giao việc khác khi agent đang chạy → lượt mới". Đường đó
+> đã tồn tại trong sản phẩm dưới tên **follow-up**: khi agent đang chạy,
+> **Enter** = điều chỉnh việc đang làm (steering, cùng lượt), **Alt+Enter** =
+> việc khác (lượt mới xếp sau) — `queueWhileBusy()` trong
+> `react/use-chat-orchestration.ts`. Gợi ý phím dưới ô nhập nay nói rõ khác biệt
+> đó (trước đây gọi cả hai là "xếp hàng"). **Còn thiếu:** một nút *New task* nổi
+> bật ở cột trái; nó là việc trình bày, không phải việc dữ liệu.
+
+Đang có (cập nhật 2026-10-08, đợt P1-E): **model và tùy chọn phụ đã lùi sau nội
+nhập** — hàng phụ ở chân giờ là `model · phạm vi · gửi`, mọi chữ ở đó nhỏ hơn
+`text-read` (16px) của ô nhập; **phạm vi project đang chọn đã phân biệt được**
+bằng chip có chữ (`chưa có thư mục` ↔ tên thư mục, xem `workspaceScopeChip`);
+**focus rõ mà không dịch chuyển hội thoại** — vùng nhập lớn lên 8px, hàng chân
+trả lại đúng 8px ở đáy, nên chiều cao vỏ không đổi (đo được 170/170 và 144/144 ở
+375/768/1024/1440px, `docs/design-qa/2026-10-08-composer/`), và hiệu ứng phát
+sáng `PulseGlow` đã gỡ.
+
+**Còn thiếu của điểm 15:** cơ chế gắn đường dẫn dạng `@đường/dẫn` — kéo theo hai
+vế "file đã gắn" (nay chỉ có chip tệp đính kèm, hiện tên tệp chứ không phải đường
+dẫn) và "đường dẫn không hợp lệ" (chưa có gì để sai). Đây là việc **P2**, không
+phải chỉnh CSS.
 
 **16. Streaming ổn định và tôn trọng vị trí đọc.** Đang đọc tin cũ thì không tự kéo
 xuống cuối; có cập nhật mới thì **báo nhẹ** và cho quay lại tiến trình đang chạy. Tool
@@ -1218,16 +1451,31 @@ hoàn tác. `Allow once` và `Allow for project` phải khác nhau về **nghĩa
 khác nhãn — quyền rộng không được dễ bấm nhầm.
 Đang có: hai bề mặt phê duyệt (`components/diff-confirm.tsx` với "Duyệt & Ghi Đĩa" /
 "Từ chối", và `components/shell-confirm.tsx`), có phím tắt và có chốt `Esc` để từ
-chối. Chưa có hai mức quyền, và nhãn còn trộn tiếng Anh trong khối phím tắt của
-`diff-confirm.tsx` (`reject`, `then ↵ on the chosen button`) — trộn ngôn ngữ ở đúng
-chỗ người dùng đang phải quyết định là lỗi, không phải chi tiết.
+chối.
+
+**Nhãn phím tắt — ĐÃ SỬA (2026-10-06).** Khối phím tắt ở cả hai hộp thoại nay đọc
+`Esc từ chối · Tab rồi ↵ ở nút đang chọn`. Trộn ngôn ngữ ở đúng chỗ người dùng đang
+phải quyết định là lỗi chứ không phải chi tiết, nên đây là sửa bắt buộc, không phải
+việc thẩm mỹ.
+
+**Hai mức quyền — CHƯA LÀM.** `Allow once` / `Allow for project` khác nhau về NGHĨA
+đòi ghi vào chính sách quyền theo workspace (`toolPermissions` + `approvalPolicy`),
+tức là đụng vào hành vi an toàn chứ không chỉ nhãn nút. Việc này cần một đợt riêng
+có test cho cả hai chiều (cho phép rộng phải khó bấm nhầm hơn, và phải thu hồi được)
+— không nên làm kèm một đợt bố cục.
 
 **18. Bản sắc đến từ một trải nghiệm đặc trưng.** Vyen phải được nhận ra qua **cách
 gom một lượt công việc, cách tool thành tiến trình dễ hiểu, và cách kết quả được
 chứng minh** — không phải qua nền trắng + Inter + icon Lucide + xanh trầm, vì bốn thứ
 đó ai cũng có. Đây là sự khác biệt bền hơn mọi hiệu ứng trang trí.
-Đang có: §14.6 đã nêu đúng hướng, nhưng chưa điểm nào ở §15.1–§15.4 hoàn thành, nên
-hiện chưa có gì để nhận ra.
+Đang có: từ đợt P1 đã có ba mảnh — nhịp khoảng cách trong-khối/giữa-lượt
+(`rowSpacing`), dòng gọn tool nói được "bao nhiêu · mất bao lâu · trạng thái nào",
+ và trạng thái tool là CHỮ chứ không chỉ màu. **Đợt 2026-10-07 thêm hai mảnh:**
+dữ liệu LƯỢT theo sự kiện (`lib/turns.ts` + `StoredMessage.turnId`), turn header
+đọc được `tên việc · trạng thái` khi nhìn lướt lịch sử, và **thân lượt gập được**
+(đợt P1-C): mảnh "cách gom một lượt công việc" nay đã đủ ba vế — gom, đánh dấu chỗ
+mở, và thu lại khi cần đọc lướt. Và §15.6 vẫn đòi bộ ảnh ở §12/§14.9 trước khi nói
+"đã tốt hơn": ảnh lượt có tool chạy đã có, ảnh diff/approval thì chưa.
 
 ### 15.5 Trạng thái — chốt tên và nghĩa
 
@@ -1263,6 +1511,17 @@ dưới là bản chốt.
 
 `stopping` chỉ có ở lượt; tool trong lúc đó giữ `đang chạy` cho tới khi thoát, rồi
 chuyển `bị bỏ dở` (hoặc `lỗi` nếu chính nó hỏng).
+
+> **Lỗ đã biết (đo được 2026-10-07, chưa sửa):** tải lại trang làm lượt đang
+> `chờ bạn quyết định` biến thành `xong`. `sanitizeToolInvocations` (`lib/db.ts`)
+> **cố ý** bỏ mọi invocation chưa có `result` (pending không tái tạo được part hợp
+> lệ), nên khi app ghi lại row đang `streaming` sau khi nạp, dấu vết "đang chờ
+> quyền" biến mất và `turnStatusOf` chỉ còn thấy một row trợ lý đã xong. Đo trong
+> `docs/design-qa/2026-10-07-turns/`: row `a3` đi từ `tools 1 / streaming` sang
+> `tools 0 / complete`. Muốn đúng §15.5 thì lượt bị ngắt giữa chừng phải để lại
+> **một dấu vết lưu trữ** (trạng thái `blocked`/`cancelled` hoặc cờ "chờ quyền") —
+> đừng suy từ việc "row còn `streaming` hay không", vì chính việc ghi lại đã xoá
+> dấu hiệu đó.
 
 **Bằng chứng** — sáu bậc đã có ở `lib/evidence.ts`, nhãn badge là copy của
 `describeEvidence`; chốt dùng đúng nhãn đó, không tự đặt tên khác: `Kế hoạch · chưa
@@ -1301,9 +1560,27 @@ kết quả có được kiểm chứng không · có cần mình quyết địn
 phép tính trên mã: khi chưa có UI render thật để nhìn thì **không được khẳng định đã
 vượt đối thủ**. Điều kiện để câu đó trở thành sự thật vẫn là bộ ảnh ở §12 và §14.9.
 
+**Cập nhật 2026-10-07:** điểm 4 (turn header) và phần DỮ LIỆU của điểm 1/3 đã xong —
+nhìn lướt lịch sử nay thấy `tên việc · trạng thái` cho từng lượt. Bốn câu ở đầu mục
+này vẫn chưa trả lời được đầy đủ: "thay đổi ở đâu" còn tuỳ vào thẻ tool năm lớp
+(điểm 7/8) và "kết quả có được kiểm chứng không" vẫn chỉ có badge chứ chưa mở ra
+nguồn (điểm 10).
+
+Ảnh lượt (`docs/design-qa/2026-10-07-turns/`) đo được: 3 header đủ ở cả 4 cấu hình,
+0px tràn ngang, 0 lỗi console, tên việc là chữ thật của người dùng kèm `3 thao tác ·
+1 file`. Con số đó **không** nói UI đã đẹp hơn — nó chỉ nói phần dữ liệu lượt chạy
+đúng như đặc tả.
+
+**Đợt P1-C (2026-10-07):** thân lượt gập được — 2 header đầu có nút, header của
+lượt đang chờ quyền KHÔNG có (đo trong ảnh chụp: `headersWithFold: [true, true,
+false]`), gập rồi `aria-expanded=false` + dòng phụ `đã gập`, thân lượt 1 biến mất
+còn lượt đang chạy vẫn hiện nguyên; mở lại thì nội dung trở về. Không lỗi console,
+không tràn ngang ở 1440.
+
 **§15 là cải thiện đặc tả, không phải cải thiện UI.** Thêm được 18 điểm chấm không
-làm giao diện tốt hơn. Ba việc ở §13.2 vẫn còn nguyên sau mục này: `accent-dim`
-`#7fb8a6` chỉ **2.26:1**; chữ trên nền nhấn ở đầu Settings
-(`components/settings-dialog.tsx:196`) chỉ **2.50:1**; typography Inter 14px/16px chưa
-triển khai. Chừng nào ba việc đó chưa xong, "đã thêm §15" không được tính là tiến bộ
-về giao diện.
+làm giao diện tốt hơn. Ba việc ở §13.2 sau đợt 2026-10-06: hai lỗi tương phản **đã
+sửa** (`accent-dim` nay `#519a85`, chấm trí Settings nay `bg-accent-soft`), và
+typography **đã đổi phần họ chữ** (Inter cho chrome, mono chỉ cho chữ máy) nhưng
+**chưa đổi cỡ** 14/16/12. Đợt này vẫn chưa có bộ ảnh ở §12/§14.9, nên "UI đã tốt
+hơn" vẫn là điều chưa được chứng minh bằng mắt — chỉ có thay đổi kiểm được bằng
+mã và bằng test.

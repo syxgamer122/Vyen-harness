@@ -32,7 +32,7 @@ export function UsageStats() {
   const totalBarMax = Math.max(1, ...summary.byModel.map((m) => m.promptTokens + m.completionTokens));
 
   return (
-    <div className="space-y-3 font-mono">
+    <div className="space-y-3 font-sans">
       {/* Bộ lọc thời gian */}
       <div className="flex items-center justify-between gap-2">
         <div role="group" aria-label="Khoảng thời gian" className="flex gap-1 border border-subtle bg-raised p-0.5">

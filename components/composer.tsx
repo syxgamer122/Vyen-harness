@@ -30,7 +30,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { PulseGlow, useHaptics } from '@/components/effects';
+import { useHaptics } from '@/components/effects';
 import { filterPrompts, slashCommitTarget } from '@/lib/slash-commands';
 import { ModelSelector } from '@/components/model-selector';
 import type { ModelOption, ModelFavorite, RecentModel } from '@/components/model-selector';
@@ -211,6 +211,64 @@ export function stagedFilesChip(count: number): StagedFilesChip | null {
     title: `${count} tệp đã thay đổi, chưa ghi vào đĩa`,
   };
 }
+
+export interface WorkspaceScopeChip {
+  /** Nhãn trên chip: nói PHẠM VI đang dùng, không phải tên nút bấm. */
+  label: string;
+  /** Câu đầy đủ cho tooltip: phạm vi là gì, và bấm thì được gì. */
+  title: string;
+}
+
+/**
+ * Nhãn chip phạm vi project ở hàng chân (DESIGN.md §14.4, §15.4 điểm 15).
+ *
+ * Yêu cầu là pill ngữ cảnh phải phân biệt được **phạm vi project đang chọn**
+ * với "chưa chọn gì". Trước đây chỗ này là một nút ICON thư mục: đã nối một
+ * thư mục và chưa nối trông giống hệt nhau, người dùng phải mở menu đọc mới
+ * biết agent đang thấy gì. Chip có CHỮ nói thẳng ra phạm vi đó.
+ *
+ * `null` khi cha không truyền `workspace` — phiên bản không có tính năng thư
+ * mục thì không vẽ chip, thay vì vẽ một chip nói về một phạm vi không tồn tại.
+ */
+export function workspaceScopeChip(
+  workspace: { connected: boolean; name: string | null } | undefined,
+): WorkspaceScopeChip | null {
+  if (!workspace) return null;
+  if (!workspace.connected) {
+    return {
+      label: 'chưa có thư mục',
+      title:
+        'Chưa chọn phạm vi dự án: agent chỉ thấy nội dung bạn gõ. Bấm để chọn thư mục làm việc',
+    };
+  }
+  const name = workspace.name?.trim();
+  const shown = name && name.length > 0 ? name : 'thư mục làm việc';
+  return {
+    label: shown,
+    title: `Phạm vi dự án đang chọn: ${shown}. Bấm để đổi thư mục làm việc`,
+  };
+}
+
+/**
+ * Padding dọc (px) của hai hàng cuối vỏ composer — hợp đồng cho §14.4 + §15.4.
+ *
+ * §14.4 đòi "vùng focus mở rộng nhẹ theo chiều dọc"; §15.4 điểm 15 cấm focus
+ * làm "cả hội thoại dịch chuyển". Hai vế đó chỉ cùng đúng nếu vùng nhập lớn lên
+ * ĐÚNG bằng phần hàng chân trả lại — tổng bốn số này bằng nhau ở cả hai trạng
+ * thái, nên chiều cao vỏ (và do đó cột tin nhắn phía trên) không đổi một pixel.
+ *
+ * Hàng chân trả ở ĐÁY (`footBottom`), không trả ở `footTop`: khoảng cách giữa
+ * chữ đang gõ và nút gửi giữ nguyên 6px, nên mắt không thấy nút gửi nhảy lên
+ * khi vừa bấm vào ô nhập.
+ *
+ * Lớp Tailwind tương ứng nằm ở hai hàng trong JSX bên dưới; đổi một bên mà
+ * quên bên kia là tổng lệch, và test trong `tests/composer-affordances.test.ts`
+ * (đọc thẳng hai hàng đó từ source) đỏ ngay.
+ */
+export const COMPOSER_FOCUS_PAD = {
+  rest: { inputTop: 12, inputBottom: 0, footTop: 6, footBottom: 14 },
+  focused: { inputTop: 14, inputBottom: 6, footTop: 6, footBottom: 6 },
+} as const;
 
 export interface ComposerApi {
   getText: () => string;
@@ -924,6 +982,10 @@ export const Composer = memo(function Composer({
      "không có việc gì đang chờ" chứ không phải "chưa render xong". */
   const stagedChip = stagedFilesChip(stagedFileCount ?? 0);
 
+  /* Chip phạm vi project ở hàng chân. `null` khi phiên không có tính năng
+     thư mục, lúc đó không vẽ chip — xem `workspaceScopeChip`. */
+  const scopeChip = workspaceScopeChip(workspace);
+
   if (onToggleAgentMode) {
     sessionTasks.push({
       key: 'agent-mode',
@@ -1043,7 +1105,7 @@ export const Composer = memo(function Composer({
             <button
               type="button"
               onClick={onContinue}
-              className="lift-sm flex items-center gap-1.5 rounded-full border border-default bg-overlay px-4 py-1.5 font-mono text-ui font-medium text-accent transition-all duration-150 hover:border-strong hover:bg-raised hover:text-primary"
+              className="lift-sm flex items-center gap-1.5 rounded-full border border-default bg-overlay px-4 py-1.5 font-sans text-ui font-medium text-accent transition-all duration-150 hover:border-strong hover:bg-raised hover:text-primary"
             >
               <CornerDownLeft size={12} aria-hidden="true" />
               Viết tiếp
@@ -1060,12 +1122,13 @@ export const Composer = memo(function Composer({
            * chung cách sửa: giữ nền phủ và viền làm dấu hiệu trạng thái,
            * đổi chữ sang mực (13.97:1) và đặc viền lên (4.54:1).
            */
-          <div role="status" className="notice-warn mb-2 px-3.5 py-2 rounded-lg border border-warning bg-warning/10 text-xs text-primary">
+          <div role="status" className="notice-warn mb-2 px-3.5 py-2 rounded-lg border border-warning bg-warning/10 text-ui text-primary">
             {fileError}
           </div>
         )}
 
         <form
+          data-composer-shell={isFocused ? 'focused' : 'rest'}
           onSubmit={handleFormSubmit}
           onDragOver={(e) => {
             e.preventDefault();
@@ -1083,8 +1146,6 @@ export const Composer = memo(function Composer({
               : 'border border-default'
           } ${dragging ? 'border border-accent' : ''}`}
         >
-          <PulseGlow active={isFocused} />
-
           {/*
            * Dải công cụ dính trên ô nhập. Đường kẻ `border-b` ở đây là MỘT
            * trong ba đường trang trí chồng lên nhau (đường kẻ này + viền ngoài
@@ -1100,25 +1161,22 @@ export const Composer = memo(function Composer({
            */}{/* Bo góc phải khớp `rounded-2xl` của vỏ form, nếu không dải này bo
                kiểu control trong khi vỏ bo kiểu khối — thấy ngay mép lệch. */}
           <div className="flex items-center justify-between rounded-t-[15px_15px_0_0] bg-raised/60 px-4 py-2.5">
+            {/*
+             * Dải công cụ giờ CHỈ chở thứ thuộc về tác vụ (menu Tác vụ, chế độ
+             * phê duyệt, chip file chờ duyệt). Ô chọn model đã xuống hàng chân:
+             * §14.4 đòi hàng phụ ở chân (model · phạm vi · gửi) mang chữ nhỏ hơn
+             * chữ đang gõ, và §15.4 điểm 15 đòi model "lùi sau nội dung nhập" —
+             * để nó nằm chung hàng với nút gửi là cách nói đúng điều đó mà
+             * không phải thêm một tầng nền hay bớt tính năng nào.
+             */}
             <div className="flex items-center gap-2 flex-nowrap overflow-x-auto no-scrollbar min-w-0">
-              <ModelSelector
-                models={models}
-                value={model}
-                onChange={onModelChange}
-                disabled={modelSelectorDisabled}
-                providerId={modelProviderId}
-                builtinCatalog={modelCatalogBuiltin}
-                favorites={modelFavorites}
-                recents={modelRecents}
-                onToggleFavorite={onToggleModelFavorite}
-              />
               <TaskMenu groups={taskGroups} />
               {approvalPolicy && (
                 <button
                   type="button"
                   onClick={onCycleAutoPilot}
                   title="Chế độ phê duyệt (bấm để đổi)"
-                  className="inline-flex items-center gap-1 rounded-full bg-raised px-3 py-1 text-xs text-tertiary transition-colors hover:text-primary"
+                  className="inline-flex items-center gap-1 rounded-full bg-raised px-3 py-1 text-ui text-tertiary transition-colors hover:text-primary"
                 >
                   {/* Icon chỉ mang màu, không mang nghĩa: nhãn cạnh nó đã nói
                       chế độ nào. Giữ nó cùng bậc chữ với nhãn để không thành
@@ -1175,7 +1233,7 @@ export const Composer = memo(function Composer({
              * nhiêu món đang bị giấu, kể cả khi danh sách dài hơn khung.
              */
             <div
-              className="absolute bottom-full left-0 right-0 z-30 mb-3 lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg"
+              className="absolute bottom-full left-0 right-0 z-30 mb-3 lift-lg rounded-2xl border border-default bg-overlay font-sans shadow-lift-lg"
               onMouseDown={(e) => e.preventDefault()}
             >
               <div
@@ -1291,7 +1349,7 @@ export const Composer = memo(function Composer({
           )}
 
           {webBusy && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-3 font-mono text-ui leading-relaxed">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-3 font-sans text-ui leading-relaxed">
               <span className="flex min-w-0 items-center gap-1.5 text-tertiary">
                 <span aria-hidden="true" className="terminal-cursor" />
                 <span className="truncate">Đang tra cứu web…</span>
@@ -1299,7 +1357,20 @@ export const Composer = memo(function Composer({
             </div>
           )}
 
-          <div className="relative flex items-start px-4 pt-3">
+          {/*
+           * Vùng nhập mở rộng nhẹ theo chiều dọc khi focus (§14.4): 12px trên
+           * thành 14px, và 6px dưới xuất hiện. Hàng chân trả lại đúng 8px đó ở
+           * `footBottom`, nên chiều cao vỏ KHÔNG đổi (§15.4 điểm 15: focus không
+           * được làm hội thoại dịch chuyển) — hợp đồng số ở COMPOSER_FOCUS_PAD.
+           * `transition-[padding]`: hai hàng chạy cùng nhịp, nên tổng luôn bằng
+           * nhau ở MỌI khoảnh khắc của chuyển động, không chỉ lúc kết thúc.
+           */}
+          <div
+            data-composer-row="input"
+            className={`relative flex items-start px-4 transition-[padding] duration-150 ease-out ${
+              isFocused ? 'pt-3.5 pb-1.5' : 'pt-3 pb-0'
+            }`}
+          >
             <TextareaAutosize
               ref={textareaRef}
               value={draft}
@@ -1344,28 +1415,79 @@ export const Composer = memo(function Composer({
           />
 
 
-          <div className="flex items-center justify-between gap-2 px-3 pb-3.5 pt-1.5">
-            {/* Cụm TRÁI: đính kèm + thư mục + Voice STT */}
-            <div className="flex min-w-0 items-center gap-1">
+          <div
+            data-composer-row="foot"
+            className={`flex items-center justify-between gap-2 px-3 pt-1.5 transition-[padding] duration-150 ease-out ${
+              isFocused ? 'pb-1.5' : 'pb-3.5'
+            }`}
+          >
+            {/*
+             * Hàng phụ ở chân (§14.4): model · phạm vi · gửi. Nó nằm DƯỚI chữ
+             * đang gõ nên ba thứ này không tranh chỗ với nội dung người dùng
+             * viết (§15.4 điểm 15: model và tùy chọn phụ lùi sau nội dung nhập),
+             * và mọi chữ ở đây nhỏ hơn `text-read` (16px) của ô nhập: model
+             * `text-ui` (14px), chip phạm vi `text-ui`, nút gửi chỉ có icon.
+             */}
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+              {/*
+               * Ô chọn model KHÔNG được co: `ModelSelector` chỉ khai `min-w-0`
+               * ở vỏ, nên khi bị ép nó co nhỏ hơn cả nút bên trong và nút tràn
+               * sang chip kế bên (đo được ở 768px: vỏ 26px, nút 42px, chồng
+               * 14px). Nhãn của nó đã tự cắt theo `max-w-[30vw]`, nên giữ nguyên
+               * bề rộng tự nhiên là an toàn — và chip phạm vi mới là thứ nhường
+               * chỗ (nó còn icon để đọc).
+               */}
+              <div className="min-w-0 flex-none">
+                <ModelSelector
+                  models={models}
+                  value={model}
+                  onChange={onModelChange}
+                  disabled={modelSelectorDisabled}
+                  providerId={modelProviderId}
+                  builtinCatalog={modelCatalogBuiltin}
+                  favorites={modelFavorites}
+                  recents={modelRecents}
+                  onToggleFavorite={onToggleModelFavorite}
+                />
+              </div>
+              {scopeChip && onPickWorkspace && (
+                /*
+                 * Chip phạm vi project: CÓ CHỮ, không phải nút icon thư mục
+                 * như trước (§15.4 điểm 15 — pill ngữ cảnh phải phân biệt được
+                 * "phạm vi project đang chọn" với "chưa chọn gì"). Vùng chạm
+                 * nới lên 44px CHỈ theo chiều dọc (`after:-inset-y-[6px]` quanh
+                 * `min-h-8` = 32px): nới ngang sẽ chồm sang ô chọn model và nút
+                 * đính kèm, tức ba vùng chạm đè lên nhau (§12 điểm 3).
+                 */
+                <button
+                  type="button"
+                  onClick={handlePickWorkspace}
+                  aria-label={scopeChip.label}
+                  title={scopeChip.title}
+                  className={`relative inline-flex min-h-8 min-w-0 items-center gap-1.5 rounded-md border border-subtle px-2 py-1 font-sans text-ui transition-colors after:absolute after:inset-x-0 after:-inset-y-[6px] after:content-[''] hover:border-default hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+                    workspace?.connected
+                      ? 'bg-raised text-primary'
+                      : 'bg-transparent text-tertiary'
+                  }`}
+                >
+                  {pickPending ? (
+                    <Loader2 size={12} aria-hidden="true" className="flex-none animate-spin" />
+                  ) : (
+                    <FolderOpen
+                      size={12}
+                      aria-hidden="true"
+                      className={`flex-none ${workspace?.connected ? 'text-accent' : 'text-tertiary'}`}
+                    />
+                  )}
+                  <span className="truncate">{scopeChip.label}</span>
+                </button>
+              )}
               <ToolbarButton
                 icon={Paperclip}
                 label="Đính kèm tệp"
                 className="rounded-lg hover:bg-raised"
                 onClick={() => fileInputRef.current?.click()}
               />
-              {onPickWorkspace && (
-                <ToolbarButton
-                  icon={pickPending ? Loader2 : FolderOpen}
-                  className={`rounded-lg hover:bg-raised ${pickPending ? 'animate-spin' : ''}`}
-                  active={workspace?.connected}
-                  label={
-                    workspace?.connected
-                      ? `Workspace: ${workspace.name}`
-                      : 'Kết nối thư mục làm việc'
-                  }
-                  onClick={handlePickWorkspace}
-                />
-              )}
             </div>
 
             {/*
@@ -1375,8 +1497,11 @@ export const Composer = memo(function Composer({
              * tưởng agent tự do ghi đĩa rồi mới phát hiện nó dừng hỏi.
              * Nay nhãn nói đúng việc chế độ đó làm.
              *
-             * `text-[11px]` → `text-meta`: cùng 11px nhưng có tên trong thang,
-             * nên đổi cỡ ở đây cũng đổi được cả app thay vì chỉ dòng này.
+             * Cỡ chữ: `text-meta` (12px) → `text-ui` (14px). Nhãn này nói chế
+             * độ phê duyệt — thứ người dùng phải đọc để quyết định agent có
+             * được ghi đĩa hay không — mà §15.4 điểm 12 cấm để thông tin quyết
+             * định nằm ở `micro`/`meta`. Đây cũng là cỡ của ô chọn model vừa
+             * chuyển xuống cùng hàng, nên hàng chân đọc như một khối.
              *
              * Icon `Zap` đổi sang `text-accent`: nó là dấu "chế độ này đang bật",
              * không phải dấu "có cảnh báo" — cảnh báo thật đã có ở chip file
@@ -1384,9 +1509,20 @@ export const Composer = memo(function Composer({
              * tức hụt ngưỡng AA của chữ trong khi vai trò của nó chỉ là trang
              * trí, nên nó không được làm mất một ô chữ cho màu.
              */}
-            <div className="hidden md:flex items-center gap-2">
+            {/*
+             * `md` → `lg`. Từ `md` (768px) sidebar đã chiếm 288px, nên cột hội
+             * thoại chỉ còn 414px: pill này (nhãn dài, 266px) ép cụm trái còn
+             * 76px, và ô chọn model co xuống 26px rồi tràn sang chip phạm vi —
+             * đo được bằng `elementFromPoint`: điểm giữa của ô chọn model trúng
+             * chip, tức control không bấm được nữa.
+             *
+             * Thông tin không mất khi pill ẩn: nút đổi chế độ ở dải công cụ vẫn
+             * hiện nhãn ngắn ("Hỏi khi ghi"), và menu "Tác vụ" có câu giải thích
+             * đầy đủ. Pill chỉ là bản nhắc lại, nên nó xuất hiện khi có chỗ.
+             */}
+            <div className="hidden lg:flex items-center gap-2">
               {(approvalPolicy === 'never' || approvalPolicy === 'smart' || autoPilot) && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-raised border border-subtle px-2.5 py-0.5 font-mono text-meta text-tertiary">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-raised border border-subtle px-2.5 py-0.5 font-sans text-ui text-tertiary">
                   <Zap size={11} aria-hidden="true" className="text-accent" />
                   <span>{goalLoopInfo || approvalPillLabel(approvalPolicy, autoPilot)}</span>
                 </span>
@@ -1416,8 +1552,17 @@ export const Composer = memo(function Composer({
          * `text-meta` (11px) thay `text-[10.5px]`: cỡ tự chế không thuộc
          * thang 6 bậc nào, nên không ai nhớ được có đúng một cỡ hay không.
          */}
-        <div className="mt-3 hidden text-center font-mono text-meta text-tertiary sm:block">
-          Enter để gửi · Shift+Enter xuống dòng · Enter/Alt+Enter khi AI chạy = xếp hàng · Alt+↑ lấy lại · / lệnh nhanh
+        {/*
+         * Hai phím khi AI đang chạy KHÔNG cùng nghĩa, và đó là thứ người dùng
+         * phải biết TRƯỚC khi bấm (DESIGN.md §15.1 bảng ranh giới lượt):
+         *   Enter      — điều chỉnh việc đang làm, tin thuộc LƯỢT đang mở
+         *   Alt+Enter  — giao VIỆC KHÁC, mở lượt mới xếp sau lượt hiện tại
+         * Gợi ý cũ gọi cả hai là "xếp hàng" nên người dùng không có cách nào
+         * đoán tin của mình sẽ nằm chung lượt hay tách ra — rồi nhìn lại lịch
+         * sử thì thấy hai thứ khác nhau nằm chung một chỗ.
+         */}
+        <div className="mt-3 hidden text-center font-sans text-meta text-tertiary sm:block">
+          Enter để gửi · Shift+Enter xuống dòng · khi AI chạy: Enter = điều chỉnh việc đang làm, Alt+Enter = việc mới · Alt+↑ lấy lại · / lệnh nhanh
         </div>
       </div>
     </div>

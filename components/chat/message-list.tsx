@@ -1,12 +1,29 @@
 /*
  * Danh sách tin nhắn virtualized + các chiến lược scroll/pin.
  */
-import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Message } from 'ai/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ArrowDown } from 'lucide-react';
 import { ChatErrorBoundary } from '@/components/chat-error-boundary';
-import { MessageItem, type BranchInfo } from './message-item';
+import { MessageItem, type BranchInfo, type RunPosition } from './message-item';
+import { TurnHeader } from './turn-header';
+import { foldedRowIds, groupTurns, isFoldableTurn, turnRowsOf, type TurnSummary } from '@/lib/turns';
+
+/**
+ * Trường mà `toChatMessage` gắn thêm cho tầng hiển thị (lib/chat-tree-persistence.ts).
+ * Đọc qua đúng một chỗ để không rải `as any` khắp file — và để khi thêm trường
+ * mới thì chỉ phải sửa một khai báo.
+ */
+interface MessageExtras {
+  turnId?: string;
+  status?: string;
+  finishReason?: string;
+  createdAtMs?: number;
+  toolInvocations?: Array<{ state?: string; args?: unknown }>;
+}
+
+const extrasOf = (message: Message): MessageExtras => message as unknown as MessageExtras;
 
 /* ------------------------------------------------------------------ */
 /* Subcomponent 2: Memoized MessageList with Virtualization           */
@@ -129,7 +146,7 @@ function ThinkingIndicator() {
 
   return (
     <div className="mx-auto flex max-w-thread items-start gap-3 py-3">
-      <p className="flex min-w-0 items-baseline gap-2 py-1 font-mono text-xs" role="status">
+      <p className="flex min-w-0 items-baseline gap-2 py-1 font-sans text-xs" role="status">
         <span className="text-text-muted">$</span>
         <span className="text-text-primary">đang soạn câu trả lời</span>
         <span className={`tabular-nums ${tone}`}>{elapsedSec >= 1 ? `${elapsedSec.toFixed(1)}s` : ''}</span>
@@ -251,6 +268,83 @@ export const MessageList = memo(function MessageList({
     return messages;
   }, [messages, pendingEmptyAssistant, isStreamingAssistant]);
 
+  /*
+   * LƯỢT CỦA TIN NHẮN — gom MỘT chỗ (§15.1 chốt trước), ở đây vì đây là nơi có đủ
+   * danh sách đang đọc. Mọi màn hình khác cần biết lượt đều gọi `groupTurns` với
+   * cùng dữ liệu, không tự gom lại.
+   *
+   * `messages` (không phải `visibleMessages`): tổng kết của lượt phải phản ánh cả
+   * tin ĐANG STREAM nằm ngoài virtualizer — nếu tính trên `visibleMessages` thì đúng
+   * lúc agent đang làm việc, header lại báo trạng thái cũ.
+   */
+  const turns = useMemo(() => {
+    const createdAtById = new Map<string, number>();
+    const toolArgsById = new Map<string, ReadonlyArray<unknown>>();
+
+    for (const message of messages) {
+      const extras = extrasOf(message);
+      if (typeof extras.createdAtMs === 'number') createdAtById.set(message.id, extras.createdAtMs);
+      if (extras.toolInvocations?.length) {
+        toolArgsById.set(
+          message.id,
+          extras.toolInvocations.map((invocation) => invocation.args),
+        );
+      }
+    }
+
+    return groupTurns(
+      /*
+       * Row dựng bằng `turnRowsOf`, không tự ghép từng trường ở đây: bản đầu của
+       * chỗ này tự map và bỏ sót `content`, làm MỌI header mất tên việc (rơi về
+       * "Lượt chưa có yêu cầu") mà không có lỗi biên dịch nào.
+       */
+      turnRowsOf(messages, extrasOf),
+      {
+        createdAtOf: (id) => createdAtById.get(id) ?? null,
+        toolArgsOf: (id) => toolArgsById.get(id) ?? [],
+      },
+    );
+  }, [messages]);
+
+  const turnStartByMessageId = useMemo(() => {
+    const starts = new Map<string, TurnSummary>();
+    for (const turn of turns) {
+      const first = turn.messageIds[0];
+      if (first) starts.set(first, turn);
+    }
+    return starts;
+  }, [turns]);
+
+  /*
+   * GẬP THÂN LƯỢT — trạng thái ĐỌC, không phải dữ liệu của lượt (§15.1 điểm 3).
+   *
+   * Vì sao không ghi xuống DB: gập là cách đọc lịch sử, không phải thứ người dùng
+   * giao cho agent. Ghi vào DB thì một lần bấm chuột của hôm nay sẽ ẩn nội dung ở
+   * mọi phiên sau, trên mọi thiết bị — và không ai nhớ vì sao nó ẩn.
+   */
+  const [collapsedTurnIds, setCollapsedTurnIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+
+  const hiddenRowIds = useMemo(
+    () => foldedRowIds(turns, collapsedTurnIds),
+    [turns, collapsedTurnIds],
+  );
+
+  /*
+   * `renderedMessages` — danh sách THẬT SỰ vẽ: đã bỏ tin của lượt đang gập, và đã
+   * bỏ tin đang stream (nằm ngoài virtualizer). Mọi phép tính phục vụ vẽ (vị trí
+   * trong khối, banner nén, virtualizer) đọc từ đây; đọc `visibleMessages` thì thứ
+   * tự đang vẽ lệch với dữ liệu gom lượt ngay khi có lượt gập.
+   */
+  const renderedMessages = useMemo(
+    () =>
+      hiddenRowIds.size === 0
+        ? visibleMessages
+        : visibleMessages.filter((m) => !hiddenRowIds.has(m.id)),
+    [visibleMessages, hiddenRowIds],
+  );
+
   /** Theo dõi kích thước container để chọn width bucket cho HEIGHT_CACHE */
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -278,23 +372,23 @@ export const MessageList = memo(function MessageList({
   /** Banner nén gắn vào tin ĐẦU TIÊN nằm sau ranh giới marker. */
   const compactionBannerBeforeId = useMemo(() => {
     if (!compaction) return null;
-    const idx = visibleMessages.findIndex((m) => m.id === compaction.upToId);
-    const next = idx >= 0 ? visibleMessages[idx + 1] : undefined;
+    const idx = renderedMessages.findIndex((m) => m.id === compaction.upToId);
+    const next = idx >= 0 ? renderedMessages[idx + 1] : undefined;
     return next?.id ?? null;
-  }, [compaction, visibleMessages]);
+  }, [compaction, renderedMessages]);
 
   // App không bật React Compiler; useVirtualizer của TanStack trả về hàm
   // mỗi render là hành vi chủ đích của thư viện — bỏ cảnh báo nhiễu.
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
-    count: visibleMessages.length,
+    count: renderedMessages.length,
     getScrollElement: () => scrollRef.current,
-    getItemKey: (index) => visibleMessages[index]?.id ?? `row-${index}`,
+    getItemKey: (index) => renderedMessages[index]?.id ?? `row-${index}`,
     overscan: 6,
     paddingStart: 16,
     paddingEnd: isStreamingAssistant ? 16 : 96,
     estimateSize: (index) => {
-      const m = visibleMessages[index];
+      const m = renderedMessages[index];
       if (!m) return 140;
       const bucket = getWidthBucket(containerWidth || scrollRef.current?.clientWidth);
       return HEIGHT_CACHE.get(cacheKey(chatId, m.id, bucket)) ?? estimateMessageHeight(m);
@@ -309,6 +403,64 @@ export const MessageList = memo(function MessageList({
       return h;
     },
   });
+
+  const toggleTurnFold = useCallback(
+    (turnId: string) => {
+      setCollapsedTurnIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(turnId)) next.delete(turnId);
+        else next.add(turnId);
+        return next;
+      });
+      /*
+       * Chiều cao từng hàng còn lại không đổi, nhưng VỊ TRÍ của chúng đổi; đo lại
+       * để vòng vẽ kế tiếp dùng bảng offset mới thay vì bảng cũ — không thì các
+       * hàng dưới nhảy một nhịp.
+       */
+      rowVirtualizer.measure();
+      if (isAtBottomRef.current) pin(300);
+    },
+    [isAtBottomRef, pin, rowVirtualizer],
+  );
+
+  /*
+   * VỊ TRÍ TRONG KHỐI LIÊN TIẾP CÙNG VAI — tính MỘT chỗ cho cả danh sách.
+   *
+   * §15.1 chốt trước: ranh giới lượt phải là dữ liệu gắn theo sự kiện, không
+   * suy đoán lúc vẽ, "nếu mỗi chỗ render tự gom lại thì hai màn hình sẽ gom
+   * khác nhau". Quan hệ "tin liền trước / liền sau cùng vai" là dữ liệu có
+   * thật của danh sách đang đọc (thứ tự thật của cây, không phân loại nội
+   * dung), nên nó là nguồn duy nhất để vẽ nhịp khoảng cách và avatar.
+   *
+   * Không có tin nào bị bỏ vì việc này: đổi danh sách là map này tính lại,
+   * chi phí O(n) trên mảng đã có trong bộ nhớ.
+   */
+  const runPositionById = useMemo(() => {
+    const map = new Map<string, RunPosition>();
+    for (let i = 0; i < renderedMessages.length; i += 1) {
+      const m = renderedMessages[i];
+      const sameBefore = renderedMessages[i - 1]?.role === m.role;
+      /*
+       * Tin CUỐI danh sách còn có thể được nối tiếp bởi tin ĐANG STREAM — tin
+       * đó nằm ngoài virtualizer nên không có trong mảng này. Bỏ qua nó thì
+       * ranh giới khối rơi vào giữa một lượt đang chạy: mắt thấy một khoảng
+       * ngắt giữa hai câu của cùng một việc, đúng thứ §15.1 điểm 5 cấm.
+       */
+      const sameAfter =
+        i + 1 < renderedMessages.length
+          ? renderedMessages[i + 1].role === m.role
+          : isStreamingAssistant && lastRole === m.role;
+      map.set(m.id, sameBefore ? (sameAfter ? 'middle' : 'end') : 'start');
+    }
+    return map;
+  }, [renderedMessages, isStreamingAssistant, lastRole]);
+
+  /*
+   * Tin ĐANG STREAM nằm ngoài virtualizer vì thế nó KHÔNG được mở header thứ
+   * hai: nó là phần thân của lượt đang hiện, không mở lượt nào — cùng luật với
+   * `runPositionById`. Header chỉ gắn vào tin ĐẦU của lượt (`messageIds[0]`), và
+   * lượt nào cũng mở đầu bằng tin người dùng.
+   */
 
   const branchLayoutSignature = useMemo(
     () =>
@@ -438,7 +590,7 @@ export const MessageList = memo(function MessageList({
             <h1 className="uic text-[28px] tracking-[0.05em] text-text-primary ">
               VYEN<span className="text-accent-steel">_</span>
             </h1>
-            <p className="mt-3 max-w-prose font-mono text-xs leading-relaxed text-text-muted">
+            <p className="mt-3 max-w-prose font-sans text-xs leading-relaxed text-text-muted">
               Agent harness tối giản: session tree, core tools, tự mở rộng theo workflow của bạn.
             </p>
 
@@ -448,7 +600,7 @@ export const MessageList = memo(function MessageList({
                   key={prompt}
                   type="button"
                   onClick={() => onSelectSuggestion(prompt)}
-                  className="rounded-xl border border-subtle bg-surface px-4 py-3.5 text-left font-mono text-xs text-text-primary transition-colors duration-150 hover:bg-raised"
+                  className="rounded-xl border border-subtle bg-surface px-4 py-3.5 text-left font-sans text-xs text-text-primary transition-colors duration-150 hover:bg-raised"
                 >
                   {prompt}
                 </button>
@@ -467,8 +619,10 @@ export const MessageList = memo(function MessageList({
               className="max-w-thread"
             >
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const m = visibleMessages[virtualRow.index];
+                const m = renderedMessages[virtualRow.index];
                 if (!m) return null;
+                /* Header chỉ thuộc tin ĐẦU của lượt; `turn` undefined là bình thường. */
+                const turn = turnStartByMessageId.get(m.id);
 
                 return (
                   <div
@@ -485,19 +639,27 @@ export const MessageList = memo(function MessageList({
                       paddingBottom: '1.5rem',
                     }}
                   >
+                    {turn && (
+                      <TurnHeader
+                        turn={turn}
+                        foldable={isFoldableTurn(turn.status)}
+                        collapsed={collapsedTurnIds.has(turn.id)}
+                        onToggleFold={toggleTurnFold}
+                      />
+                    )}
                     {compaction && compactionBannerBeforeId === m.id && (
                       <div className="mb-2">
                         {compaction.summary ? (
-                          <details className="lift-sm rounded-lg border border-accent-dim bg-raised px-4 py-2.5 font-mono text-xs text-status-warning">
+                          <details className="lift-sm rounded-lg border border-accent-dim bg-raised px-4 py-2.5 font-sans text-xs text-status-warning">
                             <summary className="cursor-pointer select-none font-medium text-accent-steel">
                               Đã nén {compaction.compactedCount} tin nhắn trước đó. Bấm để xem tóm tắt
                             </summary>
-                            <div className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap font-mono text-meta leading-relaxed text-status-warning">
+                            <div className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-meta leading-relaxed text-status-warning">
                               {compaction.summary}
                             </div>
                           </details>
                         ) : (
-                          <div className="lift-sm rounded-lg border border-accent-dim bg-raised px-4 py-2.5 font-mono text-xs text-status-warning">
+                          <div className="lift-sm rounded-lg border border-accent-dim bg-raised px-4 py-2.5 font-sans text-xs text-status-warning">
                             Đã lược bỏ {compaction.compactedCount} tin nhắn cũ
                           </div>
                         )}
@@ -509,6 +671,7 @@ export const MessageList = memo(function MessageList({
                     >
                       <MessageItem
                         m={m}
+                        runPosition={runPositionById.get(m.id) ?? 'end'}
                         branchInfo={branchInfoByMessageId.get(m.id)}
                         isStreaming={isLoading && m.role === 'assistant' && m.id === lastMessageId}
                         isEditing={editingId === m.id}
@@ -551,6 +714,14 @@ export const MessageList = memo(function MessageList({
                 >
                   <MessageItem
                     m={lastMsg}
+                    /* Tin đang stream tiếp nối khối nếu tin liền trước cũng là
+                       trợ lý — cùng luật với danh sách, chỉ khác nguồn: nó nằm
+                       ngoài virtualizer nên không có trong `visibleMessages`. */
+                    runPosition={
+                      renderedMessages[renderedMessages.length - 1]?.role === 'assistant'
+                        ? 'end'
+                        : 'start'
+                    }
                     branchInfo={branchInfoByMessageId.get(lastMsg.id)}
                     isStreaming={true}
                     isEditing={editingId === lastMsg.id}
@@ -583,7 +754,7 @@ export const MessageList = memo(function MessageList({
             <button
               type="button"
               onClick={onReload}
-              className="flex-shrink-0 rounded-lg bg-danger px-3.5 py-1.5 font-mono text-xs font-medium text-on-fill transition-colors hover:bg-danger/85"
+              className="flex-shrink-0 rounded-lg bg-danger px-3.5 py-1.5 font-sans text-xs font-medium text-on-fill transition-colors hover:bg-danger/85"
             >
               Thử lại
             </button>

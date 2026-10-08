@@ -36,7 +36,7 @@ function ThinkingBlock({ reasoning, isStreaming }: { reasoning: string; isStream
           <BrainCircuit size={15} className="flex-shrink-0 text-reasoning animate-pulse" />
           <span className="text-ui font-medium text-secondary">Quá trình suy luận (Reasoning)</span>
           {isStreaming && <span className="terminal-cursor not-italic" aria-hidden="true" />}
-          {!open && <span className="truncate font-mono text-meta text-tertiary italic">· {preview}</span>}
+          {!open && <span className="truncate font-sans text-meta text-tertiary italic">· {preview}</span>}
         </span>
         <span className="flex items-center gap-1 text-meta text-tertiary flex-shrink-0">
           <span>{open ? 'Thu gọn' : 'Chi tiết'}</span>
@@ -44,7 +44,7 @@ function ThinkingBlock({ reasoning, isStreaming }: { reasoning: string; isStream
         </span>
       </button>
       {open && (
-        <div className="mt-3 max-h-60 overflow-y-auto whitespace-pre-wrap border-t border-reasoning/20 pt-3 font-mono text-meta leading-relaxed text-tertiary">
+        <div className="mt-3 max-h-60 overflow-y-auto whitespace-pre-wrap border-t border-reasoning/20 pt-3 font-sans text-meta leading-relaxed text-tertiary">
           {reasoning}
         </div>
       )}
@@ -123,8 +123,44 @@ const MSG_ACTIONS =
   'opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-within:opacity-100 ' +
   '[@media(hover:none)]:opacity-100 [@media(pointer:coarse)]:opacity-100';
 
+/*
+ * Vị trí của tin trong MỘT khối liên tiếp cùng vai (DESIGN.md §15.1 điểm 3+5).
+ *
+ * Đây là dữ liệu có thật, không phải suy đoán nội dung: nó chỉ nói tin này có
+ * tin liền trước / liền sau cùng `role` trong danh sách đang đọc hay không. Ai
+ * tính thì tính một chỗ (`message-list.tsx`) rồi truyền xuống, để hai màn hình
+ * không gom hai kiểu (§15.1 chốt trước: ranh giới lượt không được đoán lúc vẽ).
+ *
+ *   start  — mở khối: có avatar, khoảng trên vừa
+ *   middle — giữa khối: không avatar, khoảng trong khối NHỎ NHẤT
+ *   end    — đóng khối: không avatar, khoảng dưới lớn (mốc ngắt giữa các lượt)
+ */
+export type RunPosition = 'start' | 'middle' | 'end';
+
+/**
+ * Khoảng cách dọc theo vị trí trong khối — nguồn DUY NHẤT của nhịp §15.1 điểm 5.
+ *
+ * Trong khối nhỏ hơn giữa khối, và mốc ngắt giữa các lượt lớn hơn mọi khoảng
+ * trong khối. Khoảng trắng ở đây biểu đạt QUAN HỆ thông tin chứ không chia đều
+ * cho đẹp, nên nó phải là một hàm của vị trí — không phải ba con số rải trong
+ * JSX do từng nhánh tự chọn.
+ *
+ * Export để test hành vi đọc được đúng hàm này thay vì regex trên className.
+ */
+export function rowSpacing(position: RunPosition): string {
+  if (position === 'middle') return 'group relative w-full py-0.5';
+  if (position === 'end') return 'group relative w-full pb-5 pt-1.5';
+  return 'group relative w-full pt-1 pb-0.5';
+}
+
 interface MessageItemProps {
   m: Message;
+  /**
+   * Vị trí trong khối liên tiếp cùng vai — xem `RunPosition`. Mặc định `end`
+   * (một tin đứng riêng vẫn là một khối trọn vẹn) để call site cũ không phải
+   * đổi hết một lượt, nhưng đường chính luôn truyền tường minh từ message list.
+   */
+  runPosition?: RunPosition;
   branchInfo?: BranchInfo;
   isStreaming: boolean;
   isEditing: boolean;
@@ -173,6 +209,7 @@ function ActionButton({
 export const MessageItem = memo(
   function MessageItem({
     m,
+    runPosition = 'end',
     branchInfo,
     isStreaming,
     isEditing,
@@ -203,7 +240,12 @@ export const MessageItem = memo(
          * ô nhập (chỉ 16px) — cùng một nội dung nhưng hai mép không khớp.
          * `max-w-4xl mx-auto` cũng là vô nghĩa ở đây: cha đã chặn ở 48rem.
          */
-        <div className="group relative w-full py-4">
+        /*
+         * Người dùng MỞ một lượt, nên hàng này luôn lấy khoảng thở lớn nhất —
+         * đó là mốc ngắt giữa hai lượt trong §15.1 điểm 5. Khoảng TRONG một lượt
+         * (các tin liên tiếp của trợ lý) do `rowSpacing` giữ nhỏ hơn.
+         */
+        <div className="group relative w-full py-5">
           {!isEditing && (
             <div
               className={`absolute top-1.5 right-1 z-10 flex items-center gap-0.5 lift-sm rounded-lg border border-subtle bg-overlay px-1 py-0.5 ${MSG_ACTIONS}`}
@@ -243,9 +285,17 @@ export const MessageItem = memo(
            * mép phải của bubble vẫn chạm mép phải của cột hội thoại — giữ được
            * bất biến gutter mà `tests/design-system.test.ts` canh.
            */}
-          <div className="ml-auto flex max-w-[85%] items-end justify-end gap-2">
+          <div className="ml-auto flex max-w-[76%] items-end justify-end gap-2">
             <ChibiAvatar side="user" />
-            <div className="bubble-user lift-sm px-4 py-3.5">
+            {/*
+             * `.user-note` (globals.css) — khối compact: bo 12px (`xl`), nền nhấn
+             * nhạt, KHÔNG bóng. Bong bóng cũ bo 16px + `lift-sm`; §15.1 điểm 2
+             * đổi vai trò: bóng và khung dành cho thứ cần tách (code, diff,
+             * bằng chứng, yêu cầu quyết định), không dành cho lời nói.
+             * Trần 76% của cả cụm (avatar 26px + gap 8px nằm trong đó) để phần
+             * chữ của người dùng đứng quanh mức 72% cột hội thoại.
+             */}
+            <div className="user-note">
             {m.experimental_attachments && m.experimental_attachments.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {m.experimental_attachments.map((att, idx) => (
@@ -285,10 +335,10 @@ export const MessageItem = memo(
                   }}
                   aria-label="Sửa nội dung tin nhắn"
                   /* Bỏ `outline-none`: ring `:focus-visible` toàn cục ở globals.css là dấu hiệu focus duy nhất của ô này. */
-                  className="w-full resize-none bg-transparent font-mono text-body text-primary placeholder:text-tertiary"
+                  className="w-full resize-none bg-transparent font-sans text-body text-primary placeholder:text-tertiary"
                   autoFocus
                 />
-                <div className="flex justify-end gap-2 border-t border-subtle pt-2 font-mono text-ui">
+                <div className="flex justify-end gap-2 border-t border-subtle pt-2 font-sans text-ui">
                   <button
                     type="button"
                     onClick={onCancelEdit}
@@ -334,7 +384,7 @@ export const MessageItem = memo(
                 type="button"
                 onClick={() => setIsExpanded((prev) => !prev)}
                 aria-expanded={isExpanded}
-                className="mt-1.5 inline-flex items-center gap-1 font-mono text-meta font-medium text-accent transition-colors hover:text-primary"
+                className="mt-1.5 inline-flex items-center gap-1 font-sans text-meta font-medium text-accent transition-colors hover:text-primary"
               >
                 {isExpanded ? (
                   <>
@@ -402,7 +452,7 @@ export const MessageItem = memo(
     const { text: bubbleContent, show: showBubble } = bubbleOf(m.content, timeline);
 
     return (
-      <div className="group relative w-full py-5">
+      <div className={rowSpacing(runPosition)}>
         {!isStreaming && (
           <div
             className={`absolute top-1 right-1 z-10 flex items-center gap-0.5 lift-sm rounded-lg border border-subtle bg-overlay px-1 py-0.5 ${MSG_ACTIONS}`}
@@ -466,27 +516,37 @@ export const MessageItem = memo(
           })()}
 
           {/*
-           * Bong bóng của bot đảo chiều với bubble user: avatar bên trái, đuôi
-           * chỉ xuống-trái, nền GIẤY TRẮNG (không phải mint) — vì đây là nội
-           * dung chính, nó phải là thứ nền sạch nhất trên màn hình.
+           * TRẢ LỜI LÀ NỘI DUNG BIÊN TẬP, KHÔNG PHẢI BONG BÓNG CHAT.
            *
-           * Chỉ PHẦN LỜI nằm trong bubble. Tool trace, khối suy luận và tệp đính
-           * kèm nằm ngoài: chúng là bảng kê công việc, không phải lời nói, và
-           * bọc chúng vào bong bóng sẽ khiến một hàng dài trông như nói dối.
+           * §15.1 điểm 2: văn bản trả lời đặt TRỰC TIẾP trên nền hội thoại;
+           * CHỈ code, diff, bằng chứng và yêu cầu quyết định mới có khung riêng
+           * (khung của chúng nằm ở component tương ứng — `.claude-code-block`,
+           * `diff-confirm`, `evidence-badge`). Khung cũ (`.bubble-bot`, bo 16px +
+           * `lift-sm` + viền) đã bị gỡ khỏi `globals.css`: bọc lời nói trong một
+           * hộp viền làm mọi khối trông cùng độ nổi, nên mắt phải tự đi tìm chỗ
+           * quan trọng — đúng thứ điểm 1 cấm.
+           *
+           * Avatar CHỈ hiện ở tin mở khối (`runPosition === 'start'`). Tin thứ
+           * hai trở đi giữ nguyên cột bằng một ô đệm cùng kích thước (26px) chứ
+           * không bỏ hẳn: bỏ đệm thì chữ thụt sang trái 34px so với tin đầu
+           * khối, tức cùng một đoạn văn mà hai lề tuỳ vị trí.
            *
            * Khi timeline bật (`timeline !== null`), model đã xen lẫn lời với
            * tool, nên ở đây chỉ lấy ĐOẠN LỜI ĐẦU TIÊN. Các đoạn lời sau tool do
-           * ToolTrace vẽ ra ngoài bubble, đúng thứ tự thời gian: nói, chạy tool,
-           * nói tiếp. Bubble vẫn là chỗ sạch nhất cho câu mở đầu, vì đó là câu
-           * người đọc chờ. Không có đoạn lời đầu (model gọi tool trước khi nói
-           * gì) thì không vẽ bubble trắng rỗng, chỉ mở màn hình bằng chip tool.
+           * ToolTrace vẽ ra ngoài, đúng thứ tự thời gian: nói, chạy tool, nói
+           * tiếp. Không có đoạn lời đầu (model gọi tool trước khi nói gì) thì
+           * không vẽ khối rỗng, chỉ mở màn hình bằng chip tool.
            */}
           {showBubble && (
           <div className="flex items-start gap-2">
-            <ChibiAvatar side="bot" className="mt-1" />
-            <div className="bubble-bot lift-sm min-w-0 flex-1 px-4 py-3.5">
+            {runPosition === 'start' ? (
+              <ChibiAvatar side="bot" className="mt-1" />
+            ) : (
+              <span aria-hidden="true" className="mt-1 h-[26px] w-[26px] flex-shrink-0" />
+            )}
           <div
-            className={`claude-prose text-primary ${isStreaming ? 'streaming-caret' : ''}`}
+            data-testid="reply-text"
+            className={`min-w-0 flex-1 claude-prose text-primary ${isStreaming ? 'streaming-caret' : ''}`}
             aria-busy={isStreaming}
           >
             <ErrorBoundary resetKey={`${m.id}:${m.content.length}`}>
@@ -497,7 +557,6 @@ export const MessageItem = memo(
               />
             </ErrorBoundary>
           </div>
-            </div>
           </div>
           )}
 
@@ -541,7 +600,7 @@ export const MessageItem = memo(
             const { truncated, message: note } = getFinishInfo(m);
             if (!truncated || isStreaming) return null;
             return (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 lift-sm rounded-lg border border-warning/30 bg-raised px-4 py-2.5 font-mono text-ui text-warning">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 lift-sm rounded-lg border border-warning/30 bg-raised px-4 py-2.5 font-sans text-ui text-warning">
                 <span className="min-w-0">{note ?? 'Câu trả lời có thể chưa hoàn chỉnh.'}</span>
                 {onContinueGenerating && (
                   <button
@@ -586,7 +645,7 @@ export const MessageItem = memo(
           )}
 
           {m.role === 'assistant' && (m as any).status === 'aborted' && (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-subtle pt-2 font-mono">
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-subtle pt-2 font-sans">
               <div className="flex items-center gap-1.5">
                 <MessageStatusBadge status="aborted" />
                 <span className="text-meta text-tertiary">· Bạn có thể tạo lại</span>

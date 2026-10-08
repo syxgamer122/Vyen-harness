@@ -25,6 +25,8 @@ import {
   approvalHint,
   resolveApprovalPolicy,
   stagedFilesChip,
+  workspaceScopeChip,
+  COMPOSER_FOCUS_PAD,
   SLASH_PALETTE_LIMIT,
   type SlashPrompt,
 } from '@/components/composer';
@@ -534,5 +536,244 @@ describe('vỏ composer giữ nguyên bất biản đã có test canh', () => {
     for (const key of ['ArrowDown', 'ArrowUp', 'Escape', 'Home', 'End']) {
       expect(source, `mất chuỗi phím ${key}`).toContain(key);
     }
+  });
+});
+
+/*
+ * Hàng phụ ở chân + phép trao padding khi focus — DESIGN.md §14.4, §15.4 điểm 15.
+ *
+ * Đây không phải một trong năm lỗi ở đầu tệp mà là HỢP ĐỒNG của thiết kế đích:
+ *   §14.4 — hàng chân chở (model · phạm vi · gửi), chữ nhỏ hơn chữ trong ô nhập,
+ *           và "vùng focus mở rộng nhẹ theo chiều dọc".
+ *   §15.4 — điểm 15: model và tùy chọn phụ lùi sau nội dung nhập; focus rõ nhưng
+ *           "không làm cả hội thoại dịch chuyển hay phát sáng gây phân tâm";
+ *           điểm 12: thông tin quyết định không nằm ở `micro`/`meta`.
+ *
+ * Hai vế ấy chỉ cùng đúng nhờ MỘT phép trao: vùng nhập lớn lên 8px, hàng chân
+ * trả lại 8px ở đáy. Các test dưới đây khoá phép trao đó bằng SỐ đọc từ chính
+ * JSX, nên đổi một lớp Tailwind mà quên lớp kia là đỏ ngay.
+ */
+describe('hàng chân composer (§14.4) và phép trao padding khi focus (§15.4 điểm 15)', () => {
+  /** Thang khoảng cách Tailwind (4px × n) — bản sao của thang, không của quyết định. */
+  const SPACING_PX: Record<string, number> = {
+    '0': 0,
+    '0.5': 2,
+    '1': 4,
+    '1.5': 6,
+    '2': 8,
+    '2.5': 10,
+    '3': 12,
+    '3.5': 14,
+    '4': 16,
+    '5': 20,
+    '6': 24,
+  };
+
+  /** Source của MỘT hàng trong vỏ composer, cắt ở hàng kế tiếp. */
+  const row = (name: 'input' | 'foot') => {
+    const start = code.indexOf(`data-composer-row="${name}"`);
+    expect(start, `không tìm thấy hàng ${name} trong JSX`).toBeGreaterThan(-1);
+    const next = code.indexOf('data-composer-row="', start + 1);
+    return code.slice(start, next === -1 ? undefined : next);
+  };
+
+  /** Chuỗi class của hàng (hàng nào khai bằng template literal mới đọc được). */
+  const tpl = (name: 'input' | 'foot') => {
+    const found = row(name).match(/className=\{`([^`]*)`\}/)?.[1];
+    expect(found, `hàng ${name} không khai className bằng template literal`).toBeTruthy();
+    return found!;
+  };
+
+  /** Class của hàng ở một trạng thái: phần TĨNH + nhánh của `isFocused`. */
+  const classesAt = (name: 'input' | 'foot', focused: boolean) => {
+    const t = tpl(name);
+    const branches = t.match(/\?\s*'([^']*)'\s*:\s*'([^']*)'/);
+    expect(branches, `hàng ${name} không khai padding theo hai trạng thái focus`).toBeTruthy();
+    return `${t.slice(0, t.indexOf('${'))} ${focused ? branches![1] : branches![2]}`;
+  };
+
+  /** px của một cạnh (`pt` / `pb`) trong chuỗi class; thiếu cạnh = 0px. */
+  const padPx = (classes: string, edge: 'pt' | 'pb') => {
+    const token = classes.split(/\s+/).find((c) => c.startsWith(`${edge}-`));
+    if (!token) return 0;
+    const step = token.slice(edge.length + 1);
+    expect(SPACING_PX[step], `lớp ${token} không có trong thang khoảng cách`).toBeDefined();
+    return SPACING_PX[step];
+  };
+
+  const four = (state: 'rest' | 'focused') => {
+    const input = classesAt('input', state === 'focused');
+    const foot = classesAt('foot', state === 'focused');
+    return {
+      inputTop: padPx(input, 'pt'),
+      inputBottom: padPx(input, 'pb'),
+      footTop: padPx(foot, 'pt'),
+      footBottom: padPx(foot, 'pb'),
+    };
+  };
+
+  describe('chip phạm vi dự án', () => {
+    it('phiên không có tính năng thư mục thì KHÔNG vẽ chip', () => {
+      expect(workspaceScopeChip(undefined)).toBeNull();
+    });
+
+    it('đã nối thư mục: nhãn là tên thư mục, không phải tên nút', () => {
+      expect(workspaceScopeChip({ connected: true, name: 'vyen' })!.label).toBe('vyen');
+    });
+
+    it('tên rỗng hoặc toàn khoảng trắng vẫn ra nhãn đọc được', () => {
+      for (const name of [null, '', '   ']) {
+        const chip = workspaceScopeChip({ connected: true, name });
+        expect(chip).not.toBeNull();
+        expect(chip!.label.trim().length).toBeGreaterThan(0);
+      }
+    });
+
+    it('"đang chọn" và "chưa chọn" không được trông giống nhau', () => {
+      // Đây đúng là lỗi §15.4 điểm 15 nêu: nút icon thư mục cũ làm hai trạng
+      // thái đó hiện ra y hệt nhau.
+      const on = workspaceScopeChip({ connected: true, name: 'vyen' })!;
+      const off = workspaceScopeChip({ connected: false, name: null })!;
+      expect(off.label).not.toBe(on.label);
+      expect(off.label).toMatch(/chưa/i);
+      expect(on.label).not.toMatch(/chưa/i);
+    });
+
+    it('cả hai trạng thái nói rõ phạm vi dự án và bấm thì được gì', () => {
+      const on = workspaceScopeChip({ connected: true, name: 'vyen' })!;
+      const off = workspaceScopeChip({ connected: false, name: null })!;
+      for (const chip of [on, off]) {
+        expect(chip.title).toMatch(/phạm vi dự án/i);
+        expect(chip.title).toMatch(/Bấm để/);
+        expect(chip.title, 'nhãn chứa em dash').not.toMatch(/—/);
+      }
+      expect(on.title).toContain('vyen');
+    });
+
+    it('composer lấy nhãn từ helper, không tự in chuỗi', () => {
+      expect(code).toMatch(/workspaceScopeChip\(workspace\)/);
+      expect(code).not.toContain('Kết nối thư mục làm việc');
+    });
+
+    it('chip là NÚT có CHỮ: nhãn hiện ra, không chỉ nằm trong aria-label', () => {
+      const chip = code.match(/\{scopeChip && onPickWorkspace && \([\s\S]*?<\/button>/)?.[0];
+      expect(chip, 'không tìm được khối chip phạm vi — regex chắc hỏng').toBeTruthy();
+      expect(chip!).toContain('{scopeChip.label}');
+      expect(chip!).toContain('aria-label={scopeChip.label}');
+    });
+
+    it('chip theo bậc cỡ `ui`, bo control, không bóng, không cỡ tự chế', () => {
+      const chip = code.match(/\{scopeChip && onPickWorkspace && \([\s\S]*?<\/button>/)?.[0] ?? '';
+      expect(chip).toMatch(/text-ui/);
+      expect(chip).not.toMatch(/text-\[/);
+      expect(chip).toMatch(/rounded-md/);
+      expect(chip).not.toMatch(/rounded-full/);
+      expect(chip, 'control không sinh bóng (§5)').not.toMatch(/lift-/);
+    });
+
+    it('vùng chạm 44px nới theo CHIỀU DỌC, không chồm sang nút bên cạnh', () => {
+      // `min-h-8` (32px) + `after:-inset-y-[6px]` = 44px. Nới ngang
+      // (`after:-inset-[6px]`) sẽ đè lên ô chọn model và nút đính kèm.
+      const chip = code.match(/\{scopeChip && onPickWorkspace && \([\s\S]*?<\/button>/)?.[0] ?? '';
+      expect(chip).toMatch(/min-h-8/);
+      expect(chip).toMatch(/after:-inset-y-\[6px\]/);
+      expect(chip).not.toMatch(/after:-inset-\[6px\]/);
+      expect(chip).toMatch(/after:inset-x-0/);
+    });
+  });
+
+  describe('hàng chân: vị trí và cỡ chữ', () => {
+    it('ô chọn model nằm trong hàng chân, không còn ở dải công cụ', () => {
+      const strip = code.indexOf('rounded-t-[15px_15px_0_0]');
+      const foot = code.indexOf('data-composer-row="foot"');
+      const model = code.indexOf('<ModelSelector');
+      const chip = code.indexOf('{scopeChip && onPickWorkspace');
+      expect(strip).toBeGreaterThan(-1);
+      expect(foot).toBeGreaterThan(strip);
+      expect(model).toBeGreaterThan(foot);
+      expect(chip).toBeGreaterThan(model);
+    });
+
+    it('mọi chữ ở hàng chân nhỏ hơn chữ trong ô nhập (16px), và không ở bậc micro/meta', () => {
+      const foot = code.slice(code.indexOf('data-composer-row="foot"'), code.indexOf('</form>'));
+      expect(foot.length, 'không cắt được khối hàng chân').toBeGreaterThan(500);
+      // Ô nhập vẫn là bậc đọc dài — đây là mốc so sánh.
+      expect(code).toMatch(/className="w-full resize-none border-none bg-transparent p-0 font-sans text-read/);
+      expect(foot).not.toMatch(/text-read/);
+      expect(foot).not.toMatch(/text-head/);
+      // §15.4 điểm 12: phạm vi và chế độ phê duyệt là thông tin để QUYẾT ĐỊNH.
+      expect(foot).not.toMatch(/text-micro/);
+      expect(foot).not.toMatch(/text-meta/);
+      expect(foot).toMatch(/text-ui/);
+    });
+
+    it('nhãn của ô chọn model cũng ở bậc `ui`, không tự chế cỡ', () => {
+      const selector = fs
+        .readFileSync(path.resolve(__dirname, '../components/model-selector.tsx'), 'utf8')
+        .replace(/\r\n/g, '\n');
+      const trigger = selector.split('aria-haspopup')[1]?.split('>')[0] ?? '';
+      expect(trigger, 'trigger của ModelSelector thiếu bậc chữ `ui`').toMatch(/text-ui/);
+      expect(trigger).not.toMatch(/text-\[/);
+    });
+
+    it('nhãn chế độ phê duyệt ở cả hai chỗ đều lên bậc `ui`', () => {
+      // Cùng một thông tin quyết định, hai chỗ hiển thị (nút đổi ở dải công cụ
+      // và pill ở hàng chân) — để một chỗ 12px là chỗ đó khó đọc hơn hẳn.
+      expect(code).not.toMatch(/text-xs/);
+      const strip = code.slice(
+        code.indexOf('rounded-t-[15px_15px_0_0]'),
+        code.indexOf('data-composer-row="input"'),
+      );
+      expect(strip, 'nút đổi chế độ ở dải công cụ chưa lên bậc ui').toMatch(/text-ui text-tertiary/);
+    });
+  });
+
+  describe('focus: vùng nhập lớn lên, vỏ KHÔNG đổi chiều cao', () => {
+    it('tổng padding dọc của hai hàng bằng nhau ở hai trạng thái', () => {
+      const rest = four('rest');
+      const focused = four('focused');
+      const sum = (f: typeof rest) => f.inputTop + f.inputBottom + f.footTop + f.footBottom;
+      expect(sum(focused)).toBe(sum(rest));
+      expect(sum(rest)).toBeGreaterThan(0);
+    });
+
+    it('vùng nhập lớn lên, hàng chân trả lại đúng chừng ấy', () => {
+      const rest = four('rest');
+      const focused = four('focused');
+      const input = (f: typeof rest) => f.inputTop + f.inputBottom;
+      const foot = (f: typeof rest) => f.footTop + f.footBottom;
+      expect(input(focused)).toBeGreaterThan(input(rest));
+      expect(foot(rest)).toBeGreaterThan(foot(focused));
+      expect(input(focused) - input(rest)).toBe(foot(rest) - foot(focused));
+    });
+
+    it('hàng chân trả ở ĐÁY, không trả ở đỉnh', () => {
+      // Trả ở đỉnh là nút gửi nhảy lên khi vừa bấm vào ô nhập — mắt thấy ngay.
+      const rest = four('rest');
+      const focused = four('focused');
+      expect(focused.footTop).toBe(rest.footTop);
+      expect(focused.footBottom).toBeLessThan(rest.footBottom);
+      expect(focused.inputTop).toBeGreaterThan(rest.inputTop);
+      expect(focused.inputBottom).toBeGreaterThan(rest.inputBottom);
+    });
+
+    it('bốn con số trong JSX khớp COMPOSER_FOCUS_PAD', () => {
+      expect(four('rest')).toEqual({ ...COMPOSER_FOCUS_PAD.rest });
+      expect(four('focused')).toEqual({ ...COMPOSER_FOCUS_PAD.focused });
+    });
+
+    it('hai hàng chạy cùng nhịp: cùng transition và cùng duration', () => {
+      for (const name of ['input', 'foot'] as const) {
+        expect(tpl(name), `hàng ${name} không chuyển padding`).toContain('transition-[padding]');
+        expect(tpl(name), `hàng ${name} thiếu duration`).toContain('duration-150');
+      }
+    });
+
+    it('không còn hiệu ứng phát sáng khi focus (§15.4 điểm 15)', () => {
+      // `PulseGlow` là vòng `animate-pulse ring-accent/30` từng bao quanh vỏ
+      // composer khi focus. Điểm 15 cấm "phát sáng gây phân tâm": dấu hiệu focus
+      // nay là viền accent cộng vùng nhập lớn lên, không phải một hiệu ứng.
+      expect(code).not.toContain('PulseGlow');
+    });
   });
 });

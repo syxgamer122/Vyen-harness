@@ -6,6 +6,7 @@ import type { Message } from 'ai/react';
 import { toParentKey, fromParentKey, type StoredMessage, type StoredAttachment } from '@/lib/db';
 import { reconstructActiveThread } from '@/lib/tree-utils';
 import { toPersistableText } from '@/lib/message-text';
+import { nextTurnId, type TurnIntent } from '@/lib/turns';
 
 export const CONTINUE_PROMPT =
   'Câu trả lời trước bị ngắt giữa chừng. Hãy viết tiếp CHÍNH XÁC từ chỗ bị cắt, ' +
@@ -196,13 +197,26 @@ function toStoredReasoning(raw: unknown): string | undefined {
 export function toChatMessage(
   row: StoredMessage,
   objectUrls: Set<string>,
-): Message & { status?: StoredMessage['status']; finishReason?: StoredMessage['finishReason'] } {
+): Message & {
+  status?: StoredMessage['status'];
+  finishReason?: StoredMessage['finishReason'];
+  turnId?: string;
+  createdAtMs?: number;
+} {
   return {
     id: row.id,
     role: row.role as Message['role'],
     content: sanitizeContent(row.content),
     status: row.status,
     finishReason: row.finishReason,
+    /* Mốc thời gian của row, dạng số. `Message.createdAt` của SDK là `Date`,
+       nên trường này đặt tên riêng để không đè lên kiểu của SDK: turn header
+       cần con số để in giờ, không cần một `Date` dựng thêm mỗi lần vẽ. */
+    createdAtMs: row.createdAt,
+    /* Lượt là dữ liệu ĐÃ LƯU (xem lib/turns.ts): trả lại nguyên vẹn cho tầng
+       hiển thị, kèm `undefined` khi row cũ chưa từng có — lúc đó `groupTurns`
+       gom bằng đúng một luật dùng chung, không phải mỗi màn hình đoán riêng. */
+    ...(row.turnId ? { turnId: row.turnId } : {}),
     annotations: row.annotations as Message['annotations'],
     /* Reasoning là của chính model này và chỉ phục vụ hiển thị lại, nhưng mất
        nó thì khối ThinkingBlock biến mất sau khi tải trang. Chỉ gắn khi thật
@@ -378,7 +392,12 @@ function hasStoredMessageChanged(
        đổi" và bỏ qua, reasoning chết lặng. So qua toStoredReasoning để
        undefined và chuỗi rỗng không sinh lượt ghi vô nghĩa. */
     toStoredReasoning(previous.reasoning) !==
-      toStoredReasoning(next.reasoning)
+      toStoredReasoning(next.reasoning) ||
+    /* Không so sánh lượt thì việc NÂNG CẤP dữ liệu không bao giờ được ghi:
+       với row cũ, `turnId` là trường DUY NHẤT đổi, nên reconcile sẽ coi row là
+       "không thay đổi" và hội thoại cũ mãi mãi không có lượt. So sánh này
+       idempotent: ghi xong hai bên bằng nhau, không sinh lượt ghi thừa. */
+    (previous.turnId ?? '') !== (next.turnId ?? '')
   );
 }
 
@@ -411,6 +430,13 @@ export async function reconcileActiveMessages(
   pendingFork: PendingAssistantFork | null,
   isCurrentlyLoading: boolean,
   finishReason: StoredMessage['finishReason'],
+  /**
+   * Ý định của SỰ KIỆN vừa tạo tin người dùng cuối cùng — `'new'` khi người
+   * dùng bảo "việc khác" (New task / follow-up đã xếp hàng), `'continue'` khi
+   * đó là điều chỉnh việc đang làm (steering, goal loop, trả lời câu đang chờ
+   * quyền). Không truyền gì thì luật suy từ dữ liệu của row liền trước.
+   */
+  turnIntent: TurnIntent | null = null,
 ): Promise<ReconcileResult> {
   if (visibleMessages.length === 0) {
     return {
@@ -444,6 +470,43 @@ export async function reconcileActiveMessages(
   let previousVisibleId: string | null = null;
   let createdAssistantId: string | undefined;
 
+  /*
+   * Con trỏ LƯỢT của lần reconcile này (§15.1 chốt trước).
+   *
+   * Hội thoại cũ chưa từng có `turnId` vẫn đi qua ĐÚNG hàm này: row nào chưa
+   * có thì được cấp ngay trong lần ghi kế tiếp và giữ nguyên từ đó về sau —
+   * nâng cấp một lần, không phải suy lại mỗi lần vẽ.
+   *
+   * `lastUserId` là row duy nhất chịu tác động của `turnIntent`: mọi sự kiện
+   * tạo tin người dùng đều chỉ tạo đúng một tin, và nó là tin cuối.
+   */
+  const lastUserId =
+    [...visibleMessages].reverse().find((message) => message.role === 'user')?.id ?? null;
+  let turnCursor: string | null = null;
+
+  const turnIdForRow = (
+    id: string,
+    role: string,
+    previousRow: StoredMessage | null,
+  ): string => {
+    const resolved = rowById.get(id) ?? null;
+    const turnId = nextTurnId(
+      turnCursor,
+      {
+        id,
+        role,
+        turnId: resolved?.turnId,
+        status: resolved?.status,
+        finishReason: resolved?.finishReason,
+        toolInvocations: resolved?.toolInvocations,
+      },
+      previousRow,
+      id === lastUserId ? turnIntent : null,
+    );
+    turnCursor = turnId;
+    return turnId;
+  };
+
   for (
     let index = 0;
     index < visibleMessages.length;
@@ -464,6 +527,14 @@ export async function reconcileActiveMessages(
      * Message đã tồn tại trong tree.
      */
     if (existing) {
+      /*
+       * Row cũ chưa có lượt: cấp ngay lượt cho nó trong lần ghi này. Không làm
+       * thì mọi row lịch sử mãi mãi không thuộc lượt nào, và tầng hiển thị phải
+       * tự đoán — đúng thứ §15.1 cấm.
+       */
+      const previousRow = previousVisibleId ? rowById.get(previousVisibleId) ?? null : null;
+      const resolvedTurnId = turnIdForRow(existing.id, existing.role, previousRow);
+
       const nextFinishReason:
         StoredMessage['finishReason'] =
         isStreamingAssistant
@@ -486,6 +557,9 @@ export async function reconcileActiveMessages(
 
       const updated: StoredMessage = {
         ...existing,
+        /* Cấp một lần rồi giữ nguyên: gán lại theo mỗi lần reconcile sẽ khiến
+           hai tab cùng mở một hội thoại ghi ra hai ranh giới lượt khác nhau. */
+        ...(existing.turnId ? {} : { turnId: resolvedTurnId }),
 
         /**
          * Content có thể thay đổi từng token trong lúc stream.
@@ -586,6 +660,17 @@ export async function reconcileActiveMessages(
       role:
         message.role as StoredMessage['role'],
       content: sanitizeContent(message.content),
+
+      /*
+       * Lượt của row mới — cấp tại ĐÂY, trong cùng transaction ghi row, nên
+       * ranh giới lượt là dữ liệu lưu trữ chứ không phải phép gom lúc vẽ.
+       * Row liền trước lấy từ `rowById` (đã chứa cả row mới của vòng lặp này).
+       */
+      turnId: turnIdForRow(
+        message.id,
+        message.role as string,
+        previousVisibleId ? rowById.get(previousVisibleId) ?? null : null,
+      ),
 
       parentId: toParentKey(parentId),
 

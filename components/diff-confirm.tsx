@@ -298,7 +298,7 @@ export function DiffConfirm({
        * settings-dialog).
        */}
       <div
-        className="relative mb-2 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-mono shadow-lift-lg animate-pop-in sm:mb-0 sm:max-h-[70vh]"
+        className="relative mb-2 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden lift-lg rounded-2xl border border-default bg-overlay font-sans shadow-lift-lg animate-pop-in sm:mb-0 sm:max-h-[70vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -326,7 +326,7 @@ export function DiffConfirm({
           <div className="flex flex-none items-center gap-2">
             {/* Số đếm nói về TOÀN BỘ thay đổi, không phải phần đang hiện. */}
             <div
-              className="flex items-center gap-1.5 rounded-lg border border-subtle bg-sunken px-2.5 py-1.5 font-mono text-meta"
+              className="flex items-center gap-1.5 rounded-lg border border-subtle bg-sunken px-2.5 py-1.5 font-sans text-meta"
               title={`So với nội dung hiện tại: ${view.totalAdds} dòng thêm, ${view.totalDels} dòng bị xoá`}
             >
               <span className="font-semibold text-diff-add">+{view.totalAdds}</span>
@@ -451,7 +451,7 @@ export function DiffConfirm({
           })}
 
           {showFull && view.fullClipped && (
-            <p className="border-t border-subtle bg-raised px-4 py-2 font-mono text-meta text-warning">
+            <p className="border-t border-subtle bg-raised px-4 py-2 font-sans text-meta text-warning">
               File có {view.all.length.toLocaleString('vi-VN')} dòng — khung này chỉ render
               {` ${FULL_MAX_ROWS.toLocaleString('vi-VN')}`} dòng đầu. Phần còn lại lấy đầy đủ qua
               nút &ldquo;Sao chép&rdquo;; nội dung ghi xuống đĩa không bị cắt.
@@ -461,12 +461,19 @@ export function DiffConfirm({
 
         {/* Action bar */}
         <div className="flex items-center justify-between gap-3 border-t border-subtle bg-raised px-4 py-3 sm:px-5">
-          <div className="hidden items-center gap-2 font-mono text-meta text-tertiary sm:flex">
+          {/*
+            * Nhãn phím tắt phải CÙNG NGÔN NGỮ với phần còn lại của hộp thoại.
+            * Trước đây khối này trộn `reject` và `then ↵ on the chosen button`
+            * vào giữa một UI tiếng Việt — §15.4 điểm 17 gọi đó là lỗi, không
+            * phải chi tiết: đây đúng là chỗ người dùng phải quyết định, nên câu
+            * chữ ở đây không được bắt họ dịch.
+            */}
+          <div className="hidden items-center gap-2 font-sans text-meta text-tertiary sm:flex">
             <span className="flex items-center gap-1">
               <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Esc
               </kbd>
-              <span>reject</span>
+              <span>từ chối</span>
             </span>
             <span className="text-disabled" aria-hidden="true">
               •
@@ -475,7 +482,7 @@ export function DiffConfirm({
               <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Tab
               </kbd>
-              <span>then ↵ on the chosen button</span>
+              <span>rồi ↵ ở nút đang chọn</span>
             </span>
           </div>
 

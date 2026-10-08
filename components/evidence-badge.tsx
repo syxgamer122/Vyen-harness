@@ -48,7 +48,7 @@ export function EvidenceBadge({ level = 'prepared', className = '', size = 'sm' 
 
   return (
     <span
-      className={`inline-flex items-center gap-1 font-mono ${toneClass} ${sizeClass} ${className}`}
+      className={`inline-flex items-center gap-1 font-sans ${toneClass} ${sizeClass} ${className}`}
       title={`Mức bằng chứng: ${info.badgeText}`}
     >
       {safeLevel === 'verified' && <CheckCircle2 className="h-3 w-3 flex-shrink-0" />}

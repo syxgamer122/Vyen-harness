@@ -92,6 +92,32 @@ describe('hasStoredMessageChanged phải SO SÁNH reasoning', () => {
   });
 });
 
+describe('hasStoredMessageChanged phải SO SÁNH lượt (nếu không, nâng cấp dữ liệu không bao giờ ghi)', () => {
+  const comparator = between(
+    'function hasStoredMessageChanged(',
+    'function toolInvocationSignature(',
+  );
+
+  it('comparator nhắc tới cả hai vế của turnId bằng !==', () => {
+    /* Với row cũ, `turnId` là trường DUY NHẤT đổi — bỏ nó khỏi phép so sánh thì
+       nâng cấp lượt chết lặng y hệt bug reasoning/toolInvocations mà file này
+       viết ra để canh. */
+    expect(
+      comparesField(comparator, 'turnId'),
+      'hasStoredMessageChanged không so sánh turnId → hội thoại cũ mãi mãi không có lượt.',
+    ).toBe(true);
+  });
+
+  it('schema Dexie không index turnId — index nó sẽ bắt buộc migration', () => {
+    const blocks = [...dbSource.matchAll(/\.stores\(\{([\s\S]*?)\n {4}\}\);/g)]
+      .map((m) => m[1]);
+    for (const block of blocks) {
+      expect(block, 'turnId không được nằm trong .stores(): trường không index thì không cần bump version Dexie').not.toMatch(/turnId/);
+    }
+    expect(dbSource, 'StoredMessage phải khai trường turnId').toMatch(/\n  turnId\?: string;/);
+  });
+});
+
 describe('cả hai chỗ dựng StoredMessage đều phải gán reasoning', () => {
   it('row đã tồn tại (updated) gán reasoning', () => {
     const updated = between(
@@ -126,6 +152,14 @@ describe('schema Dexie không index reasoning', () => {
 /* Behaviour                                                           */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Fixture mang `turnId` sẵn: đây là dạng row SAU lần nâng cấp lượt.
+ *
+ * Lý do phải có: khi row còn thiếu `turnId`, reconcile ghi nó MỘT lần để nâng
+ * cấp dữ liệu (xem describe "nâng cấp lượt" ở cuối file) — nên mọi test "row
+ * không đổi gì thì không ghi" dùng fixture cũ sẽ đỏ vì lý do đúng. Fixture ở
+ * đây đại diện dữ liệu đã nâng cấp để phép so sánh vẫn đo ĐÚNG thứ nó định đo.
+ */
 function userRow(): StoredMessage {
   return {
     id: 'u1',
@@ -139,6 +173,7 @@ function userRow(): StoredMessage {
     createdAt: 1,
     status: 'complete',
     finishReason: 'stop',
+    turnId: 'luot-1',
   };
 }
 
@@ -157,6 +192,7 @@ function assistantRow(
     createdAt: 2,
     status: 'complete',
     finishReason: 'stop',
+    turnId: 'luot-1',
     ...extra,
   };
 }
@@ -173,14 +209,16 @@ const assistantMessage = (
 function reconcile(
   visible: Message[],
   tree: StoredMessage[],
+  options: { loading?: boolean; intent?: 'new' | 'continue' | null } = {},
 ) {
   return reconcileActiveMessages(
     'c1',
     visible,
     tree,
     null,
-    false,
+    options.loading ?? false,
     'stop',
+    options.intent ?? null,
   );
 }
 
@@ -274,5 +312,108 @@ describe('đường đọc — toChatMessage', () => {
     const restored = toChatMessage(written.newRows[0], new Set());
 
     expect(restored.reasoning).toBe(text);
+  });
+
+  it('trả lại LƯỢT của row cho tầng hiển thị, và không gắn khoá rỗng cho row cũ', () => {
+    /* Turn header gắn vào tin đầu của lượt (DESIGN.md §15.1 điểm 4). Thiếu
+       `turnId` ở đường đọc thì mọi lượt cũ trở thành một lượt mới toanh ở UI,
+       hoặc mất header — mà không có lỗi nào báo. */
+    const upgraded = toChatMessage(assistantRow({ turnId: 'luot-7' }), new Set());
+    expect(upgraded.turnId).toBe('luot-7');
+
+    const legacy = toChatMessage(assistantRow({ turnId: undefined }), new Set());
+    expect('turnId' in legacy, 'khoá rỗng luôn hiện diện sẽ làm memo so sánh sai').toBe(false);
+  });
+
+  it('row cũ đọc ra mốc thời gian dạng số để turn header in giờ', () => {
+    const msg = toChatMessage(assistantRow({ createdAt: 1_700_000_000_000 }), new Set());
+    expect(msg.createdAtMs).toBe(1_700_000_000_000);
+  });
+});
+
+describe('nâng cấp LƯỢT — ghi một lần rồi thôi', () => {
+  it('hội thoại cũ chưa có turnId được cấp lượt trong lần reconcile đầu tiên', async () => {
+    /* Cùng luật với mọi đường khác (`lib/turns.ts`): tin người dùng mở lượt,
+       tin trợ lý nối vào. Ghi lại MỘT lần là đủ; từ đó ranh giới lượt là dữ
+       liệu đã lưu, không phải phép gom lúc vẽ. */
+    const legacyUser: StoredMessage = { ...userRow(), turnId: undefined };
+    const legacyAssistant: StoredMessage = { ...assistantRow(), turnId: undefined };
+    const result = await reconcile(
+      [
+        { id: 'u1', role: 'user', content: 'hỏi' } as Message,
+        { id: 'a1', role: 'assistant', content: 'Câu trả lời' } as Message,
+      ],
+      [legacyUser, legacyAssistant],
+    );
+
+    const written = new Map(result.changedRows.map((row) => [row.id, row.turnId]));
+    expect(written.get('u1'), 'thiếu lượt thì header của lượt mất theo').toBeTruthy();
+    expect(written.get('u1')).toBe(written.get('a1'));
+  });
+
+  it('chạy lại trên cây đã nâng cấp thì KHÔNG sinh lượt ghi nào', async () => {
+    /* Nếu đây đỏ: mỗi lần reconcile lại ghi lại cả cây — đúng thứ làm hỏng
+       IndexedDB của hội thoại dài, và cũng là thứ test "row không đổi gì thì
+       không sinh lượt ghi" canh ở trên. */
+    const first = await reconcile(
+      [{ id: 'u1', role: 'user', content: 'hỏi' } as Message],
+      [{ ...userRow(), turnId: undefined }],
+    );
+    const upgraded = first.changedRows.length > 0
+      ? first.changedRows
+      : first.newRows;
+
+    const second = await reconcile(
+      [{ id: 'u1', role: 'user', content: 'hỏi' } as Message],
+      upgraded,
+    );
+    expect(second.changedRows).toHaveLength(0);
+    expect(second.newRows).toHaveLength(0);
+  });
+
+  it('gửi khi agent đang chạy → CHUNG lượt; gửi khi đã xong → lượt mới', async () => {
+    /* Đây là ranh giới lượt chạy end-to-end qua ĐÚNG hàm ghi: dữ liệu vào là
+       trạng thái row, quyết định ra là dữ liệu lưu. */
+    const streamingAssistant = assistantRow({ status: 'streaming', finishReason: undefined });
+    const sameTurn = await reconcile(
+      [
+        { id: 'u1', role: 'user', content: 'hỏi' } as Message,
+        { id: 'a1', role: 'assistant', content: 'Câu trả lời' } as Message,
+        { id: 'u2', role: 'user', content: 'bổ sung: nhớ chạy test' } as Message,
+      ],
+      [userRow(), streamingAssistant],
+      { loading: true },
+    );
+    const added = new Map(sameTurn.newRows.map((row) => [row.id, row.turnId]));
+    expect(added.get('u2'), 'tin bổ sung khi đang chạy thuộc lượt đang mở').toBe('luot-1');
+
+    const newTurn = await reconcile(
+      [
+        { id: 'u1', role: 'user', content: 'hỏi' } as Message,
+        { id: 'a1', role: 'assistant', content: 'Câu trả lời' } as Message,
+        { id: 'u2', role: 'user', content: 'việc khác' } as Message,
+      ],
+      [userRow(), assistantRow()],
+    );
+    const second = new Map(newTurn.newRows.map((row) => [row.id, row.turnId]));
+    expect(second.get('u2'), 'lượt đã xong thì tin kế tiếp là việc mới').not.toBe('luot-1');
+    expect(second.get('u2')).toBeTruthy();
+  });
+
+  it('ý định `new` của sự kiện thắng trạng thái row đang stream', async () => {
+    /* Alt+Enter (follow-up) khi agent đang chạy = "việc khác": nếu trạng thái
+       row thắng thì việc mới bị gộp âm thầm vào lượt cũ — đúng thứ bảng §15.1
+       cấm. */
+    const result = await reconcile(
+      [
+        { id: 'u1', role: 'user', content: 'hỏi' } as Message,
+        { id: 'a1', role: 'assistant', content: 'Câu trả lời' } as Message,
+        { id: 'u2', role: 'user', content: 'việc khác' } as Message,
+      ],
+      [userRow(), assistantRow({ status: 'streaming', finishReason: undefined })],
+      { loading: true, intent: 'new' },
+    );
+    const added = new Map(result.newRows.map((row) => [row.id, row.turnId]));
+    expect(added.get('u2')).not.toBe('luot-1');
   });
 });

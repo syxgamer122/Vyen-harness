@@ -28,7 +28,7 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     /* Viền — 3 tầng; `default` đạt 3.03:1 cho ranh giới control */
     '#e5e5e5', '#949494', '#525252',
     /* Nhấn & trạng thái */
-    '#2a7360', '#7fb8a6', '#f0f4f3', '#ffffff', '#167a4a', '#9a6206', '#b3261e', '#0369a1', '#6d4aa8',
+    '#2a7360', '#519a85', '#f0f4f3', '#ffffff', '#167a4a', '#9a6206', '#b3261e', '#0369a1', '#6d4aa8',
     /* Diff */
     '#1f7a3d', '#b3261e', '#575757',
   ]);
@@ -60,6 +60,7 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     '../components/message-status-badge.tsx',
     '../components/chat/status-line.tsx',
     '../components/chat/tool-trace.tsx',
+    '../components/chat/turn-header.tsx',
     '../components/chat/orchestrator-badge.tsx',
     '../components/settings-dialog.tsx',
     /* Các section + tab tách ra từ settings-dialog.tsx — cùng thuộc bề mặt
@@ -877,6 +878,13 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     'settings-card',
     'field',
     'field-sm',
+    /*
+     * `.user-note` (khối compact của người dùng, §15.1 điểm 2) thay cho
+     * `.bubble-user` đã gỡ ở đợt P1. Nó LÀ một recipe sinh bo góc, nên nó phải
+     * nằm trong danh sách này — nếu không, lần sau ai gỡ `rounded-xl` khỏi nó
+     * thì mọi ghi chú của người dùng rơi về 0px mà không assertion nào đỏ.
+     */
+    'user-note',
   ];
   const RADIUS_DIRECT = /className=[\s\S]*?rounded-(?:none|sm|md|lg|xl|2xl|3xl|full)\b/;
   /* Dấu nháy kép và backtick phải escape trong regex source. */
@@ -973,12 +981,59 @@ describe('DESIGN.md — Vyen design-system contract', () => {
     /* Hàng tin nhắn KHÔNG được tự thêm padding ngang — nó sẽ cộng dồn lên
        gutter của container và làm lệch mép chữ so với ô nhập. */
     const itemCode = readRel('../components/chat/message-item.tsx');
-    const rowWrappers = [...itemCode.matchAll(/<div className="(group relative w-full py-\d+[^"]*)"/g)]
-      .map((m) => m[1]);
-    expect(rowWrappers.length, 'phải tìm được 2 hàng tin nhắn (user + assistant)').toBe(2);
+    const rowWrappers = [
+      /* Nhánh user: hàng viết thẳng trong JSX. */
+      ...itemCode.matchAll(/<div className="(group relative w-full [^"]+)"/g),
+      /* Nhánh assistant: hàng lấy từ `rowSpacing` — vẫn là CÙNG một hàng tin
+         nhắn, nên vẫn chịu cùng luật. Bắt cả hai dạng để không có đường lách:
+         đổi một nhánh sang hàm rồi nhét `px-` vào đó là ĐỎ. */
+      ...itemCode.matchAll(/return '(group relative w-full [^']+)';/g),
+    ].map((m) => m[1]);
+    expect(rowWrappers.length, 'phải tìm được hàng của cả hai nhánh (user + assistant)').toBeGreaterThanOrEqual(3);
     for (const row of rowWrappers) {
       expect(row, `hàng tin nhắn không được tự padding ngang: ${row}`).not.toMatch(/(?<![\w-])px-/);
     }
+
+    /*
+     * NHỊP KHOẢNG CÁCH (DESIGN.md §15.1 điểm 5) — khoảng trắng biểu đạt quan
+     * hệ thông tin, không chia đều: TRONG một khối liên tiếp phải thở ít hơn
+     * MỐC NGẮT giữa các lượt.
+     *
+     * Test cũ chỉ đếm "đúng 2 hàng" — nó không nói gì về nhịp, nên hệ cũ (mọi
+     * hàng cùng `py-4`) vẫn xanh. Nay assertion đọc chính `rowSpacing` — nguồn
+     * duy nhất của nhịp — và so các con số với nhau, nên đổi một nhánh cho
+     * "đều đẹp" là ĐỎ.
+     */
+    const spacing = new Map(
+      [...itemCode.matchAll(/return '(group relative w-full [^']+)';/g)].map((m) => [
+        m[1].includes('py-0.5') ? 'middle' : m[1].includes('pb-5') ? 'end' : 'start',
+        m[1],
+      ]),
+    );
+    expect([...spacing.keys()].sort(), 'rowSpacing phải có đủ ba vị trí trong khối').toEqual([
+      'end',
+      'middle',
+      'start',
+    ]);
+    const stepOf = (token: string, prefix: string) => {
+      const hit = token.match(new RegExp(`(?:^|\\s)${prefix}-([\\d.]+)`));
+      return hit ? Number(hit[1]) * 4 : 0;
+    };
+    const middleGap = stepOf(spacing.get('middle')!, 'py') * 2;
+    const endGap = stepOf(spacing.get('end')!, 'pb');
+    const startGapBefore = stepOf(spacing.get('start')!, 'pt');
+    expect(middleGap, 'khoảng TRONG khối phải nhỏ hơn mốc ngắt giữa các lượt').toBeLessThan(endGap);
+    expect(
+      Math.max(middleGap, startGapBefore),
+      'mốc ngắt giữa các lượt phải lớn hơn mọi khoảng trong khối',
+    ).toBeLessThan(endGap);
+    /* Người dùng mở một lượt: hàng của họ là mốc ngắt lớn nhất trong hai nhánh. */
+    const userRow = itemCode.match(/<div className="(group relative w-full py-\d+)">/)?.[1];
+    expect(userRow, 'không đọc được hàng của nhánh user').toBeTruthy();
+    expect(
+      stepOf(userRow!, 'py') * 2,
+      'hàng user phải thoáng hơn mốc ngắt của khối trợ lý — nó MỞ một lượt',
+    ).toBeGreaterThanOrEqual(endGap);
   });
 
   /*
@@ -1096,8 +1151,9 @@ describe('DESIGN.md — Vyen design-system contract', () => {
      * hướng bàn phím mất dấu hiệu vị trí ở mọi ô nhập trong Settings.
      *
      * `composer.tsx` là ngoại lệ CỐ Ý: focus của nó hiện ở vỏ form
-     * (`isFocused` → viền accent + `PulseGlow`) nên vòng quanh textarea là
-     * dư. Danh sách dưới đây là các ô nhập KHÔNG có dấu hiệu focus nào khác.
+     * (`isFocused` → viền accent + vùng nhập lớn lên theo chiều dọc, §14.4) nên
+     * vòng quanh textarea là dư. Danh sách dưới đây là các ô nhập KHÔNG có dấu
+     * hiệu focus nào khác.
      */
     const css = read(globalsCssPath);
     expect(css, 'globals.css phải giữ :focus-visible toàn cục').toMatch(
@@ -1124,7 +1180,8 @@ describe('DESIGN.md — Vyen design-system contract', () => {
      *
      * Ngoại lệ liệt kê TƯỜNG MINH, mỗi cái một lý do:
      *   composer.tsx        — focus hiện ở vỏ form (`isFocused` → viền accent
-     *                         + `PulseGlow`); vòng quanh textarea là dư.
+     *                         + vùng nhập lớn lên theo chiều dọc); vòng quanh
+     *                         textarea là dư.
      *   settings-dialog.tsx — container của modal, focus-trap đặt focus vào nó
      *                         lúc mở; vòng bao quanh cả modal là rác.
      * Ô nào khác mất focus ring thì đã là lỗi.
@@ -1334,7 +1391,7 @@ describe('DESIGN.md — Vyen design-system contract', () => {
       ['../components/staging-panel.tsx', new Set(['16'])],
       ['../components/workspace-checkpoints.tsx', new Set(['16'])],
     ]);
-    const SCALE_PX = new Set(['10', '11', '12', '13', '15', '20']);
+    const SCALE_PX = new Set(['10', '12', '13', '14', '16', '20']);
     const offenders: string[] = [];
     for (const rel of TOKENIZED_COMPONENTS) {
       const allowed = DISPLAY_SIZES.get(rel) ?? new Set<string>();
@@ -1351,6 +1408,226 @@ describe('DESIGN.md — Vyen design-system contract', () => {
       }
     }
     expect(offenders, `cỡ chữ lệch thang 6 bậc:\n  ${offenders.join('\n  ')}`).toEqual([]);
+  });
+
+  it('thang 6 bậc khớp bảng vai trò §13.2 (10/12/13/14/16/20) và hai recipe không lệch thang', () => {
+    /*
+     * Đợt cỡ chữ (DESIGN.md §13.2, 2026-10-06): nhãn/nút/menu 14px, hội thoại
+     * dài 16px, metadata 12px; `micro` 10 và `body` 13 giữ nguyên. Không test
+     * nào giữ con số này thì ai đó sửa một bậc là đổi diện mạo toàn app mà
+     * không gì đỏ — nên khóa cả thang lẫn hai recipe tự khai cỡ riêng trong
+     * globals.css (`.field-label`, `.field-hint`, `.claude-prose`).
+     */
+    const block = configBlock('fontSize: {', 'fontFamily: {');
+    const pxOf = (key: string) => {
+      const v = block.match(new RegExp(`^\\s*${key}:\\s*\\[\\s*'([\\d.]+)px'`, 'm'))?.[1];
+      expect(v, `fontSize.${key} phải là một số px`).toBeTruthy();
+      return Number(v);
+    };
+    expect(
+      { micro: pxOf('micro'), meta: pxOf('meta'), body: pxOf('body'), ui: pxOf('ui'), read: pxOf('read'), head: pxOf('head') },
+      'cỡ px của 6 bậc phải khớp bảng vai trò DESIGN.md §13.2',
+    ).toEqual({ micro: 10, meta: 12, body: 13, ui: 14, read: 16, head: 20 });
+
+    /* Thang phải tăng dần theo thứ tự vai trò — đảo bậc là chữ nhầm cấp. */
+    const order = ['micro', 'meta', 'body', 'ui', 'read', 'head'] as const;
+    for (let i = 1; i < order.length; i += 1) {
+      expect(pxOf(order[i]!), `fontSize.${order[i]} phải lớn hơn ${order[i - 1]}`).toBeGreaterThan(
+        pxOf(order[i - 1]!),
+      );
+    }
+
+    /* Recipe tự khai cỡ chứ không lấy từ thang — cùng một con số hay là đỏ. */
+    const css = read(globalsCssPath);
+    expect(
+      css.match(/\.field-label \{[^}]*font-size: ([\d.]+)rem;/)?.[1],
+      '.field-label phải 0.875rem = 14px (bậc ui)',
+    ).toBe('0.875');
+    expect(
+      css.match(/\.field-hint \{[^}]*font-size: ([\d.]+)rem;/)?.[1],
+      '.field-hint phải 0.75rem = 12px (bậc meta)',
+    ).toBe('0.75');
+    expect(
+      css.match(/\.claude-prose \{[^}]*font-size: (\d+)px;/)?.[1],
+      '.claude-prose phải 16px (bậc read — hội thoại dài)',
+    ).toBe('16');
+  });
+
+  it('turn header: tên việc + trạng thái nổi, phần phụ chìm, và KHÔNG có tick cho "xong"', () => {
+    /*
+     * DESIGN.md §15.1 điểm 4 + bảng §15.5 + §6 + §15.3 điểm 13.
+     *
+     * Bốn thứ dưới đây là hợp đồng, không phải thẩm mỹ:
+     *   1. Trạng thái hiện bằng CHỮ lấy từ bảng chốt — màu chỉ là lớp thứ hai.
+     *   2. MỌI trạng thái phải có icon riêng: icon thiếu thì màu trở thành tín
+     *      hiệu duy nhất, đúng thứ §6 cấm.
+     *   3. Nhãn "xong" KHÔNG được đi cùng dấu tick: §15.5 chốt "xong" chỉ nghĩa
+     *      agent đã dừng và báo hoàn tất, còn "đã xác minh" là trục bằng chứng
+     *      riêng — một tick ở đây là tự cấp chứng nhận mà không ai kiểm.
+     *   4. Không thêm viền/bóng để tạo phân cấp (§15.3 điểm 13): header là chữ
+     *      trên nền, giống thanh trạng thái.
+     *
+     * Phá gì thì đỏ: đổi `text-meta` của dòng phụ thành `text-ui` (phần phụ
+     * tranh chỗ với tên việc), thêm `border border-subtle`, hoặc đổi icon của
+     * `completed` sang một dấu tick.
+     */
+    const header = readRel('../components/chat/turn-header.tsx');
+
+    expect(header, 'trạng thái phải lấy nhãn từ bảng §15.5, không tự đặt chữ').toMatch(
+      /\{turn\.label\}/,
+    );
+    expect(header, 'phải hiện nghĩa đầy đủ của trạng thái trong title').toMatch(
+      /TURN_STATUS_MEANING\[turn\.status\]/,
+    );
+
+    /* Bảng icon: đọc từ chính source, không chép lại danh sách bên ngoài. */
+    const lookBlock = header.slice(header.indexOf('const STATUS_LOOK'), header.indexOf('export const TurnHeader'));
+    const statusKeys = [
+      'queued',
+      'running',
+      'waiting_approval',
+      'stopping',
+      'completed',
+      'blocked',
+      'failed',
+      'cancelled',
+    ];
+    for (const key of statusKeys) {
+      const entry = lookBlock.match(new RegExp(`\\b${key}:\\s*\\{([^}]*)\\}`))?.[1];
+      expect(entry, `thiếu mục icon cho trạng thái "${key}" của lượt`).toBeTruthy();
+      expect(entry!.match(/Icon:\s*(\w+)/)?.[1], `trạng thái "${key}" thiếu icon`).toBeTruthy();
+    }
+    const completedEntry = lookBlock.match(/completed:\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(
+      completedEntry,
+      'nhãn "xong" không được mang dấu tick (tick = tự cấp chứng nhận đã kiểm chứng)',
+    ).not.toMatch(/Check|Tick/);
+
+    /* Tên việc là thứ duy nhất được nổi: cỡ `ui`; phần phụ phải chìm hơn. */
+    expect(header, 'tên việc dùng bậc `ui`, không phải cỡ tự chế').toMatch(/text-ui/);
+    expect(header, 'phần phụ (giờ, số tool, số file) phải ở bậc `meta`').toMatch(
+      /text-meta text-tertiary/,
+    );
+    expect(header, 'tên việc phải còn đường đọc lại khi bị cắt: title = nguyên văn').toMatch(
+      /title=\{turn\.title\}/,
+    );
+
+    /* Phân cấp bằng vị trí và bậc chữ, KHÔNG bằng cách thêm viền/bóng. */
+    expect(header, 'header không thêm bóng — chiều sâu dành cho overlay').not.toMatch(/(?<![\w-])(?:lift-(?:sm|md|lg)|shadow-)/);
+    expect(header, 'header không thêm viền: phân cấp bằng vị trí và bậc chữ').not.toMatch(
+      /(?<![\w-])border(?:-[a-z]+)?(?![\w-])/,
+    );
+
+    /* Và nó phải được gắn vào ĐẦU lượt, phía TRÊN nội dung tin đầu tiên. */
+    const list = readRel('../components/chat/message-list.tsx');
+    const headerCall = list.indexOf('<TurnHeader');
+    const firstItem = list.indexOf('<ChatErrorBoundary');
+    expect(headerCall, 'message-list phải render <TurnHeader').toBeGreaterThan(-1);
+    expect(
+      headerCall < firstItem,
+      'turn header phải nằm TRÊN nội dung tin mở lượt — hạ nó xuống dưới là đỏ',
+    ).toBe(true);
+    expect(
+      list,
+      'header chỉ gắn vào tin ĐẦU của lượt, không lặp ở mọi dòng',
+    ).toMatch(/const first = turn\.messageIds\[0\];/);
+  });
+
+  it('nút gập lượt: nói được trạng thái mở/gập, và luật gập hỏi lib/turns chứ không đoán tại chỗ', () => {
+    /*
+     * DESIGN.md §14.2 điểm 3 + §15.1 điểm 3: phần thân lượt phải GẬP lại được, để
+     * đọc lướt lịch sử chỉ còn `tên việc · trạng thái`.
+     *
+     * Bốn điều là hợp đồng, không phải thẩm mỹ:
+     *   1. Nút phải nói trạng thái mở/gập bằng máy đọc được (`aria-expanded`) và
+     *      bằng CHỮ tiếng Việt — chevron là tín hiệu thứ hai, không thay chữ (§6).
+     *   2. Gập rồi phải NÓI RA (`đã gập`): một lượt đã gập trông giống hệt một
+     *      lượt rỗng, và người đọc sẽ tin là lượt không có gì.
+     *   3. Luật gập (`isFoldableTurn` / `foldedRowIds`) sống ở `lib/turns.ts`; màn
+     *      hình không tự đoán trạng thái. Lượt đang chạy / đang chờ quyền không
+     *      được gập (§15.1 điểm 3).
+     *   4. Không thêm viền/nền cho nút (§15.3 điểm 13).
+     *
+     * Phá gì thì đỏ: bỏ `aria-expanded`, bỏ chữ "đã gập", hoặc để
+     * `message-list.tsx` tự so `turn.status === 'completed'` thay vì hỏi lib.
+     */
+    const header = readRel('../components/chat/turn-header.tsx');
+    const list = readRel('../components/chat/message-list.tsx');
+
+    expect(header, 'nút gập phải công bố trạng thái mở/gập cho máy đọc').toMatch(
+      /aria-expanded=\{!collapsed\}/,
+    );
+    expect(header, 'nhãn phải là tiếng Việt và nói rõ đang gập hay mở').toMatch(
+      /collapsed \? `Mở lượt: \$\{turn\.title\}` : `Gập lượt: \$\{turn\.title\}`/,
+    );
+    expect(header, 'chevron là lớp thứ hai, không thay chữ').toMatch(
+      /<ChevronRight size=\{14\} \/>/,
+    );
+    expect(header, 'nút gập không được thêm viền — phân cấp bằng viền là §15.3 điểm 13 cấm').not.toMatch(
+      /border/,
+    );
+    expect(header, 'gập rồi phải nói ra, đừng để lượt trông như rỗng').toMatch(
+      /stats\.push\('đã gập'\)/,
+    );
+
+    expect(list, 'luật gập phải hỏi lib/turns, không tự đoán trạng thái').toMatch(
+      /isFoldableTurn\(turn\.status\)/,
+    );
+    expect(list, 'danh sách phải lọc row bị ẩn bằng đúng luật dùng chung').toMatch(
+      /foldedRowIds\(turns, collapsedTurnIds\)/,
+    );
+    expect(
+      list,
+      'mọi phép tính vẽ phải đọc renderedMessages (đã bỏ lượt gập) — đọc visibleMessages là lệch thứ tự',
+    ).not.toMatch(/visibleMessages\[virtualRow\.index\]/);
+  });
+
+  it('thẻ tool: đoạn phase có tên, vạch trạng thái đủ BỐN trạng thái, phạm vi nằm ở thẻ mở', () => {
+    /*
+     * DESIGN.md §14.3 lớp 1/4/5 + §15.2 điểm 6/8.
+     *
+     * Ba điều là hợp đồng:
+     *   1. Nhóm theo phase phải hiện TÊN nhóm bằng chữ (lấy từ bảng chốt của
+     *      `lib/tool-phases.ts`), không phải một dải màu — §15.3 điểm 13 cấm
+     *      sửa phân cấp bằng viền/nền, nên dòng tiêu đề đoạn không được có viền,
+     *      bóng hay nền.
+     *   2. §14.3 lớp 4: đường trạng thái bên trái phải có ở CẢ BỐN trạng thái
+     *      (đang chạy / xong / lỗi / bị bỏ dở). Trước đây chỉ lỗi và bỏ dở có
+     *      vạch, nên mắt phải đọc chữ ở cuối dòng mới phân biệt được hai thứ rất
+     *      khác nhau.
+     *   3. §14.3 lớp 1: phạm vi (project / file / workspace) thuộc THẺ, không
+     *      chen vào dòng gọn — dòng gọn đã có tham số chỉ thẳng tệp/lệnh.
+     *
+     * Phá gì thì đỏ: bỏ vạch của trạng thái `xong`, đổi tên đoạn thành chữ tự
+     * chế, hoặc thêm `border` cho dòng tiêu đề đoạn.
+     */
+    const trace = readRel('../components/chat/tool-trace.tsx');
+
+    const band = trace.slice(
+      trace.indexOf('const ToolPhaseBand'),
+      trace.indexOf('/** Chip là ĐƯỜNG MỘT'),
+    );
+    expect(band, 'không tìm thấy thành phần dòng tiêu đề đoạn phase').not.toBe('');
+    expect(band, 'tên đoạn phải lấy từ bảng chốt, không tự đặt chữ').toMatch(/\{group\.label\}/);
+    expect(band, 'số lần gọi là thông tin phụ của đoạn').toMatch(/\{group\.count\} thao tác/);
+    expect(band, 'đoạn có lỗi phải nói ra, không chỉ khác màu').toMatch(
+      /group\.errorCount > 0/,
+    );
+    expect(
+      band,
+      'dòng tiêu đề đoạn không được thêm viền/nền/bóng — phân cấp bằng vị trí và thứ tự đọc',
+    ).not.toMatch(/border|shadow-|lift-/);
+
+    for (const rail of ['border-l-accent', 'border-l-danger', 'border-l-warning', 'border-l-subtle']) {
+      expect(trace, `thiếu vạch trạng thái ${rail} (§14.3 lớp 4)`).toContain(rail);
+    }
+
+    expect(trace, 'phạm vi phải đọc từ lib/tool-phases, không đoán tại chỗ').toMatch(
+      /TOOL_SCOPE_LABEL\[scope\]/,
+    );
+    expect(trace, 'đoạn phase phải cắt từ chính mảng sự kiện đang vẽ').toMatch(
+      /groupByPhase\(events\)/,
+    );
   });
 
   it('app là dark-only: không có biến thể dark: nào trong component', () => {

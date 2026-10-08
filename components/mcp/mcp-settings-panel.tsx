@@ -296,7 +296,7 @@ export function McpSettingsPanel() {
 
   if (!available) {
     return (
-      <div className="space-y-2 border-l-2 border-subtle pl-3 font-mono">
+      <div className="space-y-2 border-l-2 border-subtle pl-3 font-sans">
         <h3 className="text-read font-semibold text-primary">MCP server</h3>
         <p className="text-meta leading-relaxed text-tertiary">
           MCP chỉ chạy trong <span className="font-medium text-primary">Vyen desktop</span> (Electron) — nơi app
@@ -307,7 +307,7 @@ export function McpSettingsPanel() {
   }
 
   return (
-    <div className="space-y-3 border-l-2 border-subtle pl-3 font-mono">
+    <div className="space-y-3 border-l-2 border-subtle pl-3 font-sans">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-read font-semibold text-primary">MCP server</h3>
         <button type="button" onClick={() => void refresh()} className="btn-secondary px-2 py-1">
@@ -346,15 +346,15 @@ export function McpSettingsPanel() {
                     <Server className="h-3.5 w-3.5 flex-shrink-0 text-tertiary" aria-hidden="true" />
                     <span className="truncate text-ui font-medium text-primary">{server.name}</span>
                     <StatusBadge status={server.status} />
-                    <span className="font-mono text-micro text-tertiary">{server.toolCount} công cụ</span>
+                    <span className="font-sans text-micro text-tertiary">{server.toolCount} công cụ</span>
                   </div>
                   <div className="mt-1 space-y-0.5">
-                    <p className="truncate font-mono text-micro text-tertiary">
+                    <p className="truncate font-sans text-micro text-tertiary">
                       <code>{server.id}</code>
                       {server.serverVersion ? ` · ${server.serverVersion}` : ''}
                     </p>
                     {server.error && (
-                      <p className="flex items-start gap-1 font-mono text-micro text-danger">
+                      <p className="flex items-start gap-1 font-sans text-micro text-danger">
                         <TriangleAlert className="mt-0.5 h-3 w-3 flex-shrink-0" aria-hidden="true" />
                         <span className="min-w-0 break-words">{server.error}</span>
                       </p>
@@ -374,7 +374,7 @@ export function McpSettingsPanel() {
                         ? 'Chế độ proxy: model tìm tool qua mcp__search thay vì nhận toàn bộ schema. Bấm để trả về chế độ đầy đủ.'
                         : 'Bật chế độ proxy: schema không nằm trong ngữ cảnh mỗi request — model tìm tool qua mcp__search (thêm một lượt gọi trung gian).'
                     }
-                    className={`rounded-full px-2 py-0.5 font-mono text-micro font-medium disabled:opacity-50 ${
+                    className={`rounded-full px-2 py-0.5 font-sans text-micro font-medium disabled:opacity-50 ${
                       server.exposeMode === 'proxy'
                         ? 'bg-accent font-semibold text-on-fill'
                         : 'border border-default bg-raised text-tertiary hover:bg-overlay'

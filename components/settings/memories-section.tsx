@@ -126,7 +126,7 @@ export function MemoriesSection() {
           <h5 className="flex items-center gap-1.5 text-ui font-semibold text-primary">
             <Clock size={13} className="text-warning" />
             <span>Đang chờ duyệt</span>
-            <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-mono text-micro tabular-nums text-warning">
+            <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-sans text-micro tabular-nums text-warning">
               {(candidates ?? []).length}
             </span>
           </h5>
@@ -146,16 +146,16 @@ export function MemoriesSection() {
                 <div className="flex items-center justify-between gap-2 border-b border-subtle pb-1.5">
                   <div className="flex items-center gap-1.5">
                     <KindGlyph kind={cand.kind} />
-                    <span className="font-mono text-micro font-semibold uppercase tracking-wider text-primary">
+                    <span className="font-sans text-micro font-semibold uppercase tracking-wider text-primary">
                       {cand.kind}
                     </span>
                     <span className="text-tertiary" aria-hidden="true">•</span>
-                    <span className="font-mono text-micro text-tertiary">
+                    <span className="font-sans text-micro text-tertiary">
                       scope: {cand.scope.kind} ({cand.scope.ref})
                     </span>
                   </div>
                   {cand.reviewDueAt && (
-                    <span className="font-mono text-micro text-warning">
+                    <span className="font-sans text-micro text-warning">
                       Hạn xét: {new Date(cand.reviewDueAt).toLocaleDateString()}
                     </span>
                   )}
@@ -237,7 +237,7 @@ export function MemoriesSection() {
         <h5 className="flex items-center gap-1.5 text-ui font-semibold text-primary">
           <Sparkles size={13} className="text-accent" />
           <span>Ký ức đã duyệt</span>
-          <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-micro tabular-nums text-accent">
+          <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-sans text-micro tabular-nums text-accent">
             {(records ?? []).length}
           </span>
         </h5>
@@ -257,7 +257,7 @@ export function MemoriesSection() {
                   <div className="flex items-center gap-1.5">
                     <KindGlyph kind={rec.kind} />
                     <span
-                      className={`rounded-full border px-2 py-0.5 font-mono text-micro font-semibold uppercase tracking-wider ${
+                      className={`rounded-full border px-2 py-0.5 font-sans text-micro font-semibold uppercase tracking-wider ${
                         rec.status === 'active'
                           ? 'border-success/40 bg-success/10 text-success'
                           : rec.status === 'reference'
@@ -269,18 +269,18 @@ export function MemoriesSection() {
                     >
                       {rec.status}
                     </span>
-                    <span className="font-mono text-micro tabular-nums text-tertiary">
+                    <span className="font-sans text-micro tabular-nums text-tertiary">
                       confirm: {rec.confirmCount}
                     </span>
                     {rec.reviewDueAt && (
-                      <span className="font-mono text-micro text-tertiary">
+                      <span className="font-sans text-micro text-tertiary">
                         • hạn: {new Date(rec.reviewDueAt).toLocaleDateString()}
                       </span>
                     )}
                   </div>
                   <div className="leading-relaxed text-primary">{rec.text}</div>
                   {rec.reason && (
-                    <div className="font-mono text-micro italic text-danger">
+                    <div className="font-sans text-micro italic text-danger">
                       Lý do: {rec.reason}
                     </div>
                   )}

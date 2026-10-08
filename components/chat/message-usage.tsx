@@ -17,7 +17,7 @@ export function MessageUsage({ annotations }: { annotations?: unknown }) {
   if (!text) return null;
   return (
     <p
-      className="mt-1 font-mono text-micro tabular-nums text-text-muted"
+      className="mt-1 font-sans text-micro tabular-nums text-text-muted"
       title={
         stats.estimated
           ? 'Ước lượng: gateway không báo token ra, số ↓ suy từ độ dài trả lời'

@@ -54,15 +54,15 @@ const bubbleHelper = source.slice(
 );
 
 describe('message-item — bubble lên đầu, tool trace dưới, suy luận ở đáy', () => {
-  it('ToolTrace render SAU bubble, không phải trên', () => {
+  it('ToolTrace render SAU khối lời, không phải trên', () => {
     const trace = assistant.indexOf('<ToolTrace');
-    const bubble = assistant.indexOf('bubble-bot');
-    expect(bubble, 'không tìm thấy bubble-bot trong nhánh assistant').toBeGreaterThan(-1);
+    const reply = assistant.indexOf('data-testid="reply-text"');
+    expect(reply, 'không tìm thấy khối lời (reply-text) trong nhánh assistant').toBeGreaterThan(-1);
     expect(trace, 'không tìm thấy call site <ToolTrace trong nhánh assistant').toBeGreaterThan(-1);
     expect(
       trace,
-      'ToolTrace phải nằm sau bubble: dời nó lên trên khối bubble-bot là ĐỎ',
-    ).toBeGreaterThan(bubble);
+      'ToolTrace phải nằm sau khối lời: dời nó lên trên reply-text là ĐỎ',
+    ).toBeGreaterThan(reply);
   });
 
   it('ThinkingBlock render SAU khối usage/evidence', () => {
@@ -79,18 +79,27 @@ describe('message-item — bubble lên đầu, tool trace dưới, suy luận �
     );
   });
 
-  it('khối bọc tin nhắn vẫn đúng 2 hàng và không tự padding ngang', () => {
+  it('hai nhánh vẫn mỗi nhánh một hàng, và không hàng nào tự padding ngang', () => {
     /*
      * Nhặt lại luật của tests/design-system.test.ts (gutter ngang). Lặp ở đây
-     * để lỗi trỏ thẳng về message-item.tsx thay vì phải tra 1043 dòng test
-     * hợp đồng thiết kế. Đổi `<div className="group relative w-full py-N">`
-     * thành một hàng thứ ba, hoặc thêm px- vào hai hàng đó, là ĐỎ.
+     * để lỗi trỏ thẳng về message-item.tsx thay vì phải tra cả nghìn dòng test
+     * hợp đồng thiết kế.
+     *
+     * Từ đợt P1, nhánh assistant lấy hàng từ hàm `rowSpacing(runPosition)` chứ
+     * không viết thẳng trong JSX (nhịp khoảng cách phải là MỘT hàm — §15.1
+     * điểm 5), nên phép đếm ở đây bám cả hai dạng. Thêm hàng thứ ba, hoặc nhét
+     * `px-` vào bất kỳ hàng nào, là ĐỎ.
      */
-    const rows = [...source.matchAll(/<div className="(group relative w-full py-\d+[^"]*)"/g)].map(
+    const literalRows = [...source.matchAll(/<div className="(group relative w-full py-\d+)">/g)].map(
       (m) => m[1],
     );
-    expect(rows, `phải có đúng 2 hàng tin nhắn (user + assistant), thấy ${rows.length}`).toHaveLength(2);
-    for (const row of rows) {
+    const fnRows = [...source.matchAll(/return '(group relative w-full [^']+)';/g)].map((m) => m[1]);
+    const assistantRow = source.match(/className=\{(rowSpacing\(runPosition\))\}/);
+
+    expect(literalRows, 'nhánh user phải có đúng 1 hàng').toHaveLength(1);
+    expect(assistantRow, 'nhánh assistant phải lấy hàng từ rowSpacing(runPosition)').toBeTruthy();
+    expect(fnRows.length, 'rowSpacing phải khai hàng cho cả ba vị trí trong khối').toBe(3);
+    for (const row of [...literalRows, ...fnRows]) {
       expect(row, `hàng tin nhắn không được tự padding ngang: ${row}`).not.toMatch(/(?<![\w-])px-/);
     }
   });
@@ -117,7 +126,7 @@ describe('message-item — bubble lên đầu, tool trace dưới, suy luận �
      * buildTimeline vào trong nhánh user là ĐỎ.
      */
     expect(userBranch.length, 'không cắt được nhánh user').toBeGreaterThan(100);
-    for (const token of ['ToolTrace', 'ThinkingBlock', 'bubble-bot', 'buildTimeline', 'bubbleOf']) {
+    for (const token of ['ToolTrace', 'ThinkingBlock', 'reply-text', 'buildTimeline', 'bubbleOf']) {
       expect(userBranch, `nhánh user không được chứa ${token}`).not.toContain(token);
     }
   });

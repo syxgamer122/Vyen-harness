@@ -281,7 +281,7 @@ export function ModelSelector({
         }`}
       >
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 truncate text-ui font-mono">{m.label}</span>
+          <span className="min-w-0 truncate text-ui font-sans">{m.label}</span>
           <span className="flex flex-none items-center gap-1 text-tertiary" aria-hidden="true">
             {m.caps?.includes('vision') && <Eye size={12} className="flex-none" />}
             {m.caps?.includes('pdf') && <FileText size={12} className="flex-none" />}
@@ -357,7 +357,7 @@ export function ModelSelector({
         title={triggerTitle}
         id="model-selector-trigger"
         data-testid="model-selector-trigger"
-        className="relative flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-subtle bg-raised px-3 font-mono text-ui font-medium text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-default hover:bg-overlay disabled:opacity-40"
+        className="relative flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-subtle bg-raised px-3 font-sans text-ui font-medium text-primary transition-colors after:absolute after:-inset-[6px] after:content-[''] hover:border-default hover:bg-overlay disabled:opacity-40"
       >
         <span className="min-w-0 max-w-[30vw] truncate sm:max-w-[160px]">{selectionLabel}</span>
         <ChevronDown size={12} className="flex-none text-tertiary" aria-hidden="true" />
@@ -392,7 +392,7 @@ export function ModelSelector({
                   }}
                   aria-label="Tìm model"
                   placeholder="Tìm model: tên hoặc id"
-                  className="w-full bg-transparent font-mono text-ui text-primary placeholder:text-tertiary"
+                  className="w-full bg-transparent font-sans text-ui text-primary placeholder:text-tertiary"
                 />
               </div>
               <span className="flex-none text-micro tabular-nums text-tertiary">
@@ -407,7 +407,7 @@ export function ModelSelector({
               tabIndex={-1}
               aria-label="Danh sách model"
               aria-activedescendant={`${listId}-opt-${cursor}`}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 outline-none font-mono"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5 outline-none font-sans"
             >
               {ordered.length === 0 && (
                 <div className="flex flex-col items-center gap-2 px-2.5 py-6 text-center">

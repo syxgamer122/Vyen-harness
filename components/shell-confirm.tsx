@@ -60,7 +60,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
        * tách khỏi nền (cùng cách làm với diff-confirm).
        */}
       <div
-        className={`relative mb-2 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden lift-lg rounded-2xl border bg-overlay font-mono shadow-lift-lg animate-pop-in sm:mb-0 ${
+        className={`relative mb-2 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden lift-lg rounded-2xl border bg-overlay font-sans shadow-lift-lg animate-pop-in sm:mb-0 ${
           isDestructive ? 'border-danger' : 'border-default'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -95,7 +95,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
         {/* Terminal Body */}
         <div className="space-y-3 bg-base px-4 py-4 sm:px-5 sm:py-5">
           {state.cwd && (
-            <div className="flex items-center gap-1.5 font-mono text-meta text-tertiary">
+            <div className="flex items-center gap-1.5 font-sans text-meta text-tertiary">
               <span>cwd:</span>
               <span className="truncate text-secondary">{state.cwd || '.'}</span>
             </div>
@@ -128,12 +128,14 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
 
         {/* Action bar */}
         <div className="flex items-center justify-between gap-3 border-t border-subtle bg-raised px-4 py-3 sm:px-5">
-          <div className="hidden items-center gap-2 font-mono text-meta text-tertiary sm:flex">
+          {/* Nhãn phím tắt cùng ngôn ngữ với hộp thoại — xem diff-confirm.tsx và
+              DESIGN.md §15.4 điểm 17 (trộn tiếng Anh ngay chỗ phải quyết định). */}
+          <div className="hidden items-center gap-2 font-sans text-meta text-tertiary sm:flex">
             <span className="flex items-center gap-1">
               <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Esc
               </kbd>
-              <span>reject</span>
+              <span>từ chối</span>
             </span>
             <span className="text-disabled" aria-hidden="true">
               •
@@ -142,7 +144,7 @@ export function ShellConfirm({ state, onClose }: { state: ShellConfirmState | nu
               <kbd className="rounded-full border border-subtle bg-sunken px-2 py-0.5 text-micro text-secondary">
                 Tab
               </kbd>
-              <span>then ↵ on the chosen button</span>
+              <span>rồi ↵ ở nút đang chọn</span>
             </span>
           </div>
 

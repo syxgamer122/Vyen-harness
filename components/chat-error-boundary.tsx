@@ -70,7 +70,7 @@ export class ChatErrorBoundary extends Component<
       return (
         <div
           role="alert"
-          className="mx-auto my-4 max-w-xl lift-sm rounded-lg border border-danger/40 bg-raised p-5 text-xs font-mono text-text-primary"
+          className="mx-auto my-4 max-w-xl lift-sm rounded-lg border border-danger/40 bg-raised p-5 text-xs font-sans text-text-primary"
         >
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-error" />

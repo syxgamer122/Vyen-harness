@@ -285,7 +285,7 @@ export function SchedulerPanel() {
   };
 
   return (
-    <div className="space-y-4 font-mono text-ui">
+    <div className="space-y-4 font-sans text-ui">
       <div className="flex items-center justify-between border-b border-subtle pb-3">
         <div>
           <h3 className="text-read font-semibold text-primary">Lịch chạy Recipe (Scheduler)</h3>

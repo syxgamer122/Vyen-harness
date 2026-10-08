@@ -83,10 +83,10 @@ export function CustomSlashCommandsSection() {
               key={cmd.name}
               className="flex flex-col gap-0.5 border border-subtle bg-raised p-2"
             >
-              <div className="flex items-center gap-1.5 font-mono font-medium text-accent">
+              <div className="flex items-center gap-1.5 font-sans font-medium text-accent">
                 <span>/{cmd.name}</span>
                 {cmd.aliases && cmd.aliases.length > 0 && (
-                  <span className="font-mono text-micro font-normal text-disabled">
+                  <span className="font-sans text-micro font-normal text-disabled">
                     ({cmd.aliases.map((a) => `/${a}`).join(', ')})
                   </span>
                 )}

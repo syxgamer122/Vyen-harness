@@ -79,7 +79,7 @@ export function AgentMemorySection() {
   };
 
   return (
-    <div className="space-y-3 font-mono">
+    <div className="space-y-3 font-sans">
       <div>
         <div className="flex items-center justify-between gap-2">
           <h4 className="field-label text-read">Sổ tay có cấu trúc (bạn tự viết)</h4>
@@ -166,7 +166,7 @@ export function AgentMemorySection() {
         {filtered.map((r) => (
           <li key={r.id} className="border border-subtle bg-surface px-2.5 py-2 text-ui">
             <div className="flex items-start gap-2">
-              <span className="flex-none font-mono text-meta text-tertiary">
+              <span className="flex-none font-sans text-meta text-tertiary">
                 {r.category}
                 <span className="ml-1 text-disabled">{r.scope === 'global' ? '· toàn cục' : '· local'}</span>
               </span>
@@ -183,7 +183,7 @@ export function AgentMemorySection() {
                   <span className="block whitespace-pre-wrap text-primary">{r.data}</span>
                 )}
                 {r.tags.length > 0 && (
-                  <span className="mt-0.5 block font-mono text-meta text-disabled">{r.tags.join(', ')}</span>
+                  <span className="mt-0.5 block font-sans text-meta text-disabled">{r.tags.join(', ')}</span>
                 )}
               </span>
               <span className="flex flex-none items-center gap-1">

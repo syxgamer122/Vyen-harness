@@ -112,7 +112,7 @@ export function McpToolApprovalDialog() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="mcp-approval-title"
-        className="lift-lg relative w-full max-w-lg overflow-hidden rounded-2xl border border-default bg-overlay font-mono text-primary shadow-lift-lg"
+        className="lift-lg relative w-full max-w-lg overflow-hidden rounded-2xl border border-default bg-overlay font-sans text-primary shadow-lift-lg"
       >
         <div className="flex items-start gap-3 border-b border-subtle bg-raised px-4 py-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />

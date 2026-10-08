@@ -56,7 +56,7 @@
 
     /* NHẤN & TRẠNG THÁI — một bảng màu duy nhất cho toàn ứng dụng. */
     --accent: 42 115 96; /* nhấn chủ đạo: link, con trỏ, viền focus — 5.6:1, đạt AA */
-    --accent-dim: 127 184 166; /* nhấn bị tắt, cột biểu đồ — 4.0:1 (đạt 3:1 cho vật thể đồ hoạ) */
+    --accent-dim: 81 154 133; /* nhấn bị tắt, cột biểu đồ — 3.33:1 trên trắng, 3.05:1 trên #f5f5f5 (đạt 3:1 của WCAG 1.4.11) */
     --accent-soft: 240 244 243; /* NỀN nhấn nhạt — tag active, bubble, hover mềm */
     /*
      * CHỮ TRÊN NỀN BÃO HÒA. Không phải "chữ thứ 5 theo độ sáng" — nó là
@@ -330,11 +330,17 @@ html[data-animations='off'] *::after {
 }
 
 /*
- * Nhãn TRƯỜNG (form label) — chữ thường, mono, không giãn chữ.
+ * NHÃN TRƯỜNG (form label) — chữ người đọc, KHÔNG phải chữ máy.
+ *
+ * Trước đây khối này là mono, cùng nhãn nút và hàng menu: giao diện đọc như
+ * một cửa sổ terminal. Từ đợt typography (DESIGN.md §3) chỉ chữ MÁY mới giữ
+ * mono — code, lệnh, đường dẫn, ID, payload — còn nhãn, nút, điều hướng và
+ * metadata là Inter. Nhãn trường là chữ để ĐỌC và để quyết định, nên thuộc
+ * nhóm thứ hai.
  */
 .field-label {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.8125rem; /* 13px */
+  font-family: var(--font-sans), 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem; /* 14px — bậc `ui`, bảng vai trò DESIGN.md §13.2 */
   font-weight: 500;
   color: rgb(var(--text-primary));
   letter-spacing: 0;
@@ -342,7 +348,7 @@ html[data-animations='off'] *::after {
 
 /* Mô tả phụ dưới nhãn trường — nhỏ, mờ, xuống dòng thoáng. */
 .field-hint {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-sans), 'Inter', ui-sans-serif, system-ui, sans-serif;
   font-size: 0.75rem; /* 12px */
   line-height: 1.5;
   color: rgb(var(--text-tertiary));
@@ -389,8 +395,9 @@ html[data-animations='off'] *::after {
     @apply lift-md rounded-xl border border-subtle bg-surface;
   }
 
+  /* Hàng menu là ĐIỀU HƯỚNG, không phải chữ máy — Inter, xem DESIGN.md §3. */
   .menu-item {
-    @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-ui font-mono
+    @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-ui font-sans
       text-primary transition-colors duration-150 hover:bg-raised hover:text-primary;
   }
   .menu-item-danger {
@@ -413,12 +420,12 @@ html[data-animations='off'] *::after {
    */
   .field {
     @apply well w-full rounded-lg border border-default bg-surface px-3 py-2
-      text-sm font-mono text-primary transition-colors duration-150
+      text-sm font-sans text-primary transition-colors duration-150
       placeholder:text-tertiary focus:border-accent;
   }
   .field-sm {
     @apply well w-full rounded-lg border border-default bg-surface px-2.5 py-1.5
-      text-ui font-mono text-primary transition-colors duration-150
+      text-ui font-sans text-primary transition-colors duration-150
       placeholder:text-tertiary focus:border-accent;
   }
 
@@ -443,8 +450,9 @@ html[data-animations='off'] *::after {
       disabled:pointer-events-none disabled:opacity-50;
   }
 
+  /* Thông báo là CHỮ ĐỌC (Inter) — chỉ payload/đường dẫn bên trong mới mono. */
   .notice {
-    @apply rounded-lg border border-subtle px-3.5 py-2.5 text-ui font-mono leading-relaxed;
+    @apply rounded-lg border border-subtle px-3.5 py-2.5 text-ui font-sans leading-relaxed;
   }
   .notice-warn {
     @apply notice border-warning/40 bg-raised text-warning;
@@ -507,32 +515,28 @@ html[data-animations='off'] *::after {
   }
 
   /* ---------------------------------------------------------------- */
-  /* BONG BÓT — phân biệt hai bên bằng NỀN, không bằng đuôi.            */
+  /* LỜI NÓI — hai bên, hai CÁCH TRÌNH BÀY (DESIGN.md §15.1 điểm 2)     */
   /* ---------------------------------------------------------------- */
   /*
-   * Đuôi được vẽ bằng MỘT pseudo-element hình vuông xoay 45°: nửa nằm trong
-   * bong bóng (nên không thấy, vì nó cùng nền), nửa lộ ra thành cái đuôi.
-   * Không dùng SVG hay `clip-path` — một khối vuông xoay là cách gọn nhất và
-   * không thêm một phần tử nào vào DOM.
+   * Đợt P1 đổi vai trò của khung: bóng và viền dành cho thứ cần TÁCH khỏi
+   * mạch đọc — code, diff, bằng chứng, yêu cầu quyết định — không dành cho lời
+   * nói. Trợ lý vì vậy KHÔNG còn khung nào: chữ nằm trực tiếp trên nền hội
+   * thoại. Người dùng chỉ còn một khối compact nền nhấn nhạt.
    *
-   * VÌ SAO KHÔNG DÙNG `overflow: hidden` ở đây (đã thử, đã bỏ):
-   * nó cắt luôn phần đuôi lộ ra ngoài — đuôi biến thành một vết nhỏ nằm
-   * trong hộp thay vì một cái đuôi chỉ. Ô nhập của người dùng trong bubble
-   * (`textarea`) có `resize` nên không tràn ngang, và các khối khác bên
-   * trong đều tự bo góc; nên không cần cắt.
-   *
-   * Đuôi truyện tranh (pseudo-element vuông xoay 45°) đã bị gỡ khỏi hệ: nó là
-   * trang trí thuần, mép bo góc đã mang hết thông tin. Dấu hiệu hướng giờ đến
-   * từ MÀU NỀN (user nền nhấn nhạt, bot nền trắng) và CĂN LỀ trái/phải.
+   * Vì sao `.bubble-*` bị gỡ thay vì để nguyên rồi bỏ gọi: recipe không còn
+   * ai gọi là class CHẾT — nó vẫn sinh CSS, vẫn trông như có tác dụng, và lần
+   * sau có người "sửa" nó mà không biết nó không vẽ ra gì. Đây là bẫy "class
+   * chết" mà tests/design-system.test.ts đã gọi tên.
    */
-  .bubble {
-    @apply relative rounded-2xl border border-subtle;
-  }
-  .bubble-user {
-    @apply bubble border-transparent bg-accent-soft;
-  }
-  .bubble-bot {
-    @apply bubble bg-surface;
+  /*
+   * Khối của NGƯỜI DÙNG — compact, bo 12px (`xl`), nền nhấn nhạt, KHÔNG bóng.
+   *
+   * `xl` 12px thay `2xl` 16px là ĐỔI VAI TRÒ của §4.1: 16px từng được gán cho
+   * "bubble, khung modal, vỏ composer"; nay nó chỉ còn thuộc khung modal và vỏ
+   * composer (khối lớn), còn ghi chú của người dùng là khối nội dung nhỏ.
+   */
+  .user-note {
+    @apply relative rounded-xl border border-transparent bg-accent-soft px-3.5 py-2.5;
   }
   /*
    * KHÔNG còn đuôi bong bóng (pseudo-element xoay 45°).
@@ -540,9 +544,9 @@ html[data-animations='off'] *::after {
    * Đuôi là trang trí thuần: nó không mang thông tin nào mà mép bo góc chưa
    * mang, và mỗi đuôi là thêm một đường viền phải vẽ tay + một phần tử giả.
    * Người dùng đọc hội thoại theo vị trí trái/phải, nên bỏ đuôi không mất
-   * tín hiệu nào. Phía nào là câu trả lời, phía nào là câu hỏi, đã đọc ra
-   * từ màu nền (`bubble-user` nền nhấn nhạt, `bubble-bot` nền trắng) và từ
-   * căn lề trái/phải của hàng.
+   * tín hiệu nào. Phía nào là câu trả lời, phía nào là câu hỏi, đọc ra từ
+   * NỀN (`.user-note` nền nhấn nhạt so với chữ trợ lý nằm trực tiếp trên nền
+   * hội thoại), từ avatar ở tin MỞ khối, và từ căn lề trái/phải của hàng.
    */
 }
 
@@ -567,7 +571,7 @@ html[data-animations='off'] *::after {
 /* ------------------------------------------------------------------ */
 
 .claude-prose {
-  font-size: 15px;
+  font-size: 16px; /* bậc `read` — hội thoại dài 16px theo DESIGN.md §13.2 */
   line-height: 1.75;
   color: rgb(var(--text-primary));
   word-break: break-word;
