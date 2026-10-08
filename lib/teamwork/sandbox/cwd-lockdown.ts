@@ -4,6 +4,7 @@
  */
 
 import path from 'node:path';
+import { isWithinRoot, resolveWithin } from '@/lib/path-guard.cjs';
 
 export class CwdLockdownViolationError extends Error {
   public readonly workspaceRoot: string;
@@ -43,16 +44,21 @@ export class CwdGuard {
       }
     }
 
-    // Normalize Windows drive letters for comparison
-    const normRoot = process.platform === 'win32' ? rootAbs.toLowerCase() : rootAbs;
-    const normCwd = process.platform === 'win32' ? resolvedCwd.toLowerCase() : resolvedCwd;
+    // 1. Kiểm tra lexical: so theo path separator thật (một `rel.startsWith('..')`
+    //    thuần cũng từ chối nhầm sibling trong workspace tên bắt đầu bằng dấu chấm,
+    //    ví dụ `<root>/..foo`).
+    if (!isWithinRoot(rootAbs, resolvedCwd)) {
+      throw new CwdLockdownViolationError(rootAbs, targetCwd ?? resolvedCwd);
+    }
 
-    const rel = path.relative(normRoot, normCwd);
-    // Compare against real path separators: a plain `rel.startsWith('..')` also rejects
-    // legitimate in-workspace siblings whose name begins with dots (e.g. `<root>/..foo`).
-    const isEscaping = rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
-
-    if (isEscaping) {
+    // 2. Canonical realpath jail: symlink nằm trong workspace nhưng trỏ ra ngoài
+    //    phải bị chặn (bản cũ chỉ so lexical nên lọt). Dùng chung `resolveWithin`
+    //    với mọi đường fs/shell khác — đồng thời chặn luôn .git/** và
+    //    node_modules/** theo chính sách hiện hành.
+    const rel = path.relative(rootAbs, resolvedCwd) || '.';
+    try {
+      resolveWithin(rootAbs, rel);
+    } catch {
       throw new CwdLockdownViolationError(rootAbs, targetCwd ?? resolvedCwd);
     }
 

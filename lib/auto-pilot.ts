@@ -18,7 +18,7 @@ import { TOOL_CATEGORY_MAP } from '@/lib/store';
 import { getEffectiveToolPermission, isDynamicMcpTool } from '@/lib/tool-permissions';
 import { evaluateToolcallRules, type ToolcallRule } from '@/lib/toolcall-rules';
 import { isProtectedPath, validateSafeRelativePath } from '@/lib/path-utils';
-import { compileShellCommand } from '@/lib/shell-policy.cjs';
+import { compileShellCommand, isGitAutoApprovable } from '@/lib/shell-policy.cjs';
 import {
   isTurnTainted,
   isEgressTool,
@@ -183,9 +183,11 @@ export function isSafeCommand(command: string): boolean {
   if (isRunnerCommand(trimmed)) return false;
   try {
     const compiled = compileShellCommand(trimmed);
-    if (compiled.bin === 'git' && compiled.args.length > 0) {
-      const sub = compiled.args[0].toLowerCase();
-      if (sub === 'commit' || sub === 'add') return false;
+    /* Git: allowlist cờ theo từng subcommand. `git branch -D`, `git remote add`,
+       `git tag <name>`, `git stash push`, `git reflog expire`… không còn tự
+       duyệt; chỉ dạng chỉ-đọc mới qua (xem `isGitAutoApprovable`). */
+    if (compiled.bin === 'git' && !isGitAutoApprovable(compiled.args)) {
+      return false;
     }
     return SAFE_COMMAND_PATTERNS.some((p) => p.test(trimmed));
   } catch {

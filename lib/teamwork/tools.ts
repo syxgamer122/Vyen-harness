@@ -35,6 +35,7 @@ import {
   isAlwaysBlocked,
   isSafeCommand,
 } from '@/lib/auto-pilot';
+import { getSafeEnv } from '@/lib/shell-policy.cjs';
 import {
   parseEditBlocks,
   replaceMostSimilarChunk,
@@ -997,7 +998,12 @@ export class HeadlessToolRunner {
     const shellExe = isWin ? process.env.ComSpec || 'cmd.exe' : '/bin/sh';
     const shellArgs = isWin ? ['/d', '/s', '/c', command] : ['-c', command];
 
-    let effectiveEnv: Record<string, string> = { ...(process.env as Record<string, string>) };
+    /* SAFE_ENV allowlist dùng chung với bridge desktop (lib/ipc.cjs): chỉ giữ
+       biến runtime cần thiết, PATH dựng lại từ thư mục hệ thống. Trước đây
+       đường teamwork nhận nguyên `process.env`, nên biến bí mật của repo
+       (VYEN_BRIDGE_TOKEN, OPENROUTER_API_KEY, GH_TOKEN…) đi thẳng vào tiến
+       trình con — EnvScrubber denylist không bắt được các tên này. */
+    let effectiveEnv: Record<string, string> = getSafeEnv(this.workspaceRoot);
     if (envOverrides) {
       Object.assign(effectiveEnv, envOverrides);
     }
@@ -1012,6 +1018,10 @@ export class HeadlessToolRunner {
         windowsHide: true,
         windowsVerbatimArguments: isWin,
         env: effectiveEnv as NodeJS.ProcessEnv,
+        /* detached + process group: nếu không, `killProcessTree` gọi
+           `process.kill(-pid)` trên tiến trình không dẫn đầu group sẽ thất bại
+           và tiến trình cháu sống sót qua timeout (đã đo: con ở trạng thái S). */
+        detached: !isWin,
       });
 
       let stdout = '';
@@ -1113,7 +1123,7 @@ export class HeadlessToolRunner {
     const shellExe = isWin ? process.env.ComSpec || 'cmd.exe' : '/bin/sh';
     const shellArgs = isWin ? ['/d', '/s', '/c', command] : ['-c', command];
 
-    let effectiveEnv: Record<string, string> = { ...(process.env as Record<string, string>), ...options?.env };
+    let effectiveEnv: Record<string, string> = { ...getSafeEnv(this.workspaceRoot), ...(options?.env ?? {}) };
     if (this.envScrubber) {
       effectiveEnv = EnvScrubber.scrub(effectiveEnv);
     }

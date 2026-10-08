@@ -593,3 +593,63 @@ qua `isFocused` + `PulseGlow` — vòng quanh textarea là dư).
   - [x] D4 3 test khoá hợp đồng, đã thử phá để chắc không rỗng
   - [ ] D5 `vitest related` + `tsc --noEmit` + `docs:check` xanh sau D1–D4
   - [x] Verify: vitest related 623 + rest 346 + chốt 212, `tsc` 0, `docs:check` 0
+
+---
+
+## ĐỢT VÁ BẢO MẬT SANDBOX (2026-10-08) — từ báo cáo audit 4 lớp
+
+Phạm vi chốt với người dùng: Mục 1+2 chuyển hẳn worker_threads; Mục 4 giữ code
+`lib/os-sandbox/`, chỉ sửa tài liệu; làm hết Mục 3, 5, 6, 7, 8.
+
+### Bước & bằng chứng
+
+- [x] **M1+M2 — Code Mode worker_threads**: `executeCodeMode` tạo `Worker` mỗi
+  lượt (`eval`, `env: {}`, `argv/execArgv: []`, `resourceLimits` 128/32/4MB),
+  `mcp.call` chỉ qua postMessage; bridge trong worker bọc MỌI hàm host
+  try/catch rồi rethrow `Error` tạo trong realm sandbox; hết hạn/thành công đều
+  `terminate()`. Bằng chứng: `npx vitest run tests/code-mode.test.ts
+  tests/code-mode-escape.test.ts` → 44/44 xanh; 2 test mới tái hiện đúng 2 lỗi
+  cũ (escape qua lỗi host ném; vòng `while(true) await null` từng làm host bị
+  `timeout` giết mã 124 — nay timer host vẫn tick và worker bị terminate).
+- [x] **M3+M8 — shell policy**: `compileShellCommand(raw, { workspaceRoot, cwd })`
+  đưa tham số đường dẫn của cat/head/tail/ls/dir/grep/rg… qua realpath jail;
+  chặn `--pre/--output/--no-index`; `isGitAutoApprovable` allowlist cờ theo
+  subcommand (branch chỉ list/`-a`/`-r`/`--show-current`; `branch <tên>`,
+  `stash push`, `remote add` không tự duyệt); `npm/pnpm/yarn install` chặn
+  `-g/--global/--prefix/--location=global` + spec URL/tarball/git. Bằng chứng:
+  P0.6 trong `tests/p0-security-audit.test.ts` (đúng các lệnh trong báo cáo) +
+  `npm run verify:security` xanh.
+- [x] **M6+M7 — teamwork shell**: `shellRun`/`process_start`/`executeSandboxed`
+  lấy `getSafeEnv` làm nền (allowlist, PATH dựng lại) thay `process.env`;
+  spawn chuẩn thêm `detached: !isWin` để `process.kill(-pid)` diệt cả cây.
+  Bằng chứng: `tests/teamwork-shell-hardening.test.ts` — biến VYEN_*/
+  OPENROUTER_API_KEY/GH_TOKEN/SSH_AUTH_SOCK ra `[null,…]`; `sleep` con chết
+  theo process group sau timeout (trước vá: trạng thái S, sống tiếp).
+- [x] **M5 — CwdGuard**: symlink trong workspace trỏ ra ngoài bị chặn bằng
+  `resolveWithin` (realpath jail), vẫn cho thư mục thật, chặn `.git`/
+  `node_modules`/`..`. Bằng chứng: cùng file test trên (2 test).
+- [x] **M4 — tài liệu os-sandbox**: giữ nguyên code; `DOCS_TSX_ARCHITECTURE.md`
+  sửa header v6.0, residual B1 và ghi chú §6: `lib/os-sandbox/` chưa nối vào
+  đường chạy lệnh nào, test chỉ so chuỗi argv, kèm danh sách lỗi đã ghi nhận.
+  `npm run docs:check` → 0 lệch.
+- [x] Typecheck/lint/regression: xem mục "Kết quả chạy" bên dưới.
+
+### Ngoài phạm vi (ghi lại để đợt sau)
+
+- Cách ly THẬT cho `run_code`: tiến trình con + permission model của Node
+  (`--permission`, alias cũ `--experimental-permission`; Node hiện tại
+  v22.23.2 có cả hai alias) — worker thread vẫn cùng process nên escape thành
+  công chạm được filesystem của worker (dù `env: {}` không có secret).
+- Nối `lib/os-sandbox/` thật (fail-closed theo setting) hoặc gỡ hẳn.
+
+### Kết quả chạy (trên bản sao này, 2026-10-08)
+
+- [x] `npm run typecheck` → 0 lỗi (sau khi thêm JSDoc `@returns` cho `getSafeEnv`).
+- [x] `npm run lint` → 0 error, 10 warning có sẵn từ trước (không warning nào ở file của đợt này).
+- [x] `npx vitest related <7 file vừa sửa> --run` → 35 file / 686 test PASS.
+- [x] Full suite chia 4 shard: **225 file / 3.764 passed / 2 skipped / 0 failed**
+      (57+56+56+56 file).
+- [x] `npm run verify:security` (phase1 + sprint-s1 + sprint-s2) → PASS.
+- [x] `npm run docs:check` → 0 lệch.
+- [x] `git status` sạch ngoài các file của đợt này: đã hoàn `package-lock.json`
+      (npm tự bỏ optional dep Windows khi cài trên Linux) và anchor log sinh bởi test.

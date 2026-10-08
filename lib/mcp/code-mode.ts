@@ -11,25 +11,49 @@
  * - Output được cắt tối đa 24.000 ký tự (quy chuẩn Vyen).
  * - Vẫn tuân thủ đầy đủ cổng phê duyệt an toàn (auto-pilot / modal).
  *
- * Ranh giới bảo mật: `node:vm` KHÔNG phải sandbox cách ly — nó chỉ an toàn khi
- * KHÔNG có object/function thuộc realm host lọt vào context. Mọi intrinsic của
- * host (kể cả `Object`, `Math`, `setTimeout`, hay object trả về từ MCP) đều mở
- * đường về host qua `.constructor` → `Function` của host → `process`.
- * Vì vậy bridge được cài TỪ BÊN TRONG realm của context, và hàm host chỉ tồn
- * tại dưới dạng tham số của hàm sandbox (xem SANDBOX_BRIDGE_SOURCE).
+ * Ranh giới bảo mật (đợt vá 2026-10-08):
+ * - Mã model chạy trong WORKER THREAD riêng (`node:worker_threads`), KHÔNG còn
+ *   chạy trên event loop của host. Vòng lặp promise vi mô
+ *   (`while (true) await null`) chỉ làm đói worker; timer của host vẫn chạy.
+ *   Hết hạn thì `worker.terminate()` dừng cứng worker — không còn kiểu "giảm
+ *   thiểu bằng clear timer" như bản in-process (bản cũ vẫn treo host vì code
+ *   chạy đồng bộ/microtask trên chính event loop của host).
+ * - Worker nhận `env: {}`, `argv: []`, `execArgv: []` và `resourceLimits`
+ *   (RAM/stack) — không kế thừa biến môi trường của host, nên secret không đi
+ *   qua env dù worker có bị thoát khỏi vm.
+ * - `node:vm` KHÔNG phải ranh giới cách ly — nó chỉ an toàn khi KHÔNG có
+ *   object/function thuộc realm host lọt vào context. Vì vậy bridge được cài TỪ
+ *   BÊN TRONG realm của context, và MỌI hàm host (kể cả hàm ném lỗi) được bọc
+ *   try/catch rồi rethrow `Error` tạo TRONG realm sandbox: code sandbox bắt được
+ *   lỗi cũng không lấy được `Function` của realm host qua `.constructor`.
+ * - `mcp.call` chỉ đi qua `postMessage`; kết quả MCP được clone bằng JSON ngay
+ *   trong sandbox nên object thật của host không bao giờ lọt vào context.
+ *
+ * Giới hạn còn lại (chưa nối trong phạm vi này): worker thread vẫn CÙNG process
+ * với host — escape thành công sẽ chạm được filesystem của worker (dù không có
+ * env), không chỉ `process.pid`. Cách ly thật cần tiến trình con với permission
+ * model của Node: `--permission` (Node >= 22.13, alias cũ `--experimental-permission`;
+ * môi trường hiện tại Node v22.23.2 — `node --help` có cả hai alias). Việc đó cần
+ * đổi cách khởi động tiến trình nên để đợt sau.
  */
 
-import vm from 'node:vm';
+import { Worker } from 'node:worker_threads';
 import { z } from 'zod';
 import { tool } from 'ai';
 
 export const CODE_MODE_MAX_OUTPUT_CHARS = 24_000;
 export const CODE_MODE_DEFAULT_TIMEOUT_MS = 30_000;
-/** Trần cứng. Mã của model chạy đồng bộ trong `vm` nên nó CHẶN event loop của
- *  host trong suốt thời gian chạy (đo: spin 1.2s → 0 tick timer host). Trần này
- *  là thời gian UI có thể đứng trong trường hợp xấu nhất; hạ từ 120s xuống 60s
- *  cắt một nửa rủi ro treo mà vẫn dư cho lượt code bình thường (mặc định 30s). */
+/** Trần cứng. Mã của model chạy trong worker thread riêng nên không còn chặn
+ *  event loop của host; trần này chỉ để một lượt code không giữ worker quá lâu
+ *  (mỗi lượt tạo worker mới và `terminate()` khi xong). */
 export const CODE_MODE_MAX_TIMEOUT_MS = 60_000;
+
+/** Giới hạn tài nguyên của worker: sandbox không được ngốn RAM/stack của host. */
+const CODE_MODE_WORKER_RESOURCE_LIMITS = {
+  maxOldGenerationSizeMb: 128,
+  maxYoungGenerationSizeMb: 32,
+  stackSizeMb: 4,
+} as const;
 
 /** Ép `timeoutMs` (kể cả giá trị từ client qua bridge) vào khoảng [1s, 60s]. */
 export function clampCodeModeTimeout(ms: number | undefined): number {
@@ -83,11 +107,25 @@ export function truncateCodeOutput(
  *   nó là `Function` của host.
  * - `setTimeout` trả về id dạng SỐ (primitive qua realm an toàn), không trả
  *   handle Timeout của host (handle là object realm host → lại là cửa escape).
+ * - MỌI lỗi ném ra từ hàm host được bắt TRONG bridge rồi rethrow `Error` mới
+ *   tạo trong realm sandbox. Nếu để lỗi host (ví dụ `new Error` do mcpCaller
+ *   ném, hay `JSON.stringify` của host ném trên object vòng) xuyên thẳng vào
+ *   sandbox thì `err.constructor.constructor` chính là `Function` của host —
+ *   đúng vector escape đã đo được từ trước đợt vá này.
  */
 const SANDBOX_BRIDGE_SOURCE = `(function (hostCall, hostLog, hostSetTimeout, hostClearTimeout) {
   'use strict';
+  var sandboxError = function (prefix, err) {
+    var message = err && err.message ? String(err.message) : String(err);
+    return new Error(prefix + message);
+  };
   var callHost = async function (serverId, toolName, args) {
-    var hostResult = await hostCall(String(serverId), String(toolName), args);
+    var hostResult;
+    try {
+      hostResult = await hostCall(String(serverId), String(toolName), args);
+    } catch (err) {
+      throw sandboxError('MCP call thất bại: ', err);
+    }
     if (hostResult === undefined) return undefined;
     var kind = typeof hostResult;
     if (kind === 'function') return undefined;
@@ -103,7 +141,11 @@ const SANDBOX_BRIDGE_SOURCE = `(function (hostCall, hostLog, hostSetTimeout, hos
       return await callHost(serverId, toolName, args);
     },
     log: function () {
-      hostLog.apply(null, arguments);
+      try {
+        hostLog.apply(null, arguments);
+      } catch (err) {
+        throw sandboxError('console.log thất bại: ', err);
+      }
     },
   };
   globalThis.mcp = bridge;
@@ -116,17 +158,156 @@ const SANDBOX_BRIDGE_SOURCE = `(function (hostCall, hostLog, hostSetTimeout, hos
   globalThis.setTimeout = function (fn, ms) {
     if (typeof fn !== 'function') throw new TypeError('setTimeout yêu cầu callback là hàm.');
     var extra = Array.prototype.slice.call(arguments, 2);
-    return hostSetTimeout(function () {
-      return fn.apply(undefined, extra);
-    }, ms);
+    try {
+      return hostSetTimeout(function () {
+        return fn.apply(undefined, extra);
+      }, ms);
+    } catch (err) {
+      throw sandboxError('setTimeout thất bại: ', err);
+    }
   };
   globalThis.clearTimeout = function (handle) {
-    return hostClearTimeout(handle);
+    try {
+      return hostClearTimeout(handle);
+    } catch (err) {
+      throw sandboxError('clearTimeout thất bại: ', err);
+    }
   };
 })`;
 
 /**
- * Thực thi đoạn mã JavaScript trong sandbox Node.js VM.
+ * Source của worker — chạy trong thread riêng, chỉ giao tiếp với host qua
+ * `postMessage`. Không import module dự án (worker `eval` chỉ có builtin của
+ * Node), nhận user code + bridge source qua `workerData`.
+ */
+const CODE_MODE_WORKER_SOURCE = `
+'use strict';
+const { parentPort, workerData } = require('node:worker_threads');
+const vm = require('node:vm');
+
+const logs = [];
+function captureLog() {
+  try {
+    const line = Array.prototype.map
+      .call(arguments, function (a) {
+        return typeof a === 'object' && a !== null ? JSON.stringify(a, null, 2) : String(a);
+      })
+      .join(' ');
+    logs.push(line);
+  } catch (err) {
+    logs.push('[log error] ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
+let nextRequestId = 1;
+const pendingCalls = new Map();
+function hostCall(serverId, toolName, args) {
+  return new Promise(function (resolve, reject) {
+    const id = nextRequestId++;
+    pendingCalls.set(id, { resolve: resolve, reject: reject });
+    try {
+      parentPort.postMessage({ type: 'mcp-call', id: id, serverId: serverId, toolName: toolName, args: args });
+    } catch (err) {
+      pendingCalls.delete(id);
+      reject(new Error('Không gửi được yêu cầu MCP qua worker: ' + (err && err.message ? err.message : String(err))));
+    }
+  });
+}
+
+parentPort.on('message', function (msg) {
+  if (!msg || msg.type !== 'mcp-result') return;
+  const entry = pendingCalls.get(msg.id);
+  if (!entry) return;
+  pendingCalls.delete(msg.id);
+  if (msg.ok) entry.resolve(msg.value);
+  else entry.reject(new Error(String(msg.error)));
+});
+
+let timerSeq = 0;
+const timers = new Map();
+function hostSetTimeout(fn, ms) {
+  if (typeof fn !== 'function') throw new TypeError('setTimeout yêu cầu callback là hàm.');
+  const delay = Math.min(Math.max(Number(ms) || 0, 0), 2147483647);
+  const id = ++timerSeq;
+  const handle = setTimeout(function () {
+    timers.delete(id);
+    try {
+      fn();
+    } catch (err) {
+      /* Callback của sandbox ném lỗi là chuyện nội bộ của nó — không được làm sập worker. */
+    }
+  }, delay);
+  timers.set(id, handle);
+  return id;
+}
+function hostClearTimeout(handle) {
+  const id = Number(handle);
+  const timer = timers.get(id);
+  if (timer) {
+    clearTimeout(timer);
+    timers.delete(id);
+  }
+}
+
+/* Context KHÔNG nạp gì từ worker. Bẫy đã đo: vm.createContext({}) khiến chuỗi
+   prototype của global chạy về Object.prototype của HOST (worker) →
+   globalThis.constructor.constructor('return process')() lấy được process.
+   Cách vá: sandbox object phải có prototype NULL, rồi gắn prototype chuẩn của
+   realm SANDBOX bằng setPrototypeOf chạy TRONG context. */
+const context = vm.createContext(Object.create(null));
+vm.runInContext('Object.setPrototypeOf(globalThis, Object.prototype)', context, {
+  filename: 'code-mode-realm-fix.js',
+});
+
+const installBridge = vm.runInContext(workerData.bridgeSource, context, {
+  filename: 'code-mode-bridge.js',
+});
+installBridge(hostCall, captureLog, hostSetTimeout, hostClearTimeout);
+
+function sanitizeResult(value) {
+  if (value === undefined) return { present: false };
+  try {
+    return { present: true, value: structuredClone(value) };
+  } catch (err) {
+    /* rơi xuống JSON */
+  }
+  try {
+    return { present: true, value: JSON.parse(JSON.stringify(value)) };
+  } catch (err) {
+    /* rơi xuống String */
+  }
+  return { present: true, value: String(value) };
+}
+
+function finish(value) {
+  parentPort.postMessage({ type: 'result', logs: logs, result: sanitizeResult(value) });
+}
+function fail(err) {
+  parentPort.postMessage({
+    type: 'error',
+    logs: logs,
+    message: String(err && err.message ? err.message : err),
+  });
+}
+
+try {
+  const wrapped = '(async () => {\\n' + workerData.code + '\\n})()';
+  const script = new vm.Script(wrapped, { filename: 'code-mode.js' });
+  const promise = script.runInContext(context, { displayErrors: true });
+  Promise.resolve(promise).then(finish, fail);
+} catch (err) {
+  fail(err);
+}
+`;
+
+const EMPTY_LOGS: string[] = [];
+
+function extractLogs(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((line): line is string => typeof line === 'string') : EMPTY_LOGS;
+}
+
+/**
+ * Thực thi đoạn mã JavaScript trong worker thread cách ly, có trần thời gian cứng.
  */
 export async function executeCodeMode(
   code: string,
@@ -136,129 +317,15 @@ export async function executeCodeMode(
   const timeoutMs = clampCodeModeTimeout(options.timeoutMs);
   const maxChars = options.maxOutputChars ?? CODE_MODE_MAX_OUTPUT_CHARS;
 
-  const logs: string[] = [];
-
-  const captureLog = (...args: unknown[]) => {
-    const line = args
-      .map((a) => (typeof a === 'object' && a !== null ? JSON.stringify(a, null, 2) : String(a)))
-      .join(' ');
-    logs.push(line);
+  const buildErrorResult = (errorMsg: string, logs: string[]): CodeModeResult => {
+    const durationMs = Date.now() - startTime;
+    const logOutput = logs.join('\n').trim();
+    const errorOutput = logOutput ? `${logOutput}\n\n[Lỗi]: ${errorMsg}` : `[Lỗi]: ${errorMsg}`;
+    const { text: finalOutput, truncated } = truncateCodeOutput(errorOutput, maxChars);
+    return { ok: false, output: finalOutput, error: errorMsg, durationMs, truncated };
   };
 
-  /**
-   * Trạng thái huỷ của lượt chạy (A2). Khi hết thời gian (hoặc lượt chạy kết
-   * thúc), mọi timer còn treo bị clear và `mcp.call` sau đó bị từ chối.
-   *
-   * Đây là GIẢM THIỂU, không phải dừng cứng: một vòng lặp promise tự dựng
-   * (không dùng timer, không qua mcp.call) vẫn có thể chạy nền. Dừng cứng thật
-   * sự cần worker thread — chưa làm trong phạm vi này.
-   */
-  let cancelled = false;
-  let timerSeq = 0;
-  const timers = new Map<number, NodeJS.Timeout>();
-
-  const cancelRun = () => {
-    cancelled = true;
-    for (const handle of timers.values()) clearTimeout(handle);
-    timers.clear();
-  };
-
-  const hostCall = async (
-    serverId: string,
-    toolName: string,
-    args: Record<string, unknown> = {},
-  ): Promise<unknown> => {
-    if (cancelled) {
-      throw new Error(`Code Mode đã kết thúc hoặc quá thời gian — từ chối gọi ${serverId}/${toolName}.`);
-    }
-    if (!options.mcpCaller) {
-      throw new Error(`MCP caller chưa được cấu hình cho Code Mode khi gọi ${serverId}/${toolName}.`);
-    }
-    return await options.mcpCaller(serverId, toolName, args);
-  };
-
-  const hostSetTimeout = (fn: unknown, ms?: unknown): number => {
-    if (cancelled) return -1;
-    if (typeof fn !== 'function') {
-      throw new TypeError('setTimeout yêu cầu callback là hàm.');
-    }
-    const delay = Math.min(Math.max(Number(ms) || 0, 0), 2_147_483_647);
-    const id = ++timerSeq;
-    const handle = setTimeout(() => {
-      timers.delete(id);
-      if (cancelled) return;
-      try {
-        (fn as () => void)();
-      } catch {
-        /* Callback của sandbox ném lỗi là chuyện nội bộ của nó — không được làm sập host. */
-      }
-    }, delay);
-    timers.set(id, handle);
-    return id;
-  };
-
-  const hostClearTimeout = (handle: unknown): void => {
-    const id = Number(handle);
-    const timer = timers.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      timers.delete(id);
-    }
-  };
-
-  /* Context KHÔNG nạp gì từ host. Bẫy ĐÃ ĐO BẰNG PROBE: `vm.createContext({})`
-     khiến chuỗi prototype của global chạy về `Object.prototype` của HOST →
-     `globalThis.constructor.constructor('return process')()` lấy được pid host
-     (escape thật, xem probe-code-mode-adversarial + tests/code-mode-escape).
-     Cách vá kiểm chứng được: sandbox object phải có prototype NULL, rồi gắn
-     prototype chuẩn của realm SANDBOX bằng setPrototypeOf chạy TRONG context
-     (sau bước này `globalThis.constructor === Object` của sandbox và mọi
-     intrinsic vẫn dùng được bình thường). */
-  const context = vm.createContext(Object.create(null));
-  vm.runInContext('Object.setPrototypeOf(globalThis, Object.prototype)', context, {
-    filename: 'code-mode-realm-fix.js',
-  });
-
-  const installBridge = vm.runInContext(SANDBOX_BRIDGE_SOURCE, context, {
-    filename: 'code-mode-bridge.js',
-  }) as (
-    hostCall: unknown,
-    hostLog: unknown,
-    hostSetTimeout: unknown,
-    hostClearTimeout: unknown,
-  ) => void;
-
-  installBridge(hostCall, captureLog, hostSetTimeout, hostClearTimeout);
-
-  // Đóng gói code vào async IIFE để hỗ trợ top-level await và return
-  const wrappedScript = `(async () => {\n${code}\n})()`;
-
-  try {
-    const script = new vm.Script(wrappedScript, {
-      filename: 'code-mode.js',
-    });
-
-    // Thực thi script trả về Promise
-    const promise = script.runInContext(context, {
-      timeout: timeoutMs,
-      displayErrors: true,
-    }) as Promise<unknown>;
-
-    // Chờ promise với timeout race
-    let timer: NodeJS.Timeout | null = null;
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        reject(new Error(`Thực thi mã quá thời gian cho phép (${timeoutMs / 1000}s).`));
-      }, timeoutMs);
-    });
-
-    let rawResult: unknown;
-    try {
-      rawResult = await Promise.race([promise, timeoutPromise]);
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-
+  const buildSuccessResult = (rawResult: unknown, logs: string[]): CodeModeResult => {
     const durationMs = Date.now() - startTime;
     const logOutput = logs.join('\n').trim();
 
@@ -302,25 +369,155 @@ export async function executeCodeMode(
       durationMs,
       truncated: outputTruncated || returnValueTruncated,
     };
-  } catch (err: unknown) {
-    const durationMs = Date.now() - startTime;
-    const errorMsg = String(err instanceof Error ? err.message : err);
-    const logOutput = logs.join('\n').trim();
-    const errorOutput = logOutput ? `${logOutput}\n\n[Lỗi]: ${errorMsg}` : `[Lỗi]: ${errorMsg}`;
-    const { text: finalOutput, truncated } = truncateCodeOutput(errorOutput, maxChars);
+  };
 
-    return {
-      ok: false,
-      output: finalOutput,
-      error: errorMsg,
-      durationMs,
-      truncated,
+  return new Promise<CodeModeResult>((resolve) => {
+    let settled = false;
+    let timer: NodeJS.Timeout | null = null;
+    let worker: Worker | null = null;
+
+    const finish = (result: CodeModeResult): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (!worker) {
+        resolve(result);
+        return;
+      }
+      /* terminate() dừng cứng worker: mọi timer/promise/microtask còn treo trong
+         sandbox chết theo, không thể chạy nền sau khi lượt chạy kết thúc. */
+      void worker
+        .terminate()
+        .catch(() => {})
+        .then(() => resolve(result));
     };
-  } finally {
-    // Hết lượt chạy (thành công, lỗi, hay quá hạn) → clear timer còn treo và
-    // chặn mọi mcp.call đến muộn từ code chạy nền.
-    cancelRun();
-  }
+
+    const respond = (payload: Record<string, unknown>): void => {
+      if (settled || !worker) return;
+      try {
+        worker.postMessage(payload);
+      } catch (err) {
+        // Kết quả MCP có thể chứa thứ không clone được qua ranh giới worker.
+        if (payload.ok) {
+          try {
+            worker.postMessage({
+              type: 'mcp-result',
+              id: payload.id,
+              ok: false,
+              error: `Kết quả MCP không chuyển được qua ranh giới worker: ${err instanceof Error ? err.message : String(err)}`,
+            });
+          } catch {
+            /* worker đã chết */
+          }
+        }
+      }
+    };
+
+    const handleMcpCall = (msg: Record<string, unknown>): void => {
+      const id = typeof msg.id === 'number' ? msg.id : -1;
+      const serverId = String(msg.serverId);
+      const toolName = String(msg.toolName);
+      const args = (
+        typeof msg.args === 'object' && msg.args !== null ? msg.args : {}
+      ) as Record<string, unknown>;
+
+      if (!options.mcpCaller) {
+        respond({
+          type: 'mcp-result',
+          id,
+          ok: false,
+          error: `MCP caller chưa được cấu hình cho Code Mode khi gọi ${serverId}/${toolName}.`,
+        });
+        return;
+      }
+
+      void Promise.resolve()
+        .then(() => options.mcpCaller!(serverId, toolName, args))
+        .then(
+          (value) => respond({ type: 'mcp-result', id, ok: true, value }),
+          (err) =>
+            respond({
+              type: 'mcp-result',
+              id,
+              ok: false,
+              error: String(err instanceof Error ? err.message : err),
+            }),
+        );
+    };
+
+    try {
+      worker = new Worker(CODE_MODE_WORKER_SOURCE, {
+        eval: true,
+        workerData: { code, bridgeSource: SANDBOX_BRIDGE_SOURCE },
+        name: 'vyen-code-mode',
+        // Không kế thừa env/argv/execArgv của host: dù worker có bị thoát khỏi
+        // vm, `process.env` bên trong cũng rỗng và cờ Node của host không lọt vào.
+        env: {},
+        argv: [],
+        execArgv: [],
+        resourceLimits: CODE_MODE_WORKER_RESOURCE_LIMITS,
+        // Không để stdout/stderr của worker chảy thẳng vào log của host; pipe
+        // được drain bằng resume() bên dưới.
+        stdout: true,
+        stderr: true,
+      });
+    } catch (err) {
+      finish(buildErrorResult(err instanceof Error ? err.message : String(err), EMPTY_LOGS));
+      return;
+    }
+
+    // Luôn drain để sandbox có lỡ ghi vào stdout của worker cũng không bị chặn
+    // bởi backpressure, và cũng không rơi vào log của host.
+    worker.stdout?.resume();
+    worker.stderr?.resume();
+
+    worker.on('message', (msg: unknown) => {
+      if (settled || !msg || typeof msg !== 'object') return;
+      const m = msg as Record<string, unknown>;
+
+      if (m.type === 'mcp-call') {
+        handleMcpCall(m);
+        return;
+      }
+
+      if (m.type === 'result') {
+        const logs = extractLogs(m.logs);
+        const payload = (typeof m.result === 'object' && m.result !== null ? m.result : {}) as {
+          present?: unknown;
+          value?: unknown;
+        };
+        const rawResult = payload.present ? payload.value : undefined;
+        try {
+          finish(buildSuccessResult(rawResult, logs));
+        } catch (err) {
+          finish(buildErrorResult(err instanceof Error ? err.message : String(err), logs));
+        }
+        return;
+      }
+
+      if (m.type === 'error') {
+        finish(
+          buildErrorResult(
+            String(m.message ?? 'Lỗi không xác định trong worker Code Mode.'),
+            extractLogs(m.logs),
+          ),
+        );
+      }
+    });
+
+    worker.on('error', (err: Error) => {
+      finish(buildErrorResult(String(err instanceof Error ? err.message : err), EMPTY_LOGS));
+    });
+
+    worker.on('exit', (exitCode: number) => {
+      if (settled) return;
+      finish(buildErrorResult(`Worker Code Mode kết thúc bất thường (exit ${exitCode}).`, EMPTY_LOGS));
+    });
+
+    timer = setTimeout(() => {
+      finish(buildErrorResult(`Thực thi mã quá thời gian cho phép (${timeoutMs / 1000}s).`, EMPTY_LOGS));
+    }, timeoutMs);
+  });
 }
 
 /* ------------------------------------------------------------------ */

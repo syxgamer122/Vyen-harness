@@ -10,6 +10,7 @@ import { EnvScrubber } from './env-scrubber';
 import { TempIsolationManager } from './temp-isolation';
 import { SandboxedExecutionOptions, SandboxedExecutionResult } from './types';
 import { spawnArgv } from '@/lib/safe-spawn';
+import { getSafeEnv } from '@/lib/shell-policy.cjs';
 
 export class SandboxedProcessManager {
   /**
@@ -72,7 +73,10 @@ export class SandboxedProcessManager {
     const shouldScrub = options.scrubSensitiveEnv !== false;
 
     if (shouldScrub) {
-      effectiveEnv = EnvScrubber.scrub(process.env, {
+      /* Nền là SAFE_ENV allowlist (dùng chung với bridge desktop) thay vì
+         `process.env` + denylist: biến bí mật không tên trong denylist như
+         VYEN_BRIDGE_TOKEN/GH_TOKEN/NPM_TOKEN không còn đi vào tiến trình con. */
+      effectiveEnv = EnvScrubber.scrub(getSafeEnv(workspaceRoot), {
         ...options.scrubConfig,
         allowlistKeys: options.envWhiteList ?? options.scrubConfig?.allowlistKeys,
         customEnv: {

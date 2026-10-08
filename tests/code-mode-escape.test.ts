@@ -436,3 +436,120 @@ describe('Code Mode — trần timeout bị chặn cứng', () => {
     expect(clampCodeModeTimeout(12_345)).toBe(12_345);
   });
 });
+
+describe('Code Mode — lỗi ném từ hàm host không mở lại đường realm (Mục 1)', () => {
+  it('mcpCaller ném Error của host → sandbox chỉ nhận Error realm sandbox', async () => {
+    const result = await runEscapeProbe(
+      `
+        try {
+          await mcp.call('srv', 'boom', {});
+          return { escaped: false, note: 'không nhận được lỗi' };
+        } catch (err) {
+          try {
+            const hostProcess = err.constructor.constructor('return process')();
+            return { escaped: true, pid: hostProcess.pid };
+          } catch (err2) {
+            return { escaped: false, error: String(err2) };
+          }
+        }
+      `,
+      { mcpCaller: async () => { throw new Error('host realm boom'); } },
+    );
+    expectBlocked(result);
+  });
+
+  it('mcpCaller trả object không clone được qua worker → sandbox nhận lỗi realm sandbox', async () => {
+    const result = await runEscapeProbe(
+      `
+        try {
+          await mcp.call('srv', 'unclonable', {});
+          return { escaped: false, note: 'không nhận được lỗi' };
+        } catch (err) {
+          try {
+            const hostProcess = err.constructor.constructor('return process')();
+            return { escaped: true, pid: hostProcess.pid };
+          } catch (err2) {
+            return { escaped: false, error: String(err2) };
+          }
+        }
+      `,
+      { mcpCaller: async () => ({ fn: () => 'không clone được' }) },
+    );
+    expectBlocked(result);
+  });
+
+  it('console.log object vòng (JSON.stringify ném ở host) không escape', async () => {
+    const result = await runEscapeProbe(`
+      try {
+        const circular = {};
+        circular.self = circular;
+        console.log(circular);
+        return { escaped: false, note: 'console.log không ném' };
+      } catch (err) {
+        try {
+          const hostProcess = err.constructor.constructor('return process')();
+          return { escaped: true, pid: hostProcess.pid };
+        } catch (err2) {
+          return { escaped: false, error: String(err2) };
+        }
+      }
+    `);
+    expectBlocked(result);
+  });
+
+  it('setTimeout với callback không phải hàm → TypeError realm sandbox', async () => {
+    const result = await runEscapeProbe(`
+      try {
+        setTimeout('không phải hàm', 10);
+        return { escaped: false, note: 'không ném' };
+      } catch (err) {
+        try {
+          const hostProcess = err.constructor.constructor('return process')();
+          return { escaped: true, pid: hostProcess.pid };
+        } catch (err2) {
+          return { escaped: false, error: String(err2) };
+        }
+      }
+    `);
+    expectBlocked(result);
+  });
+});
+
+describe('Code Mode — worker thread không treo event loop của host (Mục 2)', () => {
+  it('vòng await vi mô vô tận bị terminate() khi hết hạn, timer host vẫn chạy', async () => {
+    let ticks = 0;
+    const interval = setInterval(() => {
+      ticks += 1;
+    }, 50);
+    try {
+      const res = await executeCodeMode(
+        `
+          (async () => { while (true) { await null; } })();
+          await new Promise(() => {});
+        `,
+        { timeoutMs: 1000 },
+      );
+      expect(res.ok).toBe(false);
+      expect(res.error).toContain('quá thời gian');
+      // Trước đợt vá, microtask loop chiếm event loop host nên timer không hề chạy.
+      expect(ticks).toBeGreaterThanOrEqual(10);
+    } finally {
+      clearInterval(interval);
+    }
+  }, 15_000);
+
+  it('vòng lặp đồng bộ vô tận chỉ chặn worker, timeout của host vẫn kích hoạt', async () => {
+    let ticks = 0;
+    const interval = setInterval(() => {
+      ticks += 1;
+    }, 50);
+    try {
+      const res = await executeCodeMode(`while (true) {}`, { timeoutMs: 1000 });
+      expect(res.ok).toBe(false);
+      expect(res.error).toContain('quá thời gian');
+      expect(ticks).toBeGreaterThanOrEqual(10);
+    } finally {
+      clearInterval(interval);
+    }
+  }, 15_000);
+});
